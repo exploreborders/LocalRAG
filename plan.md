@@ -138,9 +138,11 @@ This plan provides a high-level overview. Each step may require additional resea
    - Added support for multiple document formats (.txt, .pdf, .docx, .pptx, .xlsx)
 
 ### Next Steps
-- Install and configure Ollama (manual step for user)
-- Prepare sample data
-- Implement embeddings and vector store
-- Build retrieval system
-- Integrate with Ollama LLM
-- Create application interface
+- Install Ollama and test full RAG functionality
+- Add more sample documents in various formats (.pdf, .docx, etc.)
+- Optimize parameters (chunk size, embedding model, retrieval k)
+- Add a web-based interface using Streamlit or Flask
+- Implement document upload and real-time processing
+- Add conversation memory and chat history
+- Implement evaluation metrics for retrieval quality
+- Add support for more embedding models and vector databases
