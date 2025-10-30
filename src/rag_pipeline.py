@@ -2,12 +2,12 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from retrieval import Retriever
 
 class RAGPipeline:
     def __init__(self, model_name="llama2", retriever=None):
-        self.llm = Ollama(model=model_name)
+        self.llm = OllamaLLM(model=model_name)
         if retriever is None:
             self.retriever = Retriever()
         else:
@@ -32,7 +32,7 @@ Question: {question}
 Answer:"""
 
         # Generate answer
-        answer = self.llm(prompt)
+        answer = self.llm.invoke(prompt)
 
         return {
             'result': answer,
