@@ -2,9 +2,12 @@
 """
 Simple CLI for the Local RAG System
 """
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 from retrieval import Retriever, format_results
 from rag_pipeline import RAGPipeline, format_answer
-import sys
 
 def main():
     print("Local RAG System")

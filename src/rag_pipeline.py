@@ -1,10 +1,9 @@
-from langchain_community.llms import Ollama
-from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
-from retrieval import Retriever
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import SentenceTransformerEmbeddings
+import sys
 import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from langchain_community.llms import Ollama
+from retrieval import Retriever
 
 class RAGPipeline:
     def __init__(self, model_name="llama2", retriever=None):
@@ -14,31 +13,31 @@ class RAGPipeline:
         else:
             self.retriever = retriever
 
-        # Create LangChain vector store from FAISS
-        embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
-        # Load FAISS index
-        from vector_store import load_faiss_index
-        from embeddings import load_embeddings
-        index = load_faiss_index()
-        _, documents = load_embeddings()
-
-        # Create FAISS vector store
-        self.vectorstore = FAISS(embeddings.embed_query, index, documents, relevance_score_fn=lambda x: 1/(1+x))
-
-        # Create retrieval QA chain
-        self.qa_chain = RetrievalQA.from_chain_type(
-            llm=self.llm,
-            chain_type="stuff",
-            retriever=self.vectorstore.as_retriever(search_kwargs={"k": 2}),
-            return_source_documents=True
-        )
-
     def query(self, question):
         """
         Answer a question using RAG.
         """
-        result = self.qa_chain({"query": question})
-        return result
+        # Retrieve relevant documents
+        results = self.retriever.retrieve(question, k=2)
+        context = "\n\n".join([result['document'].page_content for result in results])
+
+        # Create prompt
+        prompt = f"""Use the following context to answer the question. If you cannot answer from the context, say so.
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+
+        # Generate answer
+        answer = self.llm(prompt)
+
+        return {
+            'result': answer,
+            'source_documents': [result['document'] for result in results]
+        }
 
 def format_answer(result):
     """

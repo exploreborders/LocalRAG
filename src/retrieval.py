@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 from sentence_transformers import SentenceTransformer
 from vector_store import load_faiss_index, search_similar
 from embeddings import load_embeddings
