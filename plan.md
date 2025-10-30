@@ -94,7 +94,8 @@ This plan provides a high-level overview. Each step may require additional resea
 3. **Data Preparation**
    - Created sample document: `data/sample.txt` with RAG overview
    - Implemented document loader: `src/data_loader.py`
-     - Uses LangChain's TextLoader for .txt files
+     - Supports multiple formats: .txt, .pdf, .docx, .pptx, .xlsx
+     - Uses appropriate libraries for each format (PyPDF2, python-docx, etc.)
      - Implements text splitting with RecursiveCharacterTextSplitter
      - Chunk size: 1000 characters, overlap: 200 characters
 
@@ -134,6 +135,7 @@ This plan provides a high-level overview. Each step may require additional resea
    - Created requirements.txt for dependency management
    - Tested retrieval system with sample queries
    - Verified embedding and vector store functionality
+   - Added support for multiple document formats (.txt, .pdf, .docx, .pptx, .xlsx)
 
 ### Next Steps
 - Install and configure Ollama (manual step for user)

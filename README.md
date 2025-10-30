@@ -4,7 +4,7 @@ A local Retrieval-Augmented Generation system built with Python, Ollama, and FAI
 
 ## Features
 
-- Document loading and text chunking
+- Document loading and text chunking (supports .txt, .pdf, .docx, .pptx, .xlsx)
 - Embedding creation using sentence-transformers
 - Vector storage with FAISS
 - Retrieval system for similarity search
