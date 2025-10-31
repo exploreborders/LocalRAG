@@ -12,6 +12,17 @@
 - Process data: `python -m src.embeddings`
 - Stop databases: `docker-compose down`
 
+## Document Processing Commands
+- Process documents with optimizations: `python scripts/migrate_to_db.py` (uses optimized batch processing)
+- Process with custom settings: `python -c "from src.document_processor import DocumentProcessor; p = DocumentProcessor(); p.process_existing_documents(batch_size=10, use_parallel=True, max_workers=4)"`
+
+## Performance Optimization Settings
+- **Batch Processing**: Documents processed in configurable batches (default: 5)
+- **Parallel Processing**: Multi-worker processing for large document sets (default: 4 workers)
+- **Memory Management**: Automatic memory monitoring with configurable limits (default: 500MB)
+- **Pipeline Optimization**: OCR disabled, table extraction optimized for speed
+- **Converter Reuse**: Single DocumentConverter instance reused across operations
+
 ## Environment Configuration
 - **Local Development**: Use `.env` with localhost settings (currently active)
 - **Docker Deployment**: Environment variables are set automatically in docker-compose.yml
