@@ -13,7 +13,7 @@ from .database.models import SessionLocal, Document, DocumentChunk
 from .embeddings import get_embedding_model
 
 class DatabaseRetriever:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = "all-mpnet-base-v2"):
         self.model_name = model_name
         self.model = get_embedding_model(model_name)
         self.es = Elasticsearch(

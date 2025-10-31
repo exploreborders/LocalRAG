@@ -109,8 +109,7 @@ class DocumentProcessor:
         doc = self.save_document(filepath.name, str(filepath), file_hash, content_type)
 
         # Generate embeddings
-        model = get_embedding_model(model_name)
-        embeddings = create_embeddings(chunks, model)
+        embeddings = create_embeddings(chunks, model_name)
 
         # Save chunks to database
         self.save_chunks(doc.id, chunks, model_name, chunk_size, overlap)

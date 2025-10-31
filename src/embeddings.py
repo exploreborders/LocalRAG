@@ -9,7 +9,7 @@ import os
 import hashlib
 import sys
 
-def create_embeddings(documents, model_name="all-MiniLM-L6-v2", batch_size=32, show_progress=True):
+def create_embeddings(documents, model_name="all-mpnet-base-v2", batch_size=32, show_progress=True):
     """
     Create embeddings for document chunks using sentence-transformers with optimizations.
     """
