@@ -103,7 +103,7 @@ def get_available_embedding_models():
     """Get list of available sentence-transformers models"""
     # Common embedding models to check - focus on the most commonly used ones
     candidate_models = [
-        "nomic-ai/nomic-embed-text-v1.5"  # Only supported model
+        "nomic-ai/nomic-embed-text-v1.5"  # Primary model
     ]
 
     available_models = []

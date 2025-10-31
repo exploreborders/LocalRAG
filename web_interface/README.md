@@ -93,11 +93,11 @@ Theme changes require a full application restart because they modify the Streaml
 - **📈 Presentations**: .pptx (Microsoft PowerPoint)
 
 #### Processing Pipeline
-1. **Upload**: Files are saved to the `data/` directory
-2. **Parsing**: Text extraction based on file type
-3. **Chunking**: Documents split into manageable pieces
-4. **Embedding**: Text converted to vector representations
-5. **Indexing**: Vectors stored in FAISS for fast retrieval
+1. **Upload**: Files are processed temporarily (not permanently stored)
+2. **Parsing**: Advanced text extraction using Docling with layout awareness
+3. **Chunking**: Documents split into manageable pieces with overlap
+4. **Embedding**: Text converted to vector representations using nomic-embed-text-v1.5
+5. **Storage**: Chunks stored in PostgreSQL, vectors indexed in Elasticsearch
 
 ## Configuration
 

@@ -29,9 +29,21 @@ A local Retrieval-Augmented Generation system built with Python, PostgreSQL, Ela
    ```
 
 4. **Set up databases:**
-   - **PostgreSQL**: Install PostgreSQL and create a database. Enable pgvector extension.
-   - **Elasticsearch**: Run via Docker: `docker run -d -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" elasticsearch:8.11.0`
-   - Update `.env` file with database credentials
+    - **Option 1 - Docker Compose (Recommended):**
+      ```bash
+      python setup_databases.py docker
+      ```
+      Or manually: `docker-compose up -d`
+
+      This starts both PostgreSQL (with pgvector) and Elasticsearch with proper configuration.
+
+    - **Option 2 - Local Setup:**
+      ```bash
+      python setup_databases.py local
+      ```
+      Follow the printed instructions for local PostgreSQL and Elasticsearch installation.
+
+    - Update `.env` file with database credentials (see comments in `.env` for Docker vs local settings)
 
 5. **Initialize databases:**
    ```bash
@@ -97,16 +109,18 @@ LocalRAG/
 │   └── components/         # Reusable UI components
 ├── scripts/
 │   └── migrate_to_db.py    # Database migration script
+├── setup_databases.py      # Database setup helper script
 ├── test_system.py          # System tests
 ├── test_performance.py     # Performance benchmarks
 ├── requirements.txt        # Python dependencies
+├── docker-compose.yml      # Docker services configuration
 ├── plan.md                 # Implementation plan
 └── README.md               # This file
 ```
 
 ## Architecture
 
-- **Document Processing**: Documents are parsed using Docling for superior text extraction, then chunked and embedded using all-MiniLM-L6-v2
+- **Document Processing**: Documents are parsed using Docling for superior text extraction, then chunked and embedded using nomic-embed-text-v1.5
 - **Storage**: Chunks and metadata stored in PostgreSQL, embeddings indexed in Elasticsearch
 - **Retrieval**: Hybrid search combining vector similarity and BM25 text search
 - **Generation**: Context from retrieved documents fed to Ollama LLMs for answer generation
@@ -114,8 +128,9 @@ LocalRAG/
 ## Requirements
 
 - Python 3.8+
-- PostgreSQL with pgvector extension
-- Elasticsearch 8.x
+- Docker (recommended for databases) OR:
+  - PostgreSQL with pgvector extension
+  - Elasticsearch 8.x
 - Ollama for local LLM inference
 
 ## Implementation Status

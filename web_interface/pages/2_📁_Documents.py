@@ -110,34 +110,39 @@ def process_uploaded_files(uploaded_files, selected_model="nomic-ai/nomic-embed-
     if not uploaded_files:
         return
 
-    data_dir = Path("data")
-    data_dir.mkdir(exist_ok=True)
+    import tempfile
+    import os
 
     processor = DocumentProcessor()
     processed_count = 0
 
-    for uploaded_file in uploaded_files:
-        # Save file to data directory
-        file_path = data_dir / uploaded_file.name
+    # Use temporary directory for uploads to avoid cluttering data/
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
 
-        # Handle duplicate names
-        counter = 1
-        while file_path.exists():
-            stem = file_path.stem
-            suffix = file_path.suffix
-            file_path = data_dir / f"{stem}_{counter}{suffix}"
-            counter += 1
+        for uploaded_file in uploaded_files:
+            # Save file to temporary directory
+            file_path = temp_path / uploaded_file.name
 
-        # Save the file
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+            # Handle duplicate names (unlikely in temp dir but safe)
+            counter = 1
+            while file_path.exists():
+                stem = file_path.stem
+                suffix = file_path.suffix
+                file_path = temp_path / f"{stem}_{counter}{suffix}"
+                counter += 1
 
-        # Process the file
-        try:
-            processor.process_document(str(file_path), selected_model)
-            processed_count += 1
-        except Exception as e:
-            st.error(f"❌ Failed to process {uploaded_file.name}: {e}")
+            # Save the file temporarily
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+
+            # Process the file
+            try:
+                processor.process_document(str(file_path), selected_model)
+                processed_count += 1
+            except Exception as e:
+                st.error(f"❌ Failed to process {uploaded_file.name}: {e}")
+            # File is automatically cleaned up when temp directory exits
 
     if processed_count > 0:
         st.success(f"✅ Successfully uploaded and processed {processed_count} file(s)")

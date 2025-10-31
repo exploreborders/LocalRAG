@@ -7,11 +7,11 @@
 - Run web interface: `streamlit run web_interface/app.py`
 - Run CLI app: `python -m src.app`
 - Process data: `python -m src.embeddings`
-- Set up databases: PostgreSQL + Elasticsearch via Docker
+- Set up databases: `docker-compose up -d` (PostgreSQL + Elasticsearch)
 - Run migration: `python scripts/migrate_to_db.py`
 - Set up indices: `python src/database/opensearch_setup.py`
 - Performance tests: `python test_performance.py`
-- Deploy: `docker-compose up -d`
+- Stop databases: `docker-compose down`
 
 ## Code Style Guidelines
 - **Imports**: Group stdlib/third-party/local, sort alphabetically, use relative imports
@@ -27,6 +27,6 @@
 - **Text Files**: Direct loading for simple .txt files
 
 ## Model Requirements
-- **Default model: all-MiniLM-L6-v2**: Reliable embedding model for all operations
+- **Default model: nomic-ai/nomic-embed-text-v1.5**: Primary embedding model for all operations (requires einops)
 - **Smart Caching**: Document hash comparison prevents reprocessing
 - **Batch Processing**: Efficient document processing with single model

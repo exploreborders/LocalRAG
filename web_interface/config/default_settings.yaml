@@ -19,6 +19,5 @@ system:
   max_query_history: 10
 paths:
   data_dir: data
-  models_dir: models
-  embeddings_file: models/embeddings.pkl
-  faiss_index_file: models/faiss_index.pkl
+  temp_upload_dir: /tmp/rag_uploads
+  # Note: Storage now uses PostgreSQL + Elasticsearch instead of local files

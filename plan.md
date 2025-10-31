@@ -1,12 +1,13 @@
 # Building a Local RAG System with Python and Ollama
 
 ## Overview
-This project implements a production-ready Local RAG (Retrieval-Augmented Generation) system using PostgreSQL for document storage, Elasticsearch for vector search, and Ollama for local LLM generation. The system provides accurate, context-aware responses by combining efficient document retrieval with generative AI, all running locally for maximum privacy and control.
+This project implements a production-ready Local RAG (Retrieval-Augmented Generation) system using PostgreSQL for document storage, Elasticsearch for vector search, and Ollama for local LLM generation. The system features Docker-based database setup for easy deployment, advanced document processing with Docling, and a modern web interface. It provides accurate, context-aware responses by combining efficient document retrieval with generative AI, all running locally for maximum privacy and control.
 
 ## Prerequisites
 - Python 3.8 or higher
-- PostgreSQL database with pgvector extension
-- Elasticsearch 8.x (via Docker recommended)
+- Docker (recommended for databases) OR:
+  - PostgreSQL database with pgvector extension
+  - Elasticsearch 8.x
 - Ollama installed on your system (download from https://ollama.ai)
 - Basic knowledge of Python and command-line tools
 
@@ -18,9 +19,9 @@ This project implements a production-ready Local RAG (Retrieval-Augmented Genera
 - Install required packages: `pip install -r requirements.txt`
 
 ### 2. Set Up Databases
-- **PostgreSQL**: Install PostgreSQL and enable pgvector extension
-- **Elasticsearch**: Run via Docker: `docker run -d -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" elasticsearch:8.11.0`
-- Configure environment variables in `.env` file
+- **Docker Compose (Recommended)**: `python setup_databases.py docker` or `docker-compose up -d`
+- **Local Setup**: `python setup_databases.py local` for manual installation instructions
+- Both PostgreSQL (with pgvector) and Elasticsearch configured automatically
 
 ### 3. Install and Configure Ollama
 - Install Ollama if not already done
@@ -34,10 +35,10 @@ This project implements a production-ready Local RAG (Retrieval-Augmented Genera
 ### 5. Process Documents
 - Add documents to `data/` directory
 - Process via CLI: `python -m src.app` (choose option 3)
-- Or upload via web interface: `python run_web.py`
+- Or upload via web interface: `streamlit run web_interface/app.py`
 
 ### 6. Start Using the System
-- **Web Interface**: `python run_web.py` - Full-featured UI
+- **Web Interface**: `streamlit run web_interface/app.py` - Full-featured UI
 - **CLI**: `python -m src.app` - Command-line access
 - **Testing**: `python test_system.py` - Verify functionality
 
@@ -77,7 +78,7 @@ This plan provides a high-level overview. Each step may require additional resea
     - **Document Count**: Successfully processing 34 documents into database-backed chunks
 
 4. **Embedding System**
-    - **Primary Model**: all-MiniLM-L6-v2 (384 dimensions) for reliable performance
+    - **Primary Model**: nomic-ai/nomic-embed-text-v1.5 (768 dimensions) for high performance
     - **Database Storage**: PostgreSQL with pgvector for chunk storage
     - **Elasticsearch Indexing**: Vector similarity search with KNN optimization
     - **Performance**: Optimized batch processing and memory management
@@ -163,7 +164,8 @@ This plan provides a high-level overview. Each step may require additional resea
 ### 🎯 **Current System Status**
 
 **✅ Fully Functional Features:**
-- Database-backed document storage with PostgreSQL
+- Docker-based database setup (PostgreSQL + Elasticsearch with single command)
+- Database-backed document storage with PostgreSQL and pgvector
 - Vector search with Elasticsearch for high-performance similarity search
 - Hybrid retrieval combining vector similarity and BM25 text search
 - Advanced document processing with Docling (layout-aware parsing, table extraction)
@@ -176,7 +178,7 @@ This plan provides a high-level overview. Each step may require additional resea
 **📊 System Metrics:**
 - **Database**: PostgreSQL with pgvector + Elasticsearch with dense vectors
 - **Documents Processed**: 34 files with Docling-powered parsing and chunking
-- **Vector Dimensions**: 384 (all-MiniLM-L6-v2 model)
+- **Vector Dimensions**: 768 (nomic-embed-text-v1.5 model)
 - **Web Interface**: 4-page Streamlit application with real-time processing
 - **Performance**: Sub-second query responses with accurate retrieval
 - **Scalability**: Supports large document collections with efficient indexing
@@ -248,14 +250,34 @@ This plan provides a high-level overview. Each step may require additional resea
 - ✅ Add fallback mechanisms for unsupported formats
 
 #### **Model Optimization**
-- ✅ Switch to all-MiniLM-L6-v2 as primary embedding model (more reliable than nomic)
-- ✅ Update all processing pipelines to use the new model
+- ✅ Configure nomic-ai/nomic-embed-text-v1.5 as primary embedding model
+- ✅ Update all processing pipelines to use the nomic model
 - ✅ Maintain backward compatibility with existing document processing
 
 #### **System Updates**
 - ✅ Update AGENTS.md with new document processing guidelines
 - ✅ Update README.md and plan.md with Docling integration details
 - ✅ Clean and optimize requirements.txt
+
+### ✅ **Phase 7: Docker Database Setup (COMPLETED)**
+
+#### **Unified Database Management**
+- ✅ Create setup_databases.py helper script for easy database management
+- ✅ Configure docker-compose.yml with PostgreSQL (pgvector) and Elasticsearch
+- ✅ Implement automatic database health checks and connection testing
+- ✅ Add environment-based database configuration for Docker vs local development
+
+#### **Streamlined Setup Process**
+- ✅ Single-command database startup: `python setup_databases.py docker`
+- ✅ Automatic schema initialization with pgvector extension
+- ✅ Comprehensive setup instructions for both Docker and local environments
+- ✅ Updated documentation with Docker-first approach
+
+#### **Development Workflow Improvements**
+- ✅ Seamless switching between Docker and local database configurations
+- ✅ Environment variable-based configuration for different deployment scenarios
+- ✅ Improved error handling and user feedback during setup
+- ✅ Production-ready Docker configuration with health checks and dependencies
 - ✅ Test end-to-end document processing pipeline
 
 
