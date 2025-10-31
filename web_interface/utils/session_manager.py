@@ -89,41 +89,38 @@ def get_available_embedding_models():
     try:
         from sentence_transformers import SentenceTransformer
         import threading
+        import time
 
         def test_model(model_name, results, index):
             """Test if a model can be loaded within timeout"""
             try:
+                start_time = time.time()
                 # Try to load model with a short timeout
                 # This will download if not cached, but should be fast for cached models
                 model = SentenceTransformer(model_name, device='cpu')
+                load_time = time.time() - start_time
+                print(f"Successfully loaded {model_name} in {load_time:.2f}s")
                 results[index] = model_name
                 del model  # Clean up
-            except Exception:
+            except Exception as e:
+                print(f"Failed to load {model_name}: {str(e)[:100]}...")
                 results[index] = None
 
-        # Test models with timeout (since downloading can take time)
-        threads = []
-        results = [None] * len(candidate_models)
-
-        for i, model_name in enumerate(candidate_models):
-            thread = threading.Thread(target=test_model, args=(model_name, results, i))
-            thread.daemon = True
-            threads.append(thread)
-            thread.start()
-
-        # Wait for all threads with timeout
-        for thread in threads:
-            thread.join(timeout=10)  # 10 second timeout per model
-
-        # Collect successful results
-        for result in results:
-            if result is not None:
-                available_models.append(result)
+        # Test models sequentially to avoid threading issues with PyTorch
+        for model_name in candidate_models:
+            try:
+                model = SentenceTransformer(model_name, device='cpu')
+                available_models.append(model_name)
+                del model  # Clean up
+            except Exception:
+                continue
 
     except ImportError:
+        print("sentence-transformers not available")
         st.warning("sentence-transformers not available. Using default model list.")
         return ["all-MiniLM-L6-v2"]
     except Exception as e:
+        print(f"Error checking embedding models: {e}")
         st.warning(f"Error checking embedding models: {e}")
         return ["all-MiniLM-L6-v2"]
 

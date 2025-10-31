@@ -38,7 +38,7 @@ A local Retrieval-Augmented Generation system built with Python, Ollama, and FAI
 
 5. **Prepare data:**
     - Add your documents to the `data/` directory (currently supports .txt files)
-    - Run data processing: `python -m src.embeddings`
+    - Run data processing: `python -m src.embeddings` (single model) or `python -m src.embeddings --all` (all models)
 
 ## Usage
 

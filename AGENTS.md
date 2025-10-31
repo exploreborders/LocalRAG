@@ -6,7 +6,7 @@
 - Run single test: `python -c "from test_system import test_retrieval; test_retrieval()"`
 - Run web interface: `python run_web.py` or `streamlit run web_interface/app.py` (multipage app)
 - Run CLI app: `python -m src.app`
-- Process data: `python -m src.embeddings`
+- Process data: `python -m src.embeddings` or `python -m src.embeddings --all` (all models)
 - Test retrieval: `python -m src.retrieval`
 
 ## Multi-Model Support

@@ -11,7 +11,10 @@ class Retriever:
         self.model_name = model_name
 
         try:
-            self.model = SentenceTransformer(model_name)
+            # Load model with device specification (same as embeddings.py)
+            import torch
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            self.model = SentenceTransformer(model_name, device=device)
         except Exception as e:
             raise Exception(f"Failed to load embedding model '{model_name}': {e}")
 

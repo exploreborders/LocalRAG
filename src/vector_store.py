@@ -9,23 +9,14 @@ import os
 
 def create_faiss_index(embeddings):
     """
-    Create a FAISS index from embeddings with optimizations.
+    Create a FAISS index from embeddings.
     """
     import numpy as np
 
     dimension = embeddings.shape[1]
 
-    # Use IVF index for better performance with large datasets
-    if embeddings.shape[0] > 1000:
-        # IVF with PQ for better memory efficiency
-        nlist = min(100, max(4, embeddings.shape[0] // 39))  # Rule of thumb: sqrt(n)/4
-        quantizer = faiss.IndexFlatIP(dimension)  # Inner product for normalized embeddings
-        index = faiss.IndexIVFPQ(quantizer, dimension, nlist, 8, 8)  # PQ with 8 bytes per vector
-        index.train(embeddings.astype('float32'))
-    else:
-        # Simple L2 index for small datasets
-        index = faiss.IndexFlatL2(dimension)
-
+    # Use simple L2 index for all cases (most stable)
+    index = faiss.IndexFlatL2(dimension)
     index.add(embeddings.astype('float32'))
     return index
 
@@ -96,7 +87,9 @@ if __name__ == "__main__":
 
     # Test search with a sample query
     from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    import torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = SentenceTransformer("all-MiniLM-L6-v2", device=device)
     query = "What is RAG?"
     query_embedding = model.encode([query])[0]
 

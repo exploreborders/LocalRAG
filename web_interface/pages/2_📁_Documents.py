@@ -180,7 +180,9 @@ def reprocess_documents(selected_model="all-MiniLM-L6-v2"):
                 # Create embeddings
                 st.info(f"📊 Creating embeddings using {selected_model}...")
                 from sentence_transformers import SentenceTransformer
-                model = SentenceTransformer(selected_model)
+                import torch
+                device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                model = SentenceTransformer(selected_model, device=device)
                 texts = [doc.page_content for doc in chunks]
                 embeddings = model.encode(texts, show_progress_bar=True)
 
@@ -243,7 +245,9 @@ def batch_process_documents(selected_models):
                 if needs_processing:
                     # Create embeddings
                     from sentence_transformers import SentenceTransformer
-                    model = SentenceTransformer(model_name)
+                    import torch
+                    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                    model = SentenceTransformer(model_name, device=device)
                     texts = [doc.page_content for doc in chunks]
                     embeddings = model.encode(texts, show_progress_bar=False)
 
@@ -301,11 +305,20 @@ def main():
         st.info(f"📊 Found {len(documents)} document(s)")
 
         # Processing controls
-        col1, col2, col3 = st.columns([2, 1, 1])
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
 
         # Get available embedding models
         from utils.session_manager import get_available_embedding_models
         available_models = get_available_embedding_models()
+
+        # Debug: Show available models
+        if st.checkbox("🔍 Debug: Show available models", value=False):
+            st.write("Available models:", available_models)
+            st.write("Number of models:", len(available_models))
+
+        with col4:
+            if st.button("🔄 Refresh Models", help="Refresh the list of available models"):
+                st.rerun()
 
         with col1:
             selected_model = st.selectbox(
