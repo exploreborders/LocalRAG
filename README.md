@@ -32,14 +32,14 @@ A local Retrieval-Augmented Generation system built with Python, Ollama, and FAI
    - Start server: `ollama serve`
 
 5. **Prepare data:**
-   - Add your documents to the `data/` directory (currently supports .txt files)
-   - Run data processing: `python src/embeddings.py`
+    - Add your documents to the `data/` directory (currently supports .txt files)
+    - Run data processing: `python -m src.embeddings`
 
 ## Usage
 
 ### Run the application:
 ```bash
-python src/app.py
+python -m src.app
 ```
 
 Choose between:
@@ -50,12 +50,12 @@ Choose between:
 
 **Test retrieval:**
 ```bash
-python src/retrieval.py
+python -m src.retrieval
 ```
 
 **Test vector store:**
 ```bash
-python src/vector_store.py
+python -m src.vector_store
 ```
 
 ## Project Structure

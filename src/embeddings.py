@@ -1,5 +1,8 @@
 from sentence_transformers import SentenceTransformer
-from data_loader import load_documents, split_documents
+try:
+    from .data_loader import load_documents, split_documents
+except ImportError:
+    from data_loader import load_documents, split_documents
 import numpy as np
 import pickle
 import os

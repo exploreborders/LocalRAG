@@ -1,6 +1,9 @@
 import faiss
 import numpy as np
-from embeddings import load_embeddings
+try:
+    from .embeddings import load_embeddings
+except ImportError:
+    from embeddings import load_embeddings
 import pickle
 import os
 

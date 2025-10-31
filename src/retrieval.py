@@ -1,10 +1,10 @@
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from sentence_transformers import SentenceTransformer
-from vector_store import load_faiss_index, search_similar
-from embeddings import load_embeddings
+try:
+    from .vector_store import load_faiss_index, search_similar
+    from .embeddings import load_embeddings
+except ImportError:
+    from vector_store import load_faiss_index, search_similar
+    from embeddings import load_embeddings
 
 class Retriever:
     def __init__(self, model_name="all-MiniLM-L6-v2", index_path="models/faiss_index.pkl"):

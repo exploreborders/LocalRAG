@@ -1,9 +1,8 @@
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from langchain_ollama import OllamaLLM
-from retrieval import Retriever
+try:
+    from .retrieval import Retriever
+except ImportError:
+    from retrieval import Retriever
 
 class RAGPipeline:
     def __init__(self, model_name="llama2", retriever=None):
