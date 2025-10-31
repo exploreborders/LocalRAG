@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
 """
 Performance benchmarking for RAG system.
-Compare old FAISS-based system with new database-backed system.
+Tests the database-backed system with Elasticsearch vector search.
 """
 
 import time
 import numpy as np
-from pathlib import Path
 import sys
-import os
 
 # Add src to path
 sys.path.append('src')
 
-from src.retrieval import Retriever as OldRetriever
-from src.retrieval_db import DatabaseRetriever as NewRetriever
-from src.rag_pipeline import RAGPipeline as OldRAG
-from src.rag_pipeline_db import RAGPipelineDB as NewRAG
+from src.retrieval_db import DatabaseRetriever
+from src.rag_pipeline_db import RAGPipelineDB
 
 def benchmark_retrieval():
     """Benchmark retrieval performance"""

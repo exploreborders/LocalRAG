@@ -240,70 +240,7 @@ def main():
     # Track if settings have changed
     settings_changed = False
 
-    # Retrieval Settings
-    st.markdown("### 🔍 Retrieval Settings")
-    with st.container():
-        st.markdown('<div class="setting-group">', unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-
-        with col1:
-            chunk_size = st.slider(
-                "Document Chunk Size",
-                min_value=500,
-                max_value=2000,
-                value=settings.get('retrieval', {}).get('chunk_size', 1000),
-                step=100,
-                help="Size of text chunks for processing (larger = more context, slower processing)"
-            )
-
-            k_retrieval = st.slider(
-                "Number of Results (k)",
-                min_value=1,
-                max_value=10,
-                value=settings.get('retrieval', {}).get('k_retrieval', 3),
-                help="Number of similar documents to retrieve for each query"
-            )
-
-        with col2:
-            chunk_overlap = st.slider(
-                "Chunk Overlap",
-                min_value=0,
-                max_value=400,
-                value=settings.get('retrieval', {}).get('chunk_overlap', 200),
-                step=50,
-                help="Overlap between consecutive chunks (prevents context loss)"
-            )
-
-            # Get available embedding models dynamically
-            available_embedding_models = get_available_embedding_models()
-            current_embedding_model = settings.get('retrieval', {}).get('embedding_model', 'all-MiniLM-L6-v2')
-
-            # Ensure current model is in the list, otherwise use first available
-            if current_embedding_model not in available_embedding_models:
-                current_embedding_model = available_embedding_models[0] if available_embedding_models else 'all-MiniLM-L6-v2'
-
-            embedding_model = st.selectbox(
-                "Embedding Model",
-                available_embedding_models,
-                index=available_embedding_models.index(current_embedding_model) if current_embedding_model in available_embedding_models else 0,
-                help=f"Available embedding models: {', '.join(available_embedding_models)}"
-            )
-
-        # Update settings if changed
-        if (chunk_size != settings.get('retrieval', {}).get('chunk_size', 1000) or
-            chunk_overlap != settings.get('retrieval', {}).get('chunk_overlap', 200) or
-            k_retrieval != settings.get('retrieval', {}).get('k_retrieval', 3) or
-            embedding_model != settings.get('retrieval', {}).get('embedding_model', 'all-MiniLM-L6-v2')):
-            settings_changed = True
-            settings['retrieval'] = {
-                'chunk_size': chunk_size,
-                'chunk_overlap': chunk_overlap,
-                'k_retrieval': k_retrieval,
-                'embedding_model': embedding_model
-            }
-
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # Generation Settings
     st.markdown("### 🤖 Generation Settings")
