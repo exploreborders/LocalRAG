@@ -105,7 +105,7 @@ def list_documents():
         st.error(f"❌ Failed to load documents: {e}")
         return []
 
-def process_uploaded_files(uploaded_files, selected_model="all-MiniLM-L6-v2"):
+def process_uploaded_files(uploaded_files, selected_model="nomic-ai/nomic-embed-text-v1.5"):
     """Process uploaded files"""
     if not uploaded_files:
         return
@@ -143,7 +143,7 @@ def process_uploaded_files(uploaded_files, selected_model="all-MiniLM-L6-v2"):
         st.success(f"✅ Successfully uploaded and processed {processed_count} file(s)")
         st.rerun()
 
-def reprocess_documents(selected_model="all-MiniLM-L6-v2"):
+def reprocess_documents(selected_model="nomic-ai/nomic-embed-text-v1.5"):
     """Reprocess all documents to update database and Elasticsearch"""
     try:
         with st.spinner("🔄 Processing documents..."):

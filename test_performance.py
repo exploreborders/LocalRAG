@@ -34,7 +34,7 @@ def benchmark_retrieval():
     ]
 
     # Models to test
-    models = ["paraphrase-multilingual-mpnet-base-v2"]
+    models = ["nomic-ai/nomic-embed-text-v1.5"]
 
     results = {}
 
@@ -93,7 +93,7 @@ def benchmark_rag():
         "How does RAG improve LLM responses?"
     ]
 
-    model = "paraphrase-multilingual-mpnet-base-v2"
+    model = "nomic-ai/nomic-embed-text-v1.5"
     llm_model = "llama2"
 
     for query in test_queries:
@@ -141,7 +141,7 @@ def benchmark_load():
         "Benefits of RAG"
     ] * 5  # 25 queries
 
-    model = "paraphrase-multilingual-mpnet-base-v2"
+    model = "nomic-ai/nomic-embed-text-v1.5"
 
     # Test new system
     try:

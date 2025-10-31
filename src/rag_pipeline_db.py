@@ -15,7 +15,7 @@ class RAGPipelineDB:
     and Ollama LLM for answer generation.
     """
 
-    def __init__(self, model_name: str = "all-mpnet-base-v2", llm_model: str = "llama2"):
+    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", llm_model: str = "llama2"):
         """
         Initialize the RAG pipeline.
 

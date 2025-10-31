@@ -2,21 +2,26 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 
-def create_embeddings(documents, model_name="all-mpnet-base-v2", batch_size=32, show_progress=True):
+def create_embeddings(documents, model_name="nomic-ai/nomic-embed-text-v1.5", batch_size=32, show_progress=True):
     """
-    Create embeddings for document chunks using sentence-transformers.
+    Create embeddings for document chunks using nomic-embed-text-v1.5.
 
     Args:
         documents (list): List of document objects with page_content attribute
-        model_name (str): Name of the sentence-transformers model to use
+        model_name (str): Name of the sentence-transformers model to use (only nomic-embed-text-v1.5 supported)
         batch_size (int): Batch size for encoding
         show_progress (bool): Whether to show progress bar
 
     Returns:
         tuple: (embeddings_array, model) where embeddings is numpy array
     """
-    # Load model
-    model = SentenceTransformer(model_name, device='cpu')
+    # Only support nomic-embed-text-v1.5
+    if model_name != "nomic-ai/nomic-embed-text-v1.5":
+        print(f"Warning: Only nomic-embed-text-v1.5 is supported. Using nomic-ai/nomic-embed-text-v1.5 instead of {model_name}")
+        model_name = "nomic-ai/nomic-embed-text-v1.5"
+
+    # Load model with trust_remote_code for nomic models
+    model = SentenceTransformer(model_name, device='cpu', trust_remote_code=True)
 
     texts = [doc.page_content for doc in documents]
 
@@ -42,7 +47,11 @@ def get_embedding_model(model_name):
     Returns:
         SentenceTransformer: Loaded model instance
     """
-    return SentenceTransformer(model_name, device='cpu')
+    # Use trust_remote_code for nomic models
+    if "nomic" in model_name:
+        return SentenceTransformer(model_name, device='cpu', trust_remote_code=True)
+    else:
+        return SentenceTransformer(model_name, device='cpu')
 
 
 def get_available_models():
@@ -50,25 +59,8 @@ def get_available_models():
     Get list of available sentence-transformers models that can be loaded.
 
     Returns:
-        list: List of available model names
+        list: List containing only nomic-embed-text-v1.5
     """
-    candidate_models = [
-        "all-MiniLM-L6-v2",
-        "all-mpnet-base-v2",
-        "paraphrase-multilingual-mpnet-base-v2"
-    ]
-
-    available_models = []
-
-    for model_name in candidate_models:
-        try:
-            model = SentenceTransformer(model_name, device='cpu')
-            available_models.append(model_name)
-            del model
-        except Exception:
-            continue
-
-    if not available_models:
-        available_models = ["all-MiniLM-L6-v2"]
-
-    return available_models
+    # Only support nomic-embed-text-v1.5 - assume it's available
+    # Model will be downloaded on first use
+    return ["nomic-ai/nomic-embed-text-v1.5"]

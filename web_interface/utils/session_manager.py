@@ -79,9 +79,7 @@ def get_available_embedding_models():
     """Get list of available sentence-transformers models"""
     # Common embedding models to check - focus on the most commonly used ones
     candidate_models = [
-        "all-MiniLM-L6-v2",  # Most common and well-tested
-        "all-mpnet-base-v2",  # Good performance
-        "paraphrase-multilingual-mpnet-base-v2"  # Multilingual support
+        "nomic-ai/nomic-embed-text-v1.5"  # Only supported model
     ]
 
     available_models = []
@@ -118,15 +116,15 @@ def get_available_embedding_models():
     except ImportError:
         print("sentence-transformers not available")
         st.warning("sentence-transformers not available. Using default model list.")
-        return ["all-MiniLM-L6-v2"]
+        return ["nomic-ai/nomic-embed-text-v1.5"]
     except Exception as e:
         print(f"Error checking embedding models: {e}")
         st.warning(f"Error checking embedding models: {e}")
-        return ["all-MiniLM-L6-v2"]
+        return ["nomic-ai/nomic-embed-text-v1.5"]
 
     # Always include at least the default model
     if not available_models:
-        available_models = ["all-MiniLM-L6-v2"]
+        available_models = ["nomic-ai/nomic-embed-text-v1.5"]
 
     return available_models
 

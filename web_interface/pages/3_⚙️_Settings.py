@@ -103,9 +103,7 @@ def get_available_embedding_models():
     """Get list of available sentence-transformers models"""
     # Common embedding models to check - focus on the most commonly used ones
     candidate_models = [
-        "all-MiniLM-L6-v2",  # Most common and well-tested
-        "all-mpnet-base-v2",  # Good performance
-        "paraphrase-multilingual-mpnet-base-v2"  # Multilingual support
+        "nomic-ai/nomic-embed-text-v1.5"  # Only supported model
     ]
 
     available_models = []
@@ -146,14 +144,14 @@ def get_available_embedding_models():
 
     except ImportError:
         st.warning("sentence-transformers not available. Using default model list.")
-        return ["all-MiniLM-L6-v2"]
+        return ["nomic-ai/nomic-embed-text-v1.5"]
     except Exception as e:
         st.warning(f"Error checking embedding models: {e}")
-        return ["all-MiniLM-L6-v2"]
+        return ["nomic-ai/nomic-embed-text-v1.5"]
 
     # Always include at least the default model
     if not available_models:
-        available_models = ["all-MiniLM-L6-v2"]
+        available_models = ["nomic-ai/nomic-embed-text-v1.5"]
 
     return available_models
 
@@ -369,7 +367,7 @@ def main():
                     st.success("✅ Settings saved successfully!")
 
                     # Check if embedding model changed and warn about reprocessing
-                    old_embedding_model = st.session_state.get('settings', {}).get('retrieval', {}).get('embedding_model', 'all-MiniLM-L6-v2')
+                    old_embedding_model = st.session_state.get('settings', {}).get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')
                     if embedding_model != old_embedding_model:
                         st.warning(f"⚠️ **Embedding model changed from {old_embedding_model} to {embedding_model}**")
                         st.info("📄 Go to the Documents page and click 'Reprocess Documents' to create embeddings with the new model")

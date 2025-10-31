@@ -57,7 +57,7 @@ def initialize_system():
             # Get configured models from settings
             from utils.session_manager import load_settings
             settings = load_settings()
-            embedding_model = settings.get('retrieval', {}).get('embedding_model', 'all-MiniLM-L6-v2')
+            embedding_model = settings.get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')
             llm_model = settings.get('generation', {}).get('model', 'llama2')
 
             # Initialize retriever with configured embedding model

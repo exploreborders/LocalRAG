@@ -144,7 +144,7 @@ class DocumentProcessor:
             from elasticsearch.helpers import bulk
             bulk(self.es, actions)
 
-    def process_document(self, filepath: str, model_name: str = "all-MiniLM-L6-v2", chunk_size: int = 1000, overlap: int = 200):
+    def process_document(self, filepath: str, model_name: str = "nomic-ai/nomic-embed-text-v1.5", chunk_size: int = 1000, overlap: int = 200):
         """
         Process a single document: load, chunk, embed, and save to database and Elasticsearch.
 
@@ -190,7 +190,7 @@ class DocumentProcessor:
 
         print(f"Processed {file_path.name}: {len(chunks)} chunks")
 
-    def process_directory(self, directory: str, model_name: str = "all-MiniLM-L6-v2", **kwargs):
+    def process_directory(self, directory: str, model_name: str = "nomic-ai/nomic-embed-text-v1.5", **kwargs):
         """
         Process all supported documents in a directory.
 
@@ -242,7 +242,7 @@ class DocumentProcessor:
             'embedding_model': chunk.embedding_model
         } for chunk in chunks]
 
-    def process_existing_documents(self, model_name: str = "all-mpnet-base-v2", chunk_size: int = 1000, overlap: int = 200):
+    def process_existing_documents(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", chunk_size: int = 1000, overlap: int = 200):
         """
         Process all existing documents in the database that haven't been processed yet.
         

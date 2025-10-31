@@ -18,7 +18,7 @@ class DatabaseRetriever:
     and metadata queries in PostgreSQL.
     """
 
-    def __init__(self, model_name: str = "all-mpnet-base-v2"):
+    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5"):
         """
         Initialize the retriever with specified embedding model.
 

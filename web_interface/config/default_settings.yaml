@@ -5,7 +5,7 @@ retrieval:
   chunk_size: 1000
   chunk_overlap: 200
   k_retrieval: 3
-  embedding_model: all-MiniLM-L6-v2
+  embedding_model: nomic-ai/nomic-embed-text-v1.5
 generation:
   model: mistral
   temperature: 0.7
