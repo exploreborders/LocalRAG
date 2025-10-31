@@ -111,17 +111,21 @@ retrieval:
   chunk_size: 1000        # Size of text chunks
   chunk_overlap: 200      # Overlap between chunks
   k_retrieval: 3          # Number of results to retrieve
-  embedding_model: "all-MiniLM-L6-v2"  # Sentence transformer model
+  embedding_model: "all-MiniLM-L6-v2"  # Available sentence transformer model
 ```
+
+**Note:** Both LLM Model and Embedding Model dropdowns automatically detect and show only available models.
 
 #### Generation Settings
 ```yaml
 generation:
-  model: "llama2"         # Ollama model name
+  model: "llama2"         # Ollama model name (from installed models only)
   temperature: 0.7        # Response randomness (0.0-1.0)
   max_tokens: 500         # Maximum response length
   ollama_host: "http://localhost:11434"  # Ollama server URL
 ```
+
+**Note:** The LLM Model dropdown automatically detects and shows only your installed Ollama models.
 
 #### Interface Settings
 ```yaml
@@ -169,6 +173,13 @@ interface:
 - Theme changes require app restart
 - After changing theme in Settings, restart the application
 - Check that `.streamlit/config.toml` exists in the project root
+
+**Model dropdown shows wrong models**
+- LLM dropdown automatically detects installed Ollama models
+- Embedding dropdown automatically detects available sentence-transformers models
+- If Ollama is not running, only "llama2" will be shown as default
+- If sentence-transformers models are not cached, only "all-MiniLM-L6-v2" will be shown
+- Install additional models with `ollama pull <model_name>` or they will auto-download when first used
 
 ### Performance Optimization
 

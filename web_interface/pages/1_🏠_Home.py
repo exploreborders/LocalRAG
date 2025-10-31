@@ -54,12 +54,18 @@ def initialize_system():
     """Initialize the RAG system components"""
     try:
         with st.spinner("🔄 Initializing Local RAG System..."):
-            # Initialize retriever
-            st.session_state.retriever = Retriever()
+            # Get configured models from settings
+            from utils.session_manager import load_settings
+            settings = load_settings()
+            embedding_model = settings.get('retrieval', {}).get('embedding_model', 'all-MiniLM-L6-v2')
+            llm_model = settings.get('generation', {}).get('model', 'llama2')
 
-            # Try to initialize RAG pipeline (may fail if Ollama not running)
+            # Initialize retriever with configured embedding model
+            st.session_state.retriever = Retriever(embedding_model)
+
+            # Try to initialize RAG pipeline with configured LLM (may fail if Ollama not running)
             try:
-                st.session_state.rag_pipeline = RAGPipeline()
+                st.session_state.rag_pipeline = RAGPipeline(llm_model)
                 st.session_state.rag_available = True
             except Exception as e:
                 st.session_state.rag_pipeline = None
@@ -67,7 +73,7 @@ def initialize_system():
                 st.warning(f"⚠️ RAG mode unavailable: {str(e)}")
 
             st.session_state.system_initialized = True
-            st.success("✅ System initialized successfully!")
+            st.success(f"✅ System initialized successfully with {embedding_model} embeddings!")
 
     except Exception as e:
         st.error(f"❌ Failed to initialize system: {str(e)}")

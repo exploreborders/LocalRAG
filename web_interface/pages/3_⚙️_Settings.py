@@ -6,6 +6,7 @@ Settings Page - Configuration Options
 import streamlit as st
 import os
 import sys
+import subprocess
 from pathlib import Path
 
 # Add src directory to path for imports
@@ -70,6 +71,91 @@ def save_settings_to_file(settings):
     except Exception as e:
         st.error(f"Failed to save settings: {e}")
         return False
+
+def get_installed_ollama_models():
+    """Get list of installed Ollama models"""
+    try:
+        # Run ollama list command
+        result = subprocess.run(['ollama', 'list'], capture_output=True, text=True, timeout=5)
+
+        if result.returncode == 0:
+            lines = result.stdout.strip().split('\n')
+            if len(lines) > 1:  # Skip header line
+                # Parse model names from output
+                models = []
+                for line in lines[1:]:  # Skip header
+                    if line.strip():
+                        parts = line.split()
+                        if parts:
+                            model_name = parts[0].split(':')[0]  # Remove :latest tag
+                            if model_name not in models:
+                                models.append(model_name)
+                return models if models else ["llama2"]  # Default fallback
+        else:
+            st.warning("Could not connect to Ollama. Using default model list.")
+            return ["llama2"]
+
+    except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError) as e:
+        st.warning(f"Ollama not available: {e}. Using default model.")
+        return ["llama2"]
+
+def get_available_embedding_models():
+    """Get list of available sentence-transformers models"""
+    # Common embedding models to check - focus on the most commonly used ones
+    candidate_models = [
+        "all-MiniLM-L6-v2",  # Most common and well-tested
+        "all-mpnet-base-v2",  # Good performance
+        "paraphrase-multilingual-mpnet-base-v2"  # Multilingual support
+    ]
+
+    available_models = []
+
+    try:
+        from sentence_transformers import SentenceTransformer
+        import threading
+
+        def test_model(model_name, results, index):
+            """Test if a model can be loaded within timeout"""
+            try:
+                # Try to load model with a short timeout
+                # This will download if not cached, but should be fast for cached models
+                model = SentenceTransformer(model_name, device='cpu')
+                results[index] = model_name
+                del model  # Clean up
+            except Exception:
+                results[index] = None
+
+        # Test models with timeout (since downloading can take time)
+        threads = []
+        results = [None] * len(candidate_models)
+
+        for i, model_name in enumerate(candidate_models):
+            thread = threading.Thread(target=test_model, args=(model_name, results, i))
+            thread.daemon = True
+            threads.append(thread)
+            thread.start()
+
+        # Wait for all threads with timeout
+        for thread in threads:
+            thread.join(timeout=10)  # 10 second timeout per model
+
+        # Collect successful results
+        for result in results:
+            if result is not None:
+                available_models.append(result)
+
+    except ImportError:
+        st.warning("sentence-transformers not available. Using default model list.")
+        return ["all-MiniLM-L6-v2"]
+    except Exception as e:
+        st.warning(f"Error checking embedding models: {e}")
+        return ["all-MiniLM-L6-v2"]
+
+    # Always include at least the default model
+    if not available_models:
+        available_models = ["all-MiniLM-L6-v2"]
+
+    return available_models
 
 def update_streamlit_theme(config_path, theme):
     """Update Streamlit theme configuration"""
@@ -189,13 +275,19 @@ def main():
                 help="Overlap between consecutive chunks (prevents context loss)"
             )
 
+            # Get available embedding models dynamically
+            available_embedding_models = get_available_embedding_models()
+            current_embedding_model = settings.get('retrieval', {}).get('embedding_model', 'all-MiniLM-L6-v2')
+
+            # Ensure current model is in the list, otherwise use first available
+            if current_embedding_model not in available_embedding_models:
+                current_embedding_model = available_embedding_models[0] if available_embedding_models else 'all-MiniLM-L6-v2'
+
             embedding_model = st.selectbox(
                 "Embedding Model",
-                ["all-MiniLM-L6-v2", "all-mpnet-base-v2", "paraphrase-multilingual-mpnet-base-v2"],
-                index=["all-MiniLM-L6-v2", "all-mpnet-base-v2", "paraphrase-multilingual-mpnet-base-v2"].index(
-                    settings.get('retrieval', {}).get('embedding_model', 'all-MiniLM-L6-v2')
-                ),
-                help="Sentence transformer model for creating embeddings"
+                available_embedding_models,
+                index=available_embedding_models.index(current_embedding_model) if current_embedding_model in available_embedding_models else 0,
+                help=f"Available embedding models: {', '.join(available_embedding_models)}"
             )
 
         # Update settings if changed
@@ -246,13 +338,19 @@ def main():
                 help="URL where Ollama server is running"
             )
 
+            # Get installed models dynamically
+            installed_models = get_installed_ollama_models()
+            current_model = settings.get('generation', {}).get('model', 'llama2')
+
+            # Ensure current model is in the list, otherwise use first available
+            if current_model not in installed_models:
+                current_model = installed_models[0] if installed_models else 'llama2'
+
             model_name = st.selectbox(
                 "LLM Model",
-                ["llama2", "mistral", "codellama", "orca-mini"],
-                index=["llama2", "mistral", "codellama", "orca-mini"].index(
-                    settings.get('generation', {}).get('model', 'llama2')
-                ),
-                help="Ollama model to use for generation"
+                installed_models,
+                index=installed_models.index(current_model) if current_model in installed_models else 0,
+                help=f"Available Ollama models: {', '.join(installed_models)}"
             )
 
         # Update settings if changed
@@ -332,6 +430,13 @@ def main():
                 if save_settings_to_file(settings):
                     update_settings(settings)
                     st.success("✅ Settings saved successfully!")
+
+                    # Check if embedding model changed and warn about reprocessing
+                    old_embedding_model = st.session_state.get('settings', {}).get('retrieval', {}).get('embedding_model', 'all-MiniLM-L6-v2')
+                    if embedding_model != old_embedding_model:
+                        st.warning(f"⚠️ **Embedding model changed from {old_embedding_model} to {embedding_model}**")
+                        st.info("📄 Go to the Documents page and click 'Reprocess Documents' to create embeddings with the new model")
+
                     if theme != settings.get('interface', {}).get('theme', 'light'):
                         st.info("🔄 **Theme change requires app restart** - Please restart the application to apply the new theme")
                     else:

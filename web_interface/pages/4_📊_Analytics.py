@@ -136,6 +136,117 @@ def create_performance_chart():
     df = pd.DataFrame(df_data)
     return df
 
+def compare_models(model1, model2):
+    """Compare two embedding models"""
+    try:
+        # Import required modules
+        from src.retrieval import Retriever
+        from src.embeddings import load_embeddings
+        import numpy as np
+
+        st.markdown("#### 📊 Model Specifications")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown(f"**{model1}**")
+            try:
+                embeddings1, docs1, _ = load_embeddings(model1)
+                st.write(f"- Dimensions: {embeddings1.shape[1]}")
+                st.write(f"- Documents: {len(docs1)}")
+                st.write(f"- Vectors: {embeddings1.shape[0]}")
+            except Exception as e:
+                st.error(f"Could not load {model1}: {e}")
+                return
+
+        with col2:
+            st.markdown(f"**{model2}**")
+            try:
+                embeddings2, docs2, _ = load_embeddings(model2)
+                st.write(f"- Dimensions: {embeddings2.shape[1]}")
+                st.write(f"- Documents: {len(docs2)}")
+                st.write(f"- Vectors: {embeddings2.shape[0]}")
+            except Exception as e:
+                st.error(f"Could not load {model2}: {e}")
+                return
+
+        # Test queries for comparison
+        test_queries = [
+            "What is machine learning?",
+            "How does RAG work?",
+            "Explain neural networks",
+            "What are embeddings?"
+        ]
+
+        st.markdown("#### 🧪 Retrieval Performance Test")
+
+        results_data = []
+
+        for query in test_queries:
+            # Test model 1
+            try:
+                retriever1 = Retriever(model1)
+                start_time = time.time()
+                results1 = retriever1.retrieve(query, k=3)
+                time1 = time.time() - start_time
+            except Exception as e:
+                st.error(f"Error testing {model1}: {e}")
+                continue
+
+            # Test model 2
+            try:
+                retriever2 = Retriever(model2)
+                start_time = time.time()
+                results2 = retriever2.retrieve(query, k=3)
+                time2 = time.time() - start_time
+            except Exception as e:
+                st.error(f"Error testing {model2}: {e}")
+                continue
+
+            # Calculate similarity scores
+            scores1 = [r['distance'] for r in results1]
+            scores2 = [r['distance'] for r in results2]
+
+            avg_score1 = np.mean(scores1) if scores1 else 0
+            avg_score2 = np.mean(scores2) if scores2 else 0
+
+            results_data.append({
+                'Query': query[:30] + '...' if len(query) > 30 else query,
+                f'{model1} Time': f"{time1:.3f}s",
+                f'{model2} Time': f"{time2:.3f}s",
+                f'{model1} Score': f"{avg_score1:.4f}",
+                f'{model2} Score': f"{avg_score2:.4f}",
+                'Winner': model1 if avg_score1 < avg_score2 else model2
+            })
+
+        if results_data:
+            results_df = pd.DataFrame(results_data)
+            st.dataframe(results_df, use_container_width=True)
+
+            # Summary statistics
+            st.markdown("#### 📈 Summary Statistics")
+
+            total_queries = len(results_data)
+            model1_wins = sum(1 for r in results_data if r['Winner'] == model1)
+            model2_wins = sum(1 for r in results_data if r['Winner'] == model2)
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric(f"{model1} Wins", model1_wins)
+
+            with col2:
+                st.metric(f"{model2} Wins", model2_wins)
+
+            with col3:
+                st.metric("Total Queries", total_queries)
+
+        else:
+            st.warning("No comparison data available")
+
+    except Exception as e:
+        st.error(f"Model comparison failed: {e}")
+
 def main():
     """Main page content"""
     st.markdown('<h1 class="page-header">📊 Analytics Dashboard</h1>', unsafe_allow_html=True)
@@ -288,6 +399,28 @@ def main():
         st.dataframe(table_data, use_container_width=True)
     else:
         st.info("📭 No queries recorded yet")
+
+    # Model Comparison
+    st.markdown("### 🔄 Model Comparison")
+    st.markdown("Compare performance across different embedding models")
+
+    # Get available models
+    from utils.session_manager import get_available_embedding_models
+    available_models = get_available_embedding_models()
+
+    if len(available_models) > 1:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            model1 = st.selectbox("Model 1", available_models, key="model1")
+
+        with col2:
+            model2 = st.selectbox("Model 2", available_models, key="model2")
+
+        if st.button("🔍 Compare Models", type="primary"):
+            compare_models(model1, model2)
+    else:
+        st.info("📝 Need at least 2 embedding models to compare. Process documents with different models first.")
 
     # Export Data
     st.markdown("---")

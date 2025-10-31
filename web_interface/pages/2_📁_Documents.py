@@ -15,7 +15,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 # Import system components
 try:
     from src.data_loader import load_documents, split_documents
-    from src.embeddings import create_embeddings, save_embeddings
+    from src.embeddings import create_embeddings, save_embeddings, load_embeddings
     from src.vector_store import create_faiss_index, save_faiss_index
 except ImportError:
     st.error("❌ Could not import RAG system components.")
@@ -134,10 +134,10 @@ def process_uploaded_files(uploaded_files):
         st.success(f"✅ Successfully uploaded {processed_count} file(s)")
         st.rerun()
 
-def reprocess_documents():
+def reprocess_documents(selected_model="all-MiniLM-L6-v2"):
     """Reprocess all documents to update embeddings and vector store"""
     try:
-        with st.spinner("🔄 Reprocessing documents... This may take a while."):
+        with st.spinner("🔄 Checking documents..."):
 
             # Load and split documents
             docs = load_documents()
@@ -147,29 +147,127 @@ def reprocess_documents():
                 st.warning("⚠️ No documents found to process")
                 return
 
-            # Create embeddings
-            st.info("📊 Creating embeddings...")
-            from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer("all-MiniLM-L6-v2")
-            texts = [doc.page_content for doc in chunks]
-            embeddings = model.encode(texts, show_progress_bar=True)
+            # Check if we need to reprocess (smart caching)
+            from src.embeddings import get_documents_hash
+            current_hash = get_documents_hash(chunks)
 
-            # Save embeddings
-            save_embeddings(embeddings, chunks)
+            # Check if embeddings already exist for this model
+            safe_model_name = selected_model.replace('/', '_').replace('-', '_')
+            embeddings_file = f"models/embeddings_{safe_model_name}.pkl"
 
-            # Create and save FAISS index
-            st.info("🔍 Building vector index...")
-            index = create_faiss_index(embeddings)
-            save_faiss_index(index)
+            needs_reprocessing = True
+            if os.path.exists(embeddings_file):
+                try:
+                    # Load existing embeddings to check hash
+                    _, _, stored_hash = load_embeddings(selected_model)
+                    if stored_hash == current_hash:
+                        st.info(f"✅ Documents haven't changed for {selected_model}. Skipping reprocessing.")
+                        needs_reprocessing = False
+                    else:
+                        st.info(f"📝 Documents have changed for {selected_model}. Reprocessing...")
+                except Exception:
+                    st.info(f"📝 Could not verify existing embeddings for {selected_model}. Reprocessing...")
 
-            st.success(f"✅ Successfully processed {len(chunks)} document chunks from {len(docs)} files")
+            if not needs_reprocessing:
+                # Update session state to force reinitialization
+                if 'system_initialized' in st.session_state:
+                    st.session_state.system_initialized = False
+                return
+
+            # Reprocess documents
+            with st.spinner("🔄 Reprocessing documents... This may take a while."):
+
+                # Create embeddings
+                st.info(f"📊 Creating embeddings using {selected_model}...")
+                from sentence_transformers import SentenceTransformer
+                model = SentenceTransformer(selected_model)
+                texts = [doc.page_content for doc in chunks]
+                embeddings = model.encode(texts, show_progress_bar=True)
+
+                # Save embeddings and index with model-specific names
+                save_embeddings(embeddings, chunks, selected_model)
+
+                # Create and save FAISS index
+                st.info("🔍 Building vector index...")
+                index = create_faiss_index(embeddings)
+                save_faiss_index(index, selected_model)
+
+                st.success(f"✅ Successfully processed {len(chunks)} document chunks from {len(docs)} files using {selected_model}")
+
+                # Update session state to force reinitialization
+                if 'system_initialized' in st.session_state:
+                    st.session_state.system_initialized = False
+
+    except Exception as e:
+        st.error(f"❌ Failed to reprocess documents: {str(e)}")
+
+def batch_process_documents(selected_models):
+    """Process documents with multiple models in batch"""
+    try:
+        with st.spinner("🔄 Batch processing documents... This may take a while."):
+
+            # Load and split documents once
+            docs = load_documents()
+            chunks = split_documents(docs)
+
+            if not chunks:
+                st.warning("⚠️ No documents found to process")
+                return
+
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            total_models = len(selected_models)
+            processed_models = 0
+
+            for model_name in selected_models:
+                status_text.text(f"Processing with {model_name}...")
+
+                # Check if already processed (smart caching)
+                from src.embeddings import get_documents_hash
+                current_hash = get_documents_hash(chunks)
+
+                safe_model_name = model_name.replace('/', '_').replace('-', '_')
+                embeddings_file = f"models/embeddings_{safe_model_name}.pkl"
+
+                needs_processing = True
+                if os.path.exists(embeddings_file):
+                    try:
+                        _, _, stored_hash = load_embeddings(model_name)
+                        if stored_hash == current_hash:
+                            st.info(f"✅ {model_name} already up to date")
+                            needs_processing = False
+                    except Exception:
+                        pass
+
+                if needs_processing:
+                    # Create embeddings
+                    from sentence_transformers import SentenceTransformer
+                    model = SentenceTransformer(model_name)
+                    texts = [doc.page_content for doc in chunks]
+                    embeddings = model.encode(texts, show_progress_bar=False)
+
+                    # Save embeddings and index
+                    save_embeddings(embeddings, chunks, model_name)
+                    index = create_faiss_index(embeddings)
+                    save_faiss_index(index, model_name)
+
+                    st.success(f"✅ Processed {len(chunks)} chunks with {model_name}")
+
+                processed_models += 1
+                progress_bar.progress(processed_models / total_models)
+
+            progress_bar.empty()
+            status_text.empty()
+
+            st.success(f"✅ Batch processing completed! Processed documents with {len(selected_models)} models")
 
             # Update session state to force reinitialization
             if 'system_initialized' in st.session_state:
                 st.session_state.system_initialized = False
 
     except Exception as e:
-        st.error(f"❌ Failed to reprocess documents: {str(e)}")
+        st.error(f"❌ Batch processing failed: {str(e)}")
 
 def main():
     """Main page content"""
@@ -203,16 +301,50 @@ def main():
         st.info(f"📊 Found {len(documents)} document(s)")
 
         # Processing controls
-        col1, col2 = st.columns([1, 1])
+        col1, col2, col3 = st.columns([2, 1, 1])
+
+        # Get available embedding models
+        from utils.session_manager import get_available_embedding_models
+        available_models = get_available_embedding_models()
 
         with col1:
-            if st.button("🔄 Reprocess All Documents", type="secondary"):
-                reprocess_documents()
+            selected_model = st.selectbox(
+                "Embedding Model",
+                available_models,
+                help="Choose which embedding model to use for processing documents"
+            )
 
         with col2:
-            if st.button("🗑️ Clear All Documents", type="secondary"):
+            if st.button("🔄 Reprocess Documents", type="secondary", use_container_width=True):
+                reprocess_documents(selected_model)
+
+        with col3:
+            if st.button("🗑️ Clear Documents", type="secondary", use_container_width=True):
                 # This would need more sophisticated handling
                 st.warning("⚠️ Document deletion not implemented yet")
+
+        # Batch processing section
+        st.markdown("### 🔄 Batch Processing")
+        st.markdown("Process documents with multiple models simultaneously")
+
+        # Get available models
+        available_models = get_available_embedding_models()
+
+        if len(available_models) > 1:
+            selected_batch_models = st.multiselect(
+                "Select models for batch processing",
+                available_models,
+                default=[available_models[0]],
+                help="Choose multiple models to process documents with"
+            )
+
+            if st.button("🚀 Process with Selected Models", type="primary", use_container_width=True):
+                if selected_batch_models:
+                    batch_process_documents(selected_batch_models)
+                else:
+                    st.warning("Please select at least one model")
+        else:
+            st.info("📝 Need multiple embedding models for batch processing")
 
         # Document list
         for doc in documents:
@@ -245,27 +377,43 @@ def main():
     st.markdown("---")
     st.markdown("### 🔧 Processing Status")
 
-    # Check if models exist
-    models_dir = Path("models")
-    embeddings_exist = (models_dir / "embeddings.pkl").exists()
-    index_exists = (models_dir / "faiss_index.pkl").exists()
+    # Get available models and check status for each
+    available_models = get_available_embedding_models()
 
-    col1, col2 = st.columns(2)
+    st.markdown("**Available Embedding Models:**")
+    for model in available_models:
+        safe_model_name = model.replace('/', '_').replace('-', '_')
+        embeddings_file = Path(f"models/embeddings_{safe_model_name}.pkl")
+        index_file = Path(f"models/faiss_index_{safe_model_name}.pkl")
 
-    with col1:
-        if embeddings_exist:
-            st.success("✅ Embeddings: Ready")
-        else:
-            st.warning("⚠️ Embeddings: Not found")
+        col1, col2, col3 = st.columns([2, 1, 1])
 
-    with col2:
-        if index_exists:
-            st.success("✅ Vector Index: Ready")
-        else:
-            st.warning("⚠️ Vector Index: Not found")
+        with col1:
+            st.write(f"**{model}**")
 
-    if not embeddings_exist or not index_exists:
-        st.info("💡 Click 'Reprocess All Documents' to generate embeddings and vector index")
+        with col2:
+            if embeddings_file.exists():
+                st.success("✅ Embeddings")
+            else:
+                st.warning("⚠️ No Embeddings")
+
+        with col3:
+            if index_file.exists():
+                st.success("✅ Index")
+            else:
+                st.warning("⚠️ No Index")
+
+    # Overall status
+    st.markdown("---")
+    has_any_embeddings = any(
+        Path(f"models/embeddings_{model.replace('/', '_').replace('-', '_')}.pkl").exists()
+        for model in available_models
+    )
+
+    if not has_any_embeddings:
+        st.info("💡 Select a model above and click 'Reprocess Documents' to generate embeddings and vector index")
+    else:
+        st.success("✅ At least one model has processed embeddings")
 
 if __name__ == "__main__":
     main()

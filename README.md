@@ -4,11 +4,16 @@ A local Retrieval-Augmented Generation system built with Python, Ollama, and FAI
 
 ## Features
 
+- **Multi-Model Support**: Choose from multiple embedding models (all-MiniLM-L6-v2, all-mpnet-base-v2, etc.)
+- **Smart Caching**: Avoid reprocessing documents when content hasn't changed
+- **Batch Processing**: Process documents with multiple models simultaneously
+- **Model Comparison**: Side-by-side performance comparison of different embedding models
 - Document loading and text chunking (supports .txt, .pdf, .docx, .pptx, .xlsx)
-- Embedding creation using sentence-transformers
-- Vector storage with FAISS
+- Embedding creation using sentence-transformers with GPU acceleration
+- Optimized vector storage with FAISS (IVF-PQ for large datasets)
 - Retrieval system for similarity search
 - Integration with Ollama LLMs for generation
+- Comprehensive web interface with analytics and settings
 - Command-line interface
 
 ## Setup
@@ -47,9 +52,9 @@ streamlit run web_interface/app.py
 ```
 Then open http://localhost:8501 in your browser for a comprehensive multipage experience with:
 - **🏠 Home**: Query interface and system control
-- **📁 Documents**: File upload and management
-- **⚙️ Settings**: Configuration options
-- **📊 Analytics**: Performance monitoring
+- **📁 Documents**: File upload, management, and multi-model processing
+- **⚙️ Settings**: Configuration options with dynamic model detection
+- **📊 Analytics**: Performance monitoring and model comparison
 
 ### Command Line Interface:
 ```bash
@@ -101,6 +106,9 @@ See `plan.md` for detailed implementation progress.
 
 ## Notes
 
+- **Multi-Model Support**: The system supports multiple embedding models. Each model stores its own embeddings and vector index for optimal performance.
+- **Smart Caching**: Documents are only reprocessed when their content changes, saving time and resources.
+- **Model Selection**: Choose the best embedding model for your use case. Larger models generally provide better accuracy but require more resources.
 - The system currently uses sample data. Add your own documents to `data/` for real use cases.
 - Full RAG functionality requires Ollama running locally.
 - Embeddings are cached in `models/` for faster subsequent runs.

@@ -9,26 +9,61 @@ import os
 
 def create_faiss_index(embeddings):
     """
-    Create a FAISS index from embeddings.
+    Create a FAISS index from embeddings with optimizations.
     """
+    import numpy as np
+
     dimension = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dimension)  # L2 distance
+
+    # Use IVF index for better performance with large datasets
+    if embeddings.shape[0] > 1000:
+        # IVF with PQ for better memory efficiency
+        nlist = min(100, max(4, embeddings.shape[0] // 39))  # Rule of thumb: sqrt(n)/4
+        quantizer = faiss.IndexFlatIP(dimension)  # Inner product for normalized embeddings
+        index = faiss.IndexIVFPQ(quantizer, dimension, nlist, 8, 8)  # PQ with 8 bytes per vector
+        index.train(embeddings.astype('float32'))
+    else:
+        # Simple L2 index for small datasets
+        index = faiss.IndexFlatL2(dimension)
+
     index.add(embeddings.astype('float32'))
     return index
 
-def save_faiss_index(index, filename="models/faiss_index.pkl"):
+def save_faiss_index(index, model_name="all-MiniLM-L6-v2", filename=None):
     """
     Save FAISS index to file.
     """
+    if filename is None:
+        # Create model-specific filename
+        safe_model_name = model_name.replace('/', '_').replace('-', '_')
+        filename = f"models/faiss_index_{safe_model_name}.pkl"
+
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     faiss.write_index(index, filename)
     print(f"FAISS index saved to {filename}")
 
-def load_faiss_index(filename="models/faiss_index.pkl"):
+def load_faiss_index(model_name="all-MiniLM-L6-v2", filename=None):
     """
-    Load FAISS index from file.
+    Load FAISS index from file with validation.
     """
-    return faiss.read_index(filename)
+    if filename is None:
+        # Create model-specific filename
+        safe_model_name = model_name.replace('/', '_').replace('-', '_')
+        filename = f"models/faiss_index_{safe_model_name}.pkl"
+
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"FAISS index file not found: {filename}. Please process documents with this model first.")
+
+    try:
+        index = faiss.read_index(filename)
+    except Exception as e:
+        raise Exception(f"Failed to load FAISS index from {filename}: {e}")
+
+    # Validate index
+    if index.ntotal == 0:
+        raise Exception(f"FAISS index {filename} is empty (no vectors added)")
+
+    return index
 
 def search_similar(query_embedding, index, documents, k=3):
     """
@@ -49,7 +84,7 @@ def search_similar(query_embedding, index, documents, k=3):
 
 if __name__ == "__main__":
     # Load embeddings and documents
-    embeddings, documents = load_embeddings()
+    embeddings, documents = load_embeddings()[:2]
 
     # Create FAISS index
     index = create_faiss_index(embeddings)

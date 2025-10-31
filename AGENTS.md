@@ -9,6 +9,14 @@
 - Process data: `python -m src.embeddings`
 - Test retrieval: `python -m src.retrieval`
 
+## Multi-Model Support
+
+- **Model-Specific Files**: Each embedding model stores separate files (`embeddings_{model}.pkl`, `faiss_index_{model}.pkl`)
+- **Smart Caching**: Document hash comparison prevents unnecessary reprocessing
+- **Batch Processing**: Process documents with multiple models simultaneously
+- **Model Comparison**: Compare performance across different embedding models
+- **Dynamic Detection**: Automatically detect available sentence-transformers models
+
 ## Code Style Guidelines
 - **Imports**: Group stdlib/third-party/local, sort alphabetically, use relative imports (`from .module import Class`)
 - **Formatting**: 4 spaces indentation, 88 char line limit, double quotes, docstrings for public functions/classes

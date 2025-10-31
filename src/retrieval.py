@@ -7,17 +7,51 @@ except ImportError:
     from embeddings import load_embeddings
 
 class Retriever:
-    def __init__(self, model_name="all-MiniLM-L6-v2", index_path="models/faiss_index.pkl"):
-        self.model = SentenceTransformer(model_name)
-        self.index = load_faiss_index(index_path)
-        _, self.documents = load_embeddings()
+    def __init__(self, model_name="all-MiniLM-L6-v2"):
+        self.model_name = model_name
+
+        try:
+            self.model = SentenceTransformer(model_name)
+        except Exception as e:
+            raise Exception(f"Failed to load embedding model '{model_name}': {e}")
+
+        try:
+            self.index = load_faiss_index(model_name)
+        except Exception as e:
+            raise Exception(f"Failed to load FAISS index for model '{model_name}': {e}")
+
+        try:
+            _, self.documents = load_embeddings(model_name)[:2]
+        except Exception as e:
+            raise Exception(f"Failed to load embeddings for model '{model_name}': {e}")
+
+        # Validate that we have compatible data
+        if hasattr(self.index, 'd'):
+            expected_dim = self.index.d
+        else:
+            expected_dim = self.model.get_sentence_embedding_dimension()
+
+        if len(self.documents) != self.index.ntotal:
+            raise Exception(f"Document count ({len(self.documents)}) doesn't match index size ({self.index.ntotal})")
 
     def retrieve(self, query, k=3):
         """
-        Retrieve relevant documents for a given query.
+        Retrieve relevant documents for a given query with performance monitoring.
         """
-        query_embedding = self.model.encode([query])[0]
+        import time
+        start_time = time.time()
+
+        # Encode query
+        query_embedding = self.model.encode([query], normalize_embeddings=True)[0]
+
+        # Search
         results = search_similar(query_embedding, self.index, self.documents, k)
+
+        # Log performance (optional)
+        retrieval_time = time.time() - start_time
+        if retrieval_time > 1.0:  # Log slow queries
+            print(".3f")
+
         return results
 
 def format_results(results):
