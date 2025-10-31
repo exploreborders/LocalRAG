@@ -1,7 +1,7 @@
 # Building a Local RAG System with Python and Ollama
 
 ## Overview
-This project implements a production-ready Local RAG (Retrieval-Augmented Generation) system using PostgreSQL for document storage, Elasticsearch for vector search, and Ollama for local LLM generation. The system features Docker-based database setup for easy deployment, advanced document processing with Docling, and a modern web interface. It provides accurate, context-aware responses by combining efficient document retrieval with generative AI, all running locally for maximum privacy and control.
+This project implements a production-ready Local RAG (Retrieval-Augmented Generation) system using PostgreSQL for document storage, Elasticsearch for vector search, and Ollama for local LLM generation. The system features Docker-based database setup for easy deployment, advanced document processing with Docling, and a modern web interface. It provides accurate, context-aware responses by combining efficient document retrieval with generative AI, all running locally for maximum privacy and control. Currently undergoing performance optimizations to significantly speed up document processing through batch operations, parallel processing, and pipeline tuning.
 
 ## Prerequisites
 - Python 3.8 or higher
@@ -280,10 +280,37 @@ This plan provides a high-level overview. Each step may require additional resea
 - ✅ Production-ready Docker configuration with health checks and dependencies
 - ✅ Test end-to-end document processing pipeline
 
+### 🚀 **Phase 8: Docling Performance Optimizations (IN PROGRESS)**
+
+#### **Current Performance Analysis**
+- **Sequential Processing**: Documents processed one at a time (bottleneck identified)
+- **Converter Recreation**: New DocumentConverter instance per document (inefficient)
+- **No Batch Processing**: Missing docling's batch conversion capabilities
+- **Table Extraction Overhead**: do_table_structure=True adds processing time
+- **Single-threaded**: No parallelization despite CPU availability
+
+#### **Optimization Strategies (High Priority)**
+- ✅ **Batch Document Processing**: Implement docling's convert_all() for multiple documents
+- ✅ **Converter Reuse**: Create DocumentConverter once and reuse across documents
+- ✅ **Pipeline Optimization**: Evaluate table extraction necessity vs performance trade-off
+- 🔄 **Parallel Processing**: Add multiprocessing support for CPU-bound operations
+- 🔄 **GPU Acceleration**: Enable CUDA support for docling operations when available
+
+#### **Expected Performance Improvements**
+- **Batch Processing**: 2-3x speedup for document collections
+- **Converter Reuse**: 20-30% reduction in initialization overhead
+- **Parallel Processing**: 3-5x speedup on multi-core systems
+- **Pipeline Tuning**: 15-25% speedup by optimizing extraction options
+- **Combined Impact**: 5-10x faster document processing for large collections
+
+#### **Implementation Plan**
+1. **Immediate (High Impact)**: Batch processing and converter reuse
+2. **Short-term (Medium Impact)**: Parallel processing with ProcessPoolExecutor
+3. **Long-term (Low Impact)**: GPU acceleration and advanced caching
 
 ### 🎯 **Future Enhancement Opportunities**
 
-The system is now production-ready with a solid foundation. Potential future improvements include:
+The system is now production-ready with a solid foundation and ongoing performance optimizations. Potential future improvements include:
 
 - **Advanced Analytics**: Enhanced performance metrics and custom dashboards
 - **Conversation Memory**: Multi-turn conversations with context preservation
@@ -294,3 +321,5 @@ The system is now production-ready with a solid foundation. Potential future imp
 - **Multilingual Enhancement**: Improved non-English language processing
 - **Real-time Features**: Live indexing and incremental document updates
 - **Security**: Access controls and data encryption for enterprise use
+- **Advanced Caching**: Memory-efficient processing and smart reprocessing detection
+- **Distributed Processing**: Multi-node document processing for large-scale deployments
