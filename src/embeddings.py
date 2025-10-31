@@ -116,6 +116,11 @@ def load_embeddings(model_name="all-MiniLM-L6-v2", filename=None):
 
     return embeddings, documents, data.get('documents_hash', None)
 
+def get_embedding_model(model_name):
+    """Get a sentence transformer model"""
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer(model_name, device='cpu')
+
 def get_available_models():
     """
     Get list of available sentence-transformers models.

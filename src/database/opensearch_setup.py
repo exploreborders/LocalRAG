@@ -8,6 +8,14 @@ from elasticsearch import Elasticsearch
 import json
 import os
 
+def get_elasticsearch_client():
+    """Get Elasticsearch client for RAG operations."""
+    return Elasticsearch(
+        hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}],
+        basic_auth=(os.getenv("OPENSEARCH_USER", "elastic"), os.getenv("OPENSEARCH_PASSWORD", "changeme")),
+        verify_certs=False
+    )
+
 def setup_opensearch_indices():
     # Connect to Elasticsearch (using instead of OpenSearch due to Docker issues)
     client = Elasticsearch(

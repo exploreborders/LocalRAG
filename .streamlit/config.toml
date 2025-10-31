@@ -4,7 +4,7 @@
 developmentMode = false
 
 # Allows you to type a variable or string by itself in a single line of Python code to write it to the app.
-dataFrameSerialization = "legacy"
+# dataFrameSerialization removed - now uses Apache Arrow by default
 
 [logger]
 
@@ -16,9 +16,7 @@ level = "info"
 # Whether to enable st.cache.
 caching = true
 
-# If false, will attempt to open a new tab or window every time Streamlit is
-# called. If true, will only open a new tab the first time Streamlit is called.
-showSidebarNavigation = true
+
 
 # Controls whether uncaught app exceptions are displayed in the browser. By
 # default, this is set to True and Streamlit displays app exceptions and

@@ -14,9 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # Import system components
 try:
-    from src.data_loader import load_documents, split_documents
-    from src.embeddings import create_embeddings, save_embeddings, load_embeddings
-    from src.vector_store import create_faiss_index, save_faiss_index
+    from src.document_processor import DocumentProcessor
 except ImportError:
     st.error("❌ Could not import RAG system components.")
     st.stop()
@@ -85,24 +83,29 @@ def format_file_size(size_bytes):
     return f"{size_bytes:.1f} TB"
 
 def list_documents():
-    """List all documents in the data directory"""
-    data_dir = Path("data")
-    if not data_dir.exists():
+    """List all documents from database"""
+    try:
+        processor = DocumentProcessor()
+        docs = processor.get_documents()
+
+        documents = []
+        for doc in docs:
+            documents.append({
+                'name': doc['filename'],
+                'size': 0,  # Size not stored in DB
+                'modified': doc['last_modified'],
+                'extension': doc['filename'].split('.')[-1] if '.' in doc['filename'] else '',
+                'status': doc['status']
+            })
+
+        # Sort by modification time (newest first)
+        documents.sort(key=lambda x: x['modified'], reverse=True)
+        return documents
+    except Exception as e:
+        st.error(f"❌ Failed to load documents: {e}")
         return []
 
-    documents = []
-    supported_ext = get_supported_extensions()
-
-    for file_path in data_dir.iterdir():
-        if file_path.is_file() and file_path.suffix.lower() in supported_ext:
-            info = get_file_info(file_path)
-            documents.append(info)
-
-    # Sort by modification time (newest first)
-    documents.sort(key=lambda x: x['modified'], reverse=True)
-    return documents
-
-def process_uploaded_files(uploaded_files):
+def process_uploaded_files(uploaded_files, selected_model="all-MiniLM-L6-v2"):
     """Process uploaded files"""
     if not uploaded_files:
         return
@@ -110,6 +113,7 @@ def process_uploaded_files(uploaded_files):
     data_dir = Path("data")
     data_dir.mkdir(exist_ok=True)
 
+    processor = DocumentProcessor()
     processed_count = 0
 
     for uploaded_file in uploaded_files:
@@ -128,80 +132,31 @@ def process_uploaded_files(uploaded_files):
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
 
-        processed_count += 1
+        # Process the file
+        try:
+            processor.process_document(str(file_path), selected_model)
+            processed_count += 1
+        except Exception as e:
+            st.error(f"❌ Failed to process {uploaded_file.name}: {e}")
 
     if processed_count > 0:
-        st.success(f"✅ Successfully uploaded {processed_count} file(s)")
+        st.success(f"✅ Successfully uploaded and processed {processed_count} file(s)")
         st.rerun()
 
 def reprocess_documents(selected_model="all-MiniLM-L6-v2"):
-    """Reprocess all documents to update embeddings and vector store"""
+    """Reprocess all documents to update database and Elasticsearch"""
     try:
-        with st.spinner("🔄 Checking documents..."):
+        with st.spinner("🔄 Processing documents..."):
+            processor = DocumentProcessor()
+            processor.process_directory("data", selected_model)
 
-            # Load and split documents
-            docs = load_documents()
-            chunks = split_documents(docs)
+            st.success("✅ Documents processed and stored in database")
 
-            if not chunks:
-                st.warning("⚠️ No documents found to process")
-                return
-
-            # Check if we need to reprocess (smart caching)
-            from src.embeddings import get_documents_hash
-            current_hash = get_documents_hash(chunks)
-
-            # Check if embeddings already exist for this model
-            safe_model_name = selected_model.replace('/', '_').replace('-', '_')
-            embeddings_file = f"models/embeddings_{safe_model_name}.pkl"
-
-            needs_reprocessing = True
-            if os.path.exists(embeddings_file):
-                try:
-                    # Load existing embeddings to check hash
-                    _, _, stored_hash = load_embeddings(selected_model)
-                    if stored_hash == current_hash:
-                        st.info(f"✅ Documents haven't changed for {selected_model}. Skipping reprocessing.")
-                        needs_reprocessing = False
-                    else:
-                        st.info(f"📝 Documents have changed for {selected_model}. Reprocessing...")
-                except Exception:
-                    st.info(f"📝 Could not verify existing embeddings for {selected_model}. Reprocessing...")
-
-            if not needs_reprocessing:
-                # Update session state to force reinitialization
-                if 'system_initialized' in st.session_state:
-                    st.session_state.system_initialized = False
-                return
-
-            # Reprocess documents
-            with st.spinner("🔄 Reprocessing documents... This may take a while."):
-
-                # Create embeddings
-                st.info(f"📊 Creating embeddings using {selected_model}...")
-                from sentence_transformers import SentenceTransformer
-                import torch
-                device = 'cuda' if torch.cuda.is_available() else 'cpu'
-                model = SentenceTransformer(selected_model, device=device)
-                texts = [doc.page_content for doc in chunks]
-                embeddings = model.encode(texts, show_progress_bar=True)
-
-                # Save embeddings and index with model-specific names
-                save_embeddings(embeddings, chunks, selected_model)
-
-                # Create and save FAISS index
-                st.info("🔍 Building vector index...")
-                index = create_faiss_index(embeddings)
-                save_faiss_index(index, selected_model)
-
-                st.success(f"✅ Successfully processed {len(chunks)} document chunks from {len(docs)} files using {selected_model}")
-
-                # Update session state to force reinitialization
-                if 'system_initialized' in st.session_state:
-                    st.session_state.system_initialized = False
-
+            # Update session state to force reinitialization
+            if 'system_initialized' in st.session_state:
+                st.session_state.system_initialized = False
     except Exception as e:
-        st.error(f"❌ Failed to reprocess documents: {str(e)}")
+        st.error(f"❌ Processing failed: {e}")
 
 def batch_process_documents(selected_models):
     """Process documents with multiple models in batch"""
@@ -282,6 +237,15 @@ def main():
     st.markdown("### 📤 Upload Documents")
     st.markdown("Supported formats: TXT, PDF, DOCX, PPTX, XLSX")
 
+    # Get available embedding models for upload
+    from utils.session_manager import get_available_embedding_models
+    available_models = get_available_embedding_models()
+    upload_model = st.selectbox(
+        "Embedding Model for Upload",
+        available_models,
+        help="Choose which embedding model to use for processing uploaded documents"
+    )
+
     uploaded_files = st.file_uploader(
         "Choose files to upload",
         accept_multiple_files=True,
@@ -290,7 +254,7 @@ def main():
 
     if uploaded_files:
         if st.button("📤 Upload Files", type="primary"):
-            process_uploaded_files(uploaded_files)
+            process_uploaded_files(uploaded_files, upload_model)
 
     st.markdown("---")
 
@@ -369,7 +333,7 @@ def main():
                     st.caption(f"Size: {format_file_size(doc['size'])}")
 
                 with col2:
-                    st.caption(f"Modified: {time.strftime('%Y-%m-%d %H:%M', time.localtime(doc['modified']))}")
+                    st.caption(f"Modified: {time.strftime('%Y-%m-%d %H:%M', time.localtime(int(doc['modified'].timestamp())))}")
 
                 with col3:
                     file_ext = doc['extension'].upper()

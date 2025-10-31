@@ -11,6 +11,8 @@
 - Set up databases: PostgreSQL running, OpenSearch via Docker (see plan.md)
 - Run migration: `python scripts/migrate_to_db.py` (after databases are set up)
 - Set up OpenSearch indices: `python src/database/opensearch_setup.py`
+- Run performance tests: `python test_performance.py`
+- Deploy with Docker: `docker-compose up -d` (requires Docker Desktop)
 
 ## Multi-Model Support
 

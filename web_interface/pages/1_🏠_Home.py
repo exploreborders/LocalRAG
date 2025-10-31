@@ -13,8 +13,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # Import system components
 try:
-    from src.retrieval import Retriever, format_results
-    from src.rag_pipeline import RAGPipeline, format_answer
+    from src.retrieval_db import DatabaseRetriever
+    from src.rag_pipeline_db import RAGPipelineDB, format_results_db, format_answer_db
 except ImportError:
     st.error("❌ Could not import RAG system components. Please ensure you're running from the project root.")
     st.stop()
@@ -61,11 +61,11 @@ def initialize_system():
             llm_model = settings.get('generation', {}).get('model', 'llama2')
 
             # Initialize retriever with configured embedding model
-            st.session_state.retriever = Retriever(embedding_model)
+            st.session_state.retriever = DatabaseRetriever(embedding_model)
 
             # Try to initialize RAG pipeline with configured LLM (may fail if Ollama not running)
             try:
-                st.session_state.rag_pipeline = RAGPipeline(llm_model)
+                st.session_state.rag_pipeline = RAGPipelineDB(embedding_model, llm_model)
                 st.session_state.rag_available = True
             except Exception as e:
                 st.session_state.rag_pipeline = None
@@ -88,8 +88,8 @@ def process_query(query, mode="retrieval"):
             if st.session_state.retriever is None:
                 raise Exception("Retriever not initialized")
 
-            results = st.session_state.retriever.retrieve(query, k=3)
-            formatted_results = format_results(results)
+            results = st.session_state.retriever.retrieve(query, top_k=3)
+            formatted_results = format_results_db(results)
 
             # Store results for display
             st.session_state.current_results = {
@@ -103,8 +103,8 @@ def process_query(query, mode="retrieval"):
             if st.session_state.rag_pipeline is None:
                 raise Exception("RAG pipeline not available. Please ensure Ollama is running.")
 
-            result = st.session_state.rag_pipeline.query(query)
-            formatted_answer = format_answer(result)
+            result = st.session_state.rag_pipeline.query(query, top_k=3)
+            formatted_answer = format_answer_db(result['answer'])
 
             # Store results for display
             st.session_state.current_results = {
