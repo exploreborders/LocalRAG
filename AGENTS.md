@@ -21,7 +21,12 @@
 - **Error Handling**: try/except with specific exceptions, validate inputs, context managers
 - **Best Practices**: PEP 8, descriptive names, single responsibility, unit tests, no global state
 
+## Document Processing
+- **Unified Loading**: Docling integration for better document parsing (PDF, DOCX, PPTX, XLSX)
+- **Fallback Support**: Graceful fallback to basic parsers if Docling fails
+- **Text Files**: Direct loading for simple .txt files
+
 ## Model Requirements
-- **Only nomic-embed-text-v1.5**: Fixed model for all embeddings (requires einops)
+- **Default model: all-MiniLM-L6-v2**: Reliable embedding model for all operations
 - **Smart Caching**: Document hash comparison prevents reprocessing
 - **Batch Processing**: Efficient document processing with single model

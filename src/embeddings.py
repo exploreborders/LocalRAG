@@ -2,7 +2,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 
-def create_embeddings(documents, model_name="nomic-ai/nomic-embed-text-v1.5", batch_size=32, show_progress=True):
+def create_embeddings(documents, model_name="all-MiniLM-L6-v2", batch_size=32, show_progress=True):
     """
     Create embeddings for document chunks using nomic-embed-text-v1.5.
 

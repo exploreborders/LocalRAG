@@ -144,7 +144,7 @@ class DocumentProcessor:
             from elasticsearch.helpers import bulk
             bulk(self.es, actions)
 
-    def process_document(self, filepath: str, model_name: str = "nomic-ai/nomic-embed-text-v1.5", chunk_size: int = 1000, overlap: int = 200):
+    def process_document(self, filepath: str, model_name: str = "all-MiniLM-L6-v2", chunk_size: int = 1000, overlap: int = 200):
         """
         Process a single document: load, chunk, embed, and save to database and Elasticsearch.
 
@@ -166,12 +166,45 @@ class DocumentProcessor:
             print(f"Document {file_path.name} already processed")
             return
 
-        # Load and split document
-        documents = load_documents(str(file_path))
+        # Load document using Docling
+        content_type = file_path.suffix[1:] if file_path.suffix else 'unknown'
+
+        if content_type == 'txt':
+            # Use simple text loading for txt files
+            with open(str(file_path), 'r', encoding='utf-8') as f:
+                content = f.read()
+            from langchain_core.documents import Document as LangchainDocument
+            documents = [LangchainDocument(page_content=content, metadata={"source": str(file_path)})]
+        else:
+            # Use Docling for other formats
+            from docling.document_converter import DocumentConverter
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+            from docling.datamodel.base_models import InputFormat
+
+            pipeline_options = PdfPipelineOptions()
+            pipeline_options.do_ocr = False
+            pipeline_options.do_table_structure = True
+
+            doc_converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: pipeline_options,
+                }
+            )
+
+            result = doc_converter.convert(str(file_path))
+            text_content = result.document.export_to_markdown()
+            from langchain_core.documents import Document as LangchainDocument
+            documents = [LangchainDocument(
+                page_content=text_content,
+                metadata={
+                    "source": str(file_path),
+                    "docling_metadata": result.document.meta.export_json_dict()
+                }
+            )]
+
         chunks = split_documents(documents, chunk_size=chunk_size, chunk_overlap=overlap)
 
         # Save document metadata
-        content_type = file_path.suffix[1:] if file_path.suffix else 'unknown'
         doc = self.save_document(file_path.name, str(file_path), file_hash, content_type)
 
         # Generate embeddings
@@ -190,7 +223,7 @@ class DocumentProcessor:
 
         print(f"Processed {file_path.name}: {len(chunks)} chunks")
 
-    def process_directory(self, directory: str, model_name: str = "nomic-ai/nomic-embed-text-v1.5", **kwargs):
+    def process_directory(self, directory: str, model_name: str = "all-MiniLM-L6-v2", **kwargs):
         """
         Process all supported documents in a directory.
 
@@ -242,7 +275,7 @@ class DocumentProcessor:
             'embedding_model': chunk.embedding_model
         } for chunk in chunks]
 
-    def process_existing_documents(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", chunk_size: int = 1000, overlap: int = 200):
+    def process_existing_documents(self, model_name: str = "all-MiniLM-L6-v2", chunk_size: int = 1000, overlap: int = 200):
         """
         Process all existing documents in the database that haven't been processed yet.
         
@@ -252,7 +285,10 @@ class DocumentProcessor:
             overlap (int): Overlap between chunks
         """
         from .embeddings import create_embeddings
-        from .data_loader import load_pdf, load_docx, load_pptx, load_xlsx, split_documents
+        from .data_loader import split_documents
+        from docling.document_converter import DocumentConverter
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.datamodel.base_models import InputFormat
         
         # Get documents that are not processed
         docs = self.db.query(Document).filter(Document.status != 'processed').all()
@@ -267,24 +303,35 @@ class DocumentProcessor:
             if os.path.exists(doc.filepath) and os.path.isfile(doc.filepath):
                 print(f"🔄 Processing {doc.filename}...")
                 try:
-                    # Load document content based on type
-                    if doc.content_type == 'pdf':
-                        documents = load_pdf(doc.filepath)
-                    elif doc.content_type == 'docx':
-                        documents = load_docx(doc.filepath)
-                    elif doc.content_type == 'pptx':
-                        documents = load_pptx(doc.filepath)
-                    elif doc.content_type == 'xlsx':
-                        documents = load_xlsx(doc.filepath)
-                    elif doc.content_type == 'txt':
-                        # For txt, create Document object
+                    # Use Docling for unified document processing
+                    pipeline_options = PdfPipelineOptions()
+                    pipeline_options.do_ocr = False
+                    pipeline_options.do_table_structure = True
+
+                    doc_converter = DocumentConverter(
+                        format_options={
+                            InputFormat.PDF: pipeline_options,
+                        }
+                    )
+
+                    if doc.content_type == 'txt':
+                        # Use simple text loading for txt files
                         with open(doc.filepath, 'r', encoding='utf-8') as f:
                             content = f.read()
                         from langchain_core.documents import Document as LangchainDocument
                         documents = [LangchainDocument(page_content=content, metadata={"source": doc.filepath})]
                     else:
-                        print(f"⚠️ Unsupported content type: {doc.content_type}")
-                        continue
+                        # Use Docling for other formats
+                        result = doc_converter.convert(doc.filepath)
+                        text_content = result.document.export_to_markdown()
+                        from langchain_core.documents import Document as LangchainDocument
+                        documents = [LangchainDocument(
+                            page_content=text_content,
+                            metadata={
+                                "source": doc.filepath,
+                                "docling_metadata": result.document.meta.export_json_dict()
+                            }
+                        )]
                     
                     # Split into chunks
                     chunks = split_documents(documents, chunk_size, overlap)

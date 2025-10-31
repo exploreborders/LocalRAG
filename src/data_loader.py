@@ -1,17 +1,17 @@
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+from docling.document_converter import DocumentConverter
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions
+from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 import os
-import PyPDF2
-from docx import Document as DocxDocument
-from pptx import Presentation
-import openpyxl
 
 def load_documents(data_dir="data"):
     """
-    Load documents from the specified directory.
+    Load documents from the specified directory using Docling.
 
-    Supports multiple file formats: .txt, .pdf, .docx, .pptx, .xlsx
+    Supports multiple file formats: .txt, .pdf, .docx, .pptx, .xlsx, .html, .md, etc.
 
     Args:
         data_dir (str): Path to the directory containing documents
@@ -20,97 +20,57 @@ def load_documents(data_dir="data"):
         list: List of Document objects with page_content and metadata
     """
     documents = []
+
+    # Configure Docling pipeline options for better PDF processing
+    pipeline_options = PdfPipelineOptions()
+    pipeline_options.do_ocr = False  # Disable OCR for speed, enable if needed
+    pipeline_options.do_table_structure = True  # Extract tables
+
+    doc_converter = DocumentConverter(
+        format_options={
+            InputFormat.PDF: pipeline_options,
+        }
+    )
+
     for file in os.listdir(data_dir):
         file_path = os.path.join(data_dir, file)
-        if file.endswith(".txt"):
-            loader = TextLoader(file_path)
-            documents.extend(loader.load())
-        elif file.endswith(".pdf"):
-            documents.extend(load_pdf(file_path))
-        elif file.endswith(".docx"):
-            documents.extend(load_docx(file_path))
-        elif file.endswith(".pptx"):
-            documents.extend(load_pptx(file_path))
-        elif file.endswith(".xlsx"):
-            documents.extend(load_xlsx(file_path))
-        # Add more formats as needed
+        if not os.path.isfile(file_path):
+            continue
+
+        try:
+            if file.endswith(".txt"):
+                # Use LangChain TextLoader for simple text files
+                loader = TextLoader(file_path)
+                documents.extend(loader.load())
+            else:
+                # Use Docling for all other formats
+                result = doc_converter.convert(file_path)
+                # Extract text content from Docling document
+                text_content = result.document.export_to_markdown()
+                documents.append(Document(
+                    page_content=text_content,
+                    metadata={
+                        "source": file_path,
+                        "file_type": file.split('.')[-1],
+                        "docling_metadata": result.document.meta.export_json_dict()
+                    }
+                ))
+        except Exception as e:
+            print(f"Error loading {file_path}: {e}")
+            # Fallback to basic text loading if Docling fails
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                documents.append(Document(
+                    page_content=content,
+                    metadata={"source": file_path, "fallback": True}
+                ))
+            except:
+                print(f"Failed to load {file_path} with fallback method")
+
     return documents
 
-def load_pdf(file_path):
-    """
-    Load a PDF file and extract text content.
-
-    Args:
-        file_path (str): Path to the PDF file
-
-    Returns:
-        list: List containing a single Document object with extracted text
-    """
-    documents = []
-    with open(file_path, 'rb') as file:
-        pdf_reader = PyPDF2.PdfReader(file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
-        documents.append(Document(page_content=text, metadata={"source": file_path}))
-    return documents
-
-def load_docx(file_path):
-    """
-    Load a DOCX file and extract text content.
-
-    Args:
-        file_path (str): Path to the DOCX file
-
-    Returns:
-        list: List containing a single Document object with extracted text
-    """
-    documents = []
-    doc = DocxDocument(file_path)
-    text = ""
-    for para in doc.paragraphs:
-        text += para.text + "\n"
-    documents.append(Document(page_content=text, metadata={"source": file_path}))
-    return documents
-
-def load_pptx(file_path):
-    """
-    Load a PPTX file and extract text content from slides.
-
-    Args:
-        file_path (str): Path to the PPTX file
-
-    Returns:
-        list: List containing a single Document object with extracted text
-    """
-    documents = []
-    prs = Presentation(file_path)
-    text = ""
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if hasattr(shape, "text"):
-                text += shape.text + "\n"
-    documents.append(Document(page_content=text, metadata={"source": file_path}))
-    return documents
-
-def load_xlsx(file_path):
-    """
-    Load an XLSX file and extract text content from all sheets.
-
-    Args:
-        file_path (str): Path to the XLSX file
-
-    Returns:
-        list: List containing a single Document object with extracted text
-    """
-    documents = []
-    wb = openpyxl.load_workbook(file_path)
-    text = ""
-    for sheet in wb:
-        for row in sheet.iter_rows(values_only=True):
-            text += " ".join([str(cell) for cell in row if cell is not None]) + "\n"
-    documents.append(Document(page_content=text, metadata={"source": file_path}))
-    return documents
+# Individual load functions removed - now using Docling for unified document processing
 
 def split_documents(documents, chunk_size=1000, chunk_overlap=200):
     """
