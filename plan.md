@@ -204,7 +204,44 @@ This plan provides a high-level overview. Each step may require additional resea
 - **Performance**: ~0.06s per chunk embedding, ~0.15s query response
 - **Data Consistency**: All models have matching embeddings, documents, and indices (5,027 vectors each)
 
-### 🚀 **Future Enhancement Opportunities**
+### 🚀 **Phase 4: PostgreSQL + OpenSearch Integration (IN PROGRESS)**
+
+**Goal**: Transform the system into a production-ready, scalable document search platform
+
+#### **Phase 4.1: Infrastructure Setup (COMPLETED)**
+- ✅ Install and configure PostgreSQL database server
+- ✅ Create rag_system database with pgvector support
+- ✅ Create database schemas for documents, chunks, and processing jobs
+- ✅ Configure environment variables and connection settings
+- ⏳ Install and configure OpenSearch search engine (requires Docker Desktop to be started)
+- ⏳ Set up OpenSearch indices for documents and vectors
+- **Status**: Infrastructure mostly ready, OpenSearch pending Docker
+
+#### **Phase 4.2: Data Migration (COMPLETED)**
+- ✅ Migrate existing documents and metadata to PostgreSQL (34 documents migrated)
+- ⏳ Migrate embeddings and vectors to Elasticsearch (requires chunk data restructuring)
+- Implement data validation and integrity checks
+- Create migration scripts with rollback capabilities
+
+#### **Phase 4.3: Core Integration**
+- Implement new document processor with database storage
+- Update retrieval system for hybrid search (vector + text)
+- Add OpenSearch vector similarity search
+- Implement advanced filtering and faceting
+
+#### **Phase 4.4: API & UI Updates**
+- Update web interface for new search capabilities
+- Add real-time processing status and analytics
+- Implement document management dashboard
+- Add REST API endpoints
+
+#### **Phase 4.5: Testing & Optimization**
+- Performance benchmarking against current system
+- Load testing with multiple concurrent users
+- Query optimization and indexing improvements
+- Production deployment preparation
+
+### 🎯 **Future Enhancement Opportunities**
 
 While the core system is production-ready, potential future improvements include:
 

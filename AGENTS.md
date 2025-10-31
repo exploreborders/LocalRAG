@@ -8,6 +8,9 @@
 - Run CLI app: `python -m src.app`
 - Process data: `python -m src.embeddings` or `python -m src.embeddings --all` (all models)
 - Test retrieval: `python -m src.retrieval`
+- Set up databases: PostgreSQL running, OpenSearch via Docker (see plan.md)
+- Run migration: `python scripts/migrate_to_db.py` (after databases are set up)
+- Set up OpenSearch indices: `python src/database/opensearch_setup.py`
 
 ## Multi-Model Support
 
