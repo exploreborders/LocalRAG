@@ -9,7 +9,12 @@ import json
 import os
 
 def get_elasticsearch_client():
-    """Get Elasticsearch client for RAG operations."""
+    """
+    Get Elasticsearch client configured for RAG operations.
+
+    Returns:
+        Elasticsearch: Configured Elasticsearch client instance
+    """
     return Elasticsearch(
         hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}],
         basic_auth=(os.getenv("OPENSEARCH_USER", "elastic"), os.getenv("OPENSEARCH_PASSWORD", "changeme")),
@@ -17,6 +22,12 @@ def get_elasticsearch_client():
     )
 
 def setup_opensearch_indices():
+    """
+    Set up required Elasticsearch indices for the RAG system.
+
+    Creates 'rag_documents' index for full-text search and 'rag_vectors'
+    index for vector similarity search with proper mappings.
+    """
     # Connect to Elasticsearch (using instead of OpenSearch due to Docker issues)
     client = Elasticsearch(
         hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}],

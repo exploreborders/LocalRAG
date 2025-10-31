@@ -8,7 +8,12 @@ import sys
 import os
 
 def main():
-    """Run the Streamlit web interface"""
+    """
+    Run the Streamlit web interface for the Local RAG System.
+
+    Checks for virtual environment and required dependencies before
+    launching the web application on localhost:8501.
+    """
     # Check if we're in the virtual environment
     if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
         print("⚠️  Warning: Virtual environment not detected. Please activate 'rag_env' first:")

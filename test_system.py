@@ -5,6 +5,12 @@ Test script for the Local RAG System components
 from src.retrieval_db import DatabaseRetriever
 
 def test_retrieval():
+    """
+    Test the document retrieval functionality.
+
+    Creates a DatabaseRetriever instance and performs a test query
+    to verify that vector search is working correctly.
+    """
     print("Testing Retrieval System...")
     retriever = DatabaseRetriever()
     query = "What is RAG?"
@@ -17,6 +23,12 @@ def test_retrieval():
     print("✓ Retrieval test passed\n")
 
 def test_rag_pipeline():
+    """
+    Test the complete RAG pipeline functionality.
+
+    Tests retrieval + generation pipeline to ensure end-to-end
+    question answering works correctly.
+    """
     print("Testing RAG Pipeline...")
     try:
         from src.rag_pipeline_db import RAGPipelineDB

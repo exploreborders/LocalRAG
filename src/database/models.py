@@ -1,3 +1,8 @@
+"""
+SQLAlchemy models for the RAG system database.
+Defines tables for documents, chunks, and processing jobs.
+"""
+
 from sqlalchemy import create_engine, Column, Integer, String, Text, TIMESTAMP, ForeignKey, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -5,6 +10,12 @@ from sqlalchemy.orm import sessionmaker, relationship
 Base = declarative_base()
 
 class Document(Base):
+    """
+    Document metadata table.
+
+    Stores information about uploaded documents including file details,
+    processing status, and relationships to chunks and jobs.
+    """
     __tablename__ = 'documents'
 
     id = Column(Integer, primary_key=True)
@@ -20,6 +31,12 @@ class Document(Base):
     jobs = relationship("ProcessingJob", back_populates="document")
 
 class DocumentChunk(Base):
+    """
+    Document chunk table.
+
+    Stores individual text chunks from documents along with their
+    embedding information and metadata.
+    """
     __tablename__ = 'document_chunks'
 
     id = Column(Integer, primary_key=True)
@@ -34,6 +51,12 @@ class DocumentChunk(Base):
     document = relationship("Document", back_populates="chunks")
 
 class ProcessingJob(Base):
+    """
+    Processing job table.
+
+    Tracks document processing jobs including status, timing,
+    and error information.
+    """
     __tablename__ = 'processing_jobs'
 
     id = Column(Integer, primary_key=True)
@@ -53,6 +76,12 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
+    """
+    Dependency function to get database session.
+
+    Yields:
+        Session: SQLAlchemy database session
+    """
     db = SessionLocal()
     try:
         yield db

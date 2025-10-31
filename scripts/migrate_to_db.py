@@ -18,6 +18,12 @@ load_dotenv()
 
 # Database connections
 def get_postgres_connection():
+    """
+    Get PostgreSQL database connection for migration operations.
+
+    Returns:
+        psycopg2.connection: Configured PostgreSQL connection
+    """
     return psycopg2.connect(
         host=os.getenv("POSTGRES_HOST", "localhost"),
         port=os.getenv("POSTGRES_PORT", 5432),
@@ -27,6 +33,12 @@ def get_postgres_connection():
     )
 
 def get_elasticsearch_client():
+    """
+    Get Elasticsearch client for migration operations.
+
+    Returns:
+        Elasticsearch: Configured Elasticsearch client instance
+    """
     return Elasticsearch(
         hosts=[{"host": os.getenv("OPENSEARCH_HOST", "localhost"), "port": int(os.getenv("OPENSEARCH_PORT", 9200)), "scheme": "http"}],
         basic_auth=(os.getenv("OPENSEARCH_USER", "elastic"), os.getenv("OPENSEARCH_PASSWORD", "changeme")),
@@ -34,7 +46,15 @@ def get_elasticsearch_client():
     )
 
 def calculate_file_hash(filepath):
-    """Calculate MD5 hash of file."""
+    """
+    Calculate MD5 hash of a file for change detection.
+
+    Args:
+        filepath (str): Path to the file
+
+    Returns:
+        str: MD5 hash as hexadecimal string
+    """
     hash_md5 = hashlib.md5()
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
@@ -42,7 +62,12 @@ def calculate_file_hash(filepath):
     return hash_md5.hexdigest()
 
 def migrate_documents_to_postgres():
-    """Migrate document metadata to PostgreSQL."""
+    """
+    Migrate document metadata from filesystem to PostgreSQL database.
+
+    Scans the data directory and creates document records for all supported
+    file types (.txt, .pdf, .docx, .pptx, .xlsx).
+    """
     print("Migrating documents to PostgreSQL...")
 
     conn = get_postgres_connection()
@@ -76,7 +101,12 @@ def migrate_documents_to_postgres():
     print(f"Migrated {len(documents)} documents")
 
 def migrate_chunks_to_postgres():
-    """Migrate document chunks to PostgreSQL."""
+    """
+    Migrate document chunks to PostgreSQL database.
+
+    Note: Currently a placeholder - implementation depends on existing
+    chunk storage format.
+    """
     print("Migrating document chunks to PostgreSQL...")
 
     # This would require loading the existing chunk data
@@ -84,7 +114,12 @@ def migrate_chunks_to_postgres():
     pass
 
 def migrate_embeddings_to_opensearch():
-    """Migrate embeddings to OpenSearch."""
+    """
+    Migrate vector embeddings from pickle files to Elasticsearch.
+
+    Loads existing embeddings, documents, and chunks from the models directory
+    and bulk indexes them into the rag_vectors index.
+    """
     print("Migrating embeddings to OpenSearch...")
 
     client = get_elasticsearch_client()

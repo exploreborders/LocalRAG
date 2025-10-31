@@ -10,7 +10,19 @@ from langchain_core.prompts import PromptTemplate
 from .retrieval_db import DatabaseRetriever
 
 class RAGPipelineDB:
+    """
+    Retrieval-Augmented Generation pipeline using database-backed retrieval
+    and Ollama LLM for answer generation.
+    """
+
     def __init__(self, model_name: str = "all-mpnet-base-v2", llm_model: str = "llama2"):
+        """
+        Initialize the RAG pipeline.
+
+        Args:
+            model_name (str): Embedding model for retrieval
+            llm_model (str): Ollama model for generation
+        """
         self.retriever = DatabaseRetriever(model_name)
         self.llm = OllamaLLM(model=llm_model)
         self.prompt_template = PromptTemplate(
@@ -29,11 +41,29 @@ Answer:"""
         )
 
     def retrieve(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        """Retrieve relevant documents."""
+        """
+        Retrieve relevant document chunks for a query.
+
+        Args:
+            query (str): Search query
+            top_k (int): Number of results to retrieve
+
+        Returns:
+            list: Retrieved document chunks with content and metadata
+        """
         return self.retriever.retrieve(query, top_k)
 
     def generate_answer(self, query: str, context_docs: List[Dict[str, Any]]) -> str:
-        """Generate answer using LLM."""
+        """
+        Generate an answer using retrieved context and LLM.
+
+        Args:
+            query (str): Original question
+            context_docs (list): Retrieved document chunks
+
+        Returns:
+            str: Generated answer text
+        """
         # Combine context from retrieved documents
         context = "\n\n".join([doc['content'] for doc in context_docs])
 
@@ -48,7 +78,16 @@ Answer:"""
             return f"Error generating answer: {e}"
 
     def query(self, question: str, top_k: int = 5) -> Dict[str, Any]:
-        """Full RAG pipeline: retrieve and generate."""
+        """
+        Execute full RAG pipeline: retrieve relevant documents and generate answer.
+
+        Args:
+            question (str): Question to answer
+            top_k (int): Number of documents to retrieve
+
+        Returns:
+            dict: Response containing question, answer, retrieved docs, and metadata
+        """
         # Retrieve relevant documents
         retrieved_docs = self.retrieve(question, top_k)
 

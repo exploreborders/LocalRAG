@@ -15,7 +15,12 @@ from src.retrieval_db import DatabaseRetriever
 from src.rag_pipeline_db import RAGPipelineDB
 
 def benchmark_retrieval():
-    """Benchmark retrieval performance"""
+    """
+    Benchmark document retrieval performance.
+
+    Measures query latency and result quality for different
+    types of queries and model configurations.
+    """
     print("🔍 Benchmarking Retrieval Performance")
     print("=" * 50)
 

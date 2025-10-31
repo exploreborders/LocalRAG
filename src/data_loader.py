@@ -9,8 +9,15 @@ import openpyxl
 
 def load_documents(data_dir="data"):
     """
-    Load documents from the data directory.
-    Supports .txt, .pdf, .docx, .pptx, .xlsx files.
+    Load documents from the specified directory.
+
+    Supports multiple file formats: .txt, .pdf, .docx, .pptx, .xlsx
+
+    Args:
+        data_dir (str): Path to the directory containing documents
+
+    Returns:
+        list: List of Document objects with page_content and metadata
     """
     documents = []
     for file in os.listdir(data_dir):
@@ -30,7 +37,15 @@ def load_documents(data_dir="data"):
     return documents
 
 def load_pdf(file_path):
-    """Load PDF and return list of Documents."""
+    """
+    Load a PDF file and extract text content.
+
+    Args:
+        file_path (str): Path to the PDF file
+
+    Returns:
+        list: List containing a single Document object with extracted text
+    """
     documents = []
     with open(file_path, 'rb') as file:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -41,7 +56,15 @@ def load_pdf(file_path):
     return documents
 
 def load_docx(file_path):
-    """Load DOCX and return list of Documents."""
+    """
+    Load a DOCX file and extract text content.
+
+    Args:
+        file_path (str): Path to the DOCX file
+
+    Returns:
+        list: List containing a single Document object with extracted text
+    """
     documents = []
     doc = DocxDocument(file_path)
     text = ""
@@ -51,7 +74,15 @@ def load_docx(file_path):
     return documents
 
 def load_pptx(file_path):
-    """Load PPTX and return list of Documents."""
+    """
+    Load a PPTX file and extract text content from slides.
+
+    Args:
+        file_path (str): Path to the PPTX file
+
+    Returns:
+        list: List containing a single Document object with extracted text
+    """
     documents = []
     prs = Presentation(file_path)
     text = ""
@@ -63,7 +94,15 @@ def load_pptx(file_path):
     return documents
 
 def load_xlsx(file_path):
-    """Load XLSX and return list of Documents."""
+    """
+    Load an XLSX file and extract text content from all sheets.
+
+    Args:
+        file_path (str): Path to the XLSX file
+
+    Returns:
+        list: List containing a single Document object with extracted text
+    """
     documents = []
     wb = openpyxl.load_workbook(file_path)
     text = ""
@@ -75,7 +114,15 @@ def load_xlsx(file_path):
 
 def split_documents(documents, chunk_size=1000, chunk_overlap=200):
     """
-    Split documents into smaller chunks for better retrieval.
+    Split documents into smaller chunks for better retrieval performance.
+
+    Args:
+        documents (list): List of Document objects to split
+        chunk_size (int): Maximum size of each chunk in characters
+        chunk_overlap (int): Number of characters to overlap between chunks
+
+    Returns:
+        list: List of Document objects representing text chunks
     """
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,

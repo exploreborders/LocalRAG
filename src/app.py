@@ -12,6 +12,14 @@ except ImportError:
     from document_processor import DocumentProcessor
 
 def main():
+    """
+    Main CLI entry point for the Local RAG System.
+
+    Provides interactive menu for:
+    1. Document retrieval only
+    2. Full RAG pipeline with AI generation
+    3. Batch document processing
+    """
     print("Local RAG System")
     print("=================")
     print("Choose mode:")

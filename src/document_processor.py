@@ -20,15 +20,34 @@ from .database.opensearch_setup import get_elasticsearch_client
 load_dotenv()
 
 class DocumentProcessor:
+    """
+    Handles document processing, chunking, embedding generation, and storage
+    in both PostgreSQL database and Elasticsearch.
+    """
+
     def __init__(self):
+        """
+        Initialize the document processor with database and Elasticsearch connections.
+        """
         self.db: Session = SessionLocal()
         self.es = get_elasticsearch_client()
 
     def __del__(self):
+        """
+        Clean up database connections when the processor is destroyed.
+        """
         self.db.close()
 
     def calculate_file_hash(self, filepath: str) -> str:
-        """Calculate MD5 hash of file."""
+        """
+        Calculate MD5 hash of a file for change detection.
+
+        Args:
+            filepath (str): Path to the file
+
+        Returns:
+            str: MD5 hash as hexadecimal string
+        """
         hash_md5 = hashlib.md5()
         with open(filepath, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
@@ -36,11 +55,30 @@ class DocumentProcessor:
         return hash_md5.hexdigest()
 
     def document_exists(self, file_hash: str) -> bool:
-        """Check if document already exists in database."""
+        """
+        Check if a document with the given hash already exists in the database.
+
+        Args:
+            file_hash (str): MD5 hash of the file
+
+        Returns:
+            bool: True if document exists, False otherwise
+        """
         return self.db.query(Document).filter(Document.file_hash == file_hash).first() is not None
 
     def save_document(self, filename: str, filepath: str, file_hash: str, content_type: str) -> Document:
-        """Save document metadata to database."""
+        """
+        Save document metadata to the database.
+
+        Args:
+            filename (str): Name of the file
+            filepath (str): Path to the file
+            file_hash (str): MD5 hash of the file
+            content_type (str): File extension/type
+
+        Returns:
+            Document: The created Document database object
+        """
         doc = Document(
             filename=filename,
             filepath=filepath,
@@ -54,7 +92,16 @@ class DocumentProcessor:
         return doc
 
     def save_chunks(self, document_id: int, chunks: List, embedding_model: str, chunk_size: int, overlap: int):
-        """Save document chunks to database."""
+        """
+        Save document chunks to the database.
+
+        Args:
+            document_id (int): ID of the parent document
+            chunks (list): List of Document chunk objects
+            embedding_model (str): Name of the embedding model used
+            chunk_size (int): Size of each chunk
+            overlap (int): Overlap between chunks
+        """
         for i, chunk in enumerate(chunks):
             chunk_obj = DocumentChunk(
                 document_id=document_id,
@@ -68,7 +115,15 @@ class DocumentProcessor:
         self.db.commit()
 
     def save_embeddings_to_es(self, chunks: List, embeddings: List, model_name: str, document_id: int):
-        """Save embeddings to Elasticsearch."""
+        """
+        Save document chunks and their embeddings to Elasticsearch.
+
+        Args:
+            chunks (list): List of Document chunk objects
+            embeddings (list): List of embedding vectors (numpy arrays)
+            model_name (str): Name of the embedding model
+            document_id (int): ID of the parent document
+        """
         actions = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             action = {
@@ -90,26 +145,37 @@ class DocumentProcessor:
             bulk(self.es, actions)
 
     def process_document(self, filepath: str, model_name: str = "all-MiniLM-L6-v2", chunk_size: int = 1000, overlap: int = 200):
-        """Process a single document: load, chunk, embed, save to database and ES."""
-        filepath = Path(filepath)
-        if not filepath.exists():
-            raise FileNotFoundError(f"File not found: {filepath}")
+        """
+        Process a single document: load, chunk, embed, and save to database and Elasticsearch.
 
-        file_hash = self.calculate_file_hash(str(filepath))
+        Args:
+            filepath (str): Path to the document file
+            model_name (str): Name of the embedding model to use
+            chunk_size (int): Maximum size of each text chunk
+            overlap (int): Number of characters to overlap between chunks
+
+        Raises:
+            FileNotFoundError: If the specified file does not exist
+        """
+        file_path = Path(filepath)
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        file_hash = self.calculate_file_hash(str(file_path))
         if self.document_exists(file_hash):
-            print(f"Document {filepath.name} already processed")
+            print(f"Document {file_path.name} already processed")
             return
 
         # Load and split document
-        documents = load_documents(str(filepath))
-        chunks = split_documents(documents, chunk_size=chunk_size, overlap=overlap)
+        documents = load_documents(str(file_path))
+        chunks = split_documents(documents, chunk_size=chunk_size, chunk_overlap=overlap)
 
         # Save document metadata
-        content_type = filepath.suffix[1:] if filepath.suffix else 'unknown'
-        doc = self.save_document(filepath.name, str(filepath), file_hash, content_type)
+        content_type = file_path.suffix[1:] if file_path.suffix else 'unknown'
+        doc = self.save_document(file_path.name, str(file_path), file_hash, content_type)
 
         # Generate embeddings
-        embeddings = create_embeddings(chunks, model_name)
+        embeddings, _ = create_embeddings(chunks, model_name)
 
         # Save chunks to database
         self.save_chunks(doc.id, chunks, model_name, chunk_size, overlap)
@@ -122,10 +188,17 @@ class DocumentProcessor:
         doc.last_modified = datetime.now()
         self.db.commit()
 
-        print(f"Processed {filepath.name}: {len(chunks)} chunks")
+        print(f"Processed {file_path.name}: {len(chunks)} chunks")
 
     def process_directory(self, directory: str, model_name: str = "all-MiniLM-L6-v2", **kwargs):
-        """Process all documents in a directory."""
+        """
+        Process all supported documents in a directory.
+
+        Args:
+            directory (str): Path to the directory containing documents
+            model_name (str): Name of the embedding model to use
+            **kwargs: Additional arguments passed to process_document
+        """
         data_dir = Path(directory)
         for file_path in data_dir.glob("*"):
             if file_path.is_file() and file_path.suffix.lower() in ['.txt', '.pdf', '.docx', '.pptx', '.xlsx']:
@@ -135,7 +208,12 @@ class DocumentProcessor:
                     print(f"Error processing {file_path}: {e}")
 
     def get_documents(self) -> List[Dict[str, Any]]:
-        """Get all documents from database."""
+        """
+        Retrieve all documents from the database.
+
+        Returns:
+            list: List of dictionaries containing document metadata
+        """
         docs = self.db.query(Document).all()
         return [{
             'id': doc.id,
@@ -147,7 +225,15 @@ class DocumentProcessor:
         } for doc in docs]
 
     def get_chunks(self, document_id: int) -> List[Dict[str, Any]]:
-        """Get chunks for a document."""
+        """
+        Retrieve all chunks for a specific document.
+
+        Args:
+            document_id (int): ID of the document
+
+        Returns:
+            list: List of dictionaries containing chunk information
+        """
         chunks = self.db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).all()
         return [{
             'id': chunk.id,
