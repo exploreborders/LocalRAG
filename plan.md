@@ -71,14 +71,15 @@ This plan provides a high-level overview. Each step may require additional resea
     - Added configuration management with YAML settings
 
 3. **Data Processing Pipeline**
-    - **Document Loading**: Support for .txt, .pdf, .docx, .pptx, .xlsx files
+    - **Document Loading**: Docling-powered parsing for .txt, .pdf, .docx, .pptx, .xlsx files with layout awareness
     - **Text Chunking**: RecursiveCharacterTextSplitter with configurable chunk size (1000) and overlap (200)
-    - **Preprocessing**: Clean text extraction and normalization
-    - **Document Count**: Successfully processing 34 documents into 5,027 chunks
+    - **Preprocessing**: Advanced text extraction with table structure preservation and markdown export
+    - **Document Count**: Successfully processing 34 documents into database-backed chunks
 
 4. **Embedding System**
-    - **Single Model**: Initial implementation with all-MiniLM-L6-v2 (384 dimensions)
-    - **Persistence**: Pickle-based storage with metadata
+    - **Primary Model**: all-MiniLM-L6-v2 (384 dimensions) for reliable performance
+    - **Database Storage**: PostgreSQL with pgvector for chunk storage
+    - **Elasticsearch Indexing**: Vector similarity search with KNN optimization
     - **Performance**: Optimized batch processing and memory management
 
 5. **Vector Storage**
@@ -165,6 +166,7 @@ This plan provides a high-level overview. Each step may require additional resea
 - Database-backed document storage with PostgreSQL
 - Vector search with Elasticsearch for high-performance similarity search
 - Hybrid retrieval combining vector similarity and BM25 text search
+- Advanced document processing with Docling (layout-aware parsing, table extraction)
 - Multi-format document processing (PDF, DOCX, XLSX, PPTX, TXT)
 - Ollama integration for local LLM generation
 - Modern web interface with document management and analytics
@@ -173,8 +175,8 @@ This plan provides a high-level overview. Each step may require additional resea
 
 **📊 System Metrics:**
 - **Database**: PostgreSQL with pgvector + Elasticsearch with dense vectors
-- **Documents Processed**: 34 files with automatic chunking and embedding
-- **Vector Dimensions**: 768 (all-mpnet-base-v2 model)
+- **Documents Processed**: 34 files with Docling-powered parsing and chunking
+- **Vector Dimensions**: 384 (all-MiniLM-L6-v2 model)
 - **Web Interface**: 4-page Streamlit application with real-time processing
 - **Performance**: Sub-second query responses with accurate retrieval
 - **Scalability**: Supports large document collections with efficient indexing
@@ -235,6 +237,26 @@ This plan provides a high-level overview. Each step may require additional resea
 - ✅ Document processing verified working
 - ✅ Retrieval and RAG pipelines functional
 - ✅ Web interface fully operational
+
+### ✅ **Phase 6: Docling Integration (COMPLETED)**
+
+#### **Advanced Document Processing**
+- ✅ Integrate Docling 2.5.2 for superior document parsing
+- ✅ Replace individual parsers (PyPDF2, python-docx, etc.) with unified Docling API
+- ✅ Add layout-aware text extraction with table structure preservation
+- ✅ Implement markdown export for better document structure retention
+- ✅ Add fallback mechanisms for unsupported formats
+
+#### **Model Optimization**
+- ✅ Switch to all-MiniLM-L6-v2 as primary embedding model (more reliable than nomic)
+- ✅ Update all processing pipelines to use the new model
+- ✅ Maintain backward compatibility with existing document processing
+
+#### **System Updates**
+- ✅ Update AGENTS.md with new document processing guidelines
+- ✅ Update README.md and plan.md with Docling integration details
+- ✅ Clean and optimize requirements.txt
+- ✅ Test end-to-end document processing pipeline
 
 
 ### 🎯 **Future Enhancement Opportunities**

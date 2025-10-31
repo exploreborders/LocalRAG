@@ -7,8 +7,8 @@ A local Retrieval-Augmented Generation system built with Python, PostgreSQL, Ela
 - **Database-Backed Storage**: Documents and chunks stored in PostgreSQL with pgvector
 - **Vector Search**: High-performance similarity search using Elasticsearch with dense vectors
 - **Hybrid Retrieval**: Combine vector similarity with BM25 text search
-- **Document Processing**: Automatic chunking and embedding of uploaded documents
-- **Multi-Format Support**: Load documents from .txt, .pdf, .docx, .pptx, .xlsx files
+- **Advanced Document Processing**: Docling-powered parsing with layout awareness and table extraction
+- **Multi-Format Support**: Load documents from .txt, .pdf, .docx, .pptx, .xlsx files with unified processing
 - **Ollama Integration**: Local LLM generation with context from retrieved documents
 - **Web Interface**: Modern Streamlit UI for querying, document management, and analytics
 - **Scalable Architecture**: Designed for production use with proper database indexing
@@ -106,7 +106,7 @@ LocalRAG/
 
 ## Architecture
 
-- **Document Processing**: Documents are loaded, chunked, and embedded using sentence-transformers
+- **Document Processing**: Documents are parsed using Docling for superior text extraction, then chunked and embedded using all-MiniLM-L6-v2
 - **Storage**: Chunks and metadata stored in PostgreSQL, embeddings indexed in Elasticsearch
 - **Retrieval**: Hybrid search combining vector similarity and BM25 text search
 - **Generation**: Context from retrieved documents fed to Ollama LLMs for answer generation
