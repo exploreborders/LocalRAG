@@ -2,15 +2,14 @@
 
 ## Build/Lint/Test Commands
 - Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt`
+- Set up databases: `python setup_databases.py docker` (or `docker-compose up -d`)
+- Initialize databases: `python scripts/migrate_to_db.py && python src/database/opensearch_setup.py`
 - Run all tests: `python test_system.py`
 - Run single test: `python -c "from test_system import test_retrieval; test_retrieval()"`
-- Run web interface: `streamlit run web_interface/app.py`
+- Performance tests: `python test_performance.py`
+- Run web interface: `python run_web.py` (or `streamlit run web_interface/app.py`)
 - Run CLI app: `python -m src.app`
 - Process data: `python -m src.embeddings`
-- Set up databases: `docker-compose up -d` (PostgreSQL + Elasticsearch)
-- Run migration: `python scripts/migrate_to_db.py` (processes documents and creates chunks)
-- Set up indices: `python src/database/opensearch_setup.py`
-- Performance tests: `python test_performance.py`
 - Stop databases: `docker-compose down`
 
 ## Code Style Guidelines
