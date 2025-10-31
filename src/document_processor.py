@@ -135,15 +135,23 @@ class DocumentProcessor:
                     "chunk_id": i,
                     "content": chunk.page_content,
                     "embedding": embedding.tolist(),
-                    "embedding_model": model_name,
-                    "metadata": chunk.metadata
+                    "embedding_model": model_name
                 }
             }
             actions.append(action)
 
         if actions:
             from elasticsearch.helpers import bulk
-            bulk(self.es, actions)
+            success, failed = bulk(self.es, actions, stats_only=False, raise_on_error=False)
+            if failed:
+                print(f"Failed to index {failed} embeddings")
+                # Print first error
+                for action in actions[:1]:
+                    try:
+                        self.es.index(index="rag_vectors", id=action["_id"], document=action["_source"])
+                    except Exception as e:
+                        print(f"Sample indexing error: {e}")
+                        break
 
     def process_document(self, filepath: str, model_name: str = "nomic-ai/nomic-embed-text-v1.5", chunk_size: int = 1000, overlap: int = 200):
         """
@@ -246,6 +254,7 @@ class DocumentProcessor:
             'id': doc.id,
             'filename': doc.filename,
             'filepath': doc.filepath,
+            'content_type': doc.content_type,
             'status': doc.status,
             'upload_date': doc.upload_date,
             'last_modified': doc.last_modified
@@ -279,8 +288,10 @@ class DocumentProcessor:
             overlap (int): Overlap between chunks
         """
         from .embeddings import create_embeddings
-        from langchain_docling import DoclingLoader
-        from langchain_docling.loader import ExportType
+        from .data_loader import split_documents
+        from docling.document_converter import DocumentConverter
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.datamodel.base_models import InputFormat
 
         # Get documents that are not processed
         docs = self.db.query(Document).filter(Document.status != 'processed').all()
@@ -295,12 +306,30 @@ class DocumentProcessor:
             if os.path.exists(doc.filepath) and os.path.isfile(doc.filepath):
                 print(f"🔄 Processing {doc.filename}...")
                 try:
-                    # Use DoclingLoader for unified document processing and chunking
-                    loader = DoclingLoader(
-                        file_path=[doc.filepath],
-                        export_type=ExportType.DOC_CHUNKS,
-                    )
-                    chunks = loader.load()
+                    # Use Docling for unified document processing
+                    doc_converter = DocumentConverter()
+
+                    if doc.content_type == 'txt':
+                        # Use simple text loading for txt files
+                        with open(doc.filepath, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        from langchain_core.documents import Document as LangchainDocument
+                        documents = [LangchainDocument(page_content=content, metadata={"source": doc.filepath})]
+                    else:
+                        # Use Docling for other formats
+                        result = doc_converter.convert(doc.filepath)
+                        text_content = result.document.export_to_markdown()
+                        from langchain_core.documents import Document as LangchainDocument
+                        documents = [LangchainDocument(
+                            page_content=text_content,
+                            metadata={
+                                "source": doc.filepath,
+                                "docling_metadata": result.document.origin.model_dump() if result.document.origin else {}
+                            }
+                        )]
+
+                    # Split into chunks
+                    chunks = split_documents(documents, chunk_size, overlap)
 
                     if not chunks:
                         print(f"⚠️ No chunks generated for {doc.filename}")

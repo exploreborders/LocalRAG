@@ -5,8 +5,7 @@ langchain-ollama==1.0.0
 sentence-transformers==5.1.2
 ollama==0.6.0
 python-dotenv==1.2.1
-docling==2.5.2
-langchain-docling==1.1.0
+docling==2.60.0
 streamlit==1.28.1
 psycopg2==2.9.7
 SQLAlchemy==2.0.23
