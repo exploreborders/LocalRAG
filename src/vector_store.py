@@ -38,11 +38,13 @@ def search_similar(query_embedding, index, documents, k=3):
     distances, indices = index.search(query_embedding, k)
     results = []
     for i, idx in enumerate(indices[0]):
-        if idx != -1:  # Valid index
+        if idx != -1 and idx < len(documents):  # Valid index and within bounds
             results.append({
                 'document': documents[idx],
                 'distance': distances[0][i]
             })
+        else:
+            print(f"Warning: Index {idx} out of range for documents list of length {len(documents)}")
     return results
 
 if __name__ == "__main__":
