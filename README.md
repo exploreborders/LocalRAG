@@ -37,7 +37,21 @@ A local Retrieval-Augmented Generation system built with Python, Ollama, and FAI
 
 ## Usage
 
-### Run the application:
+### Web Interface (Recommended):
+```bash
+python run_web.py
+```
+Or directly:
+```bash
+streamlit run web_interface/app.py
+```
+Then open http://localhost:8501 in your browser for a comprehensive multipage experience with:
+- **🏠 Home**: Query interface and system control
+- **📁 Documents**: File upload and management
+- **⚙️ Settings**: Configuration options
+- **📊 Analytics**: Performance monitoring
+
+### Command Line Interface:
 ```bash
 python -m src.app
 ```
@@ -56,6 +70,11 @@ python -m src.retrieval
 **Test vector store:**
 ```bash
 python -m src.vector_store
+```
+
+**Run web interface:**
+```bash
+streamlit run web_interface/app.py
 ```
 
 ## Project Structure

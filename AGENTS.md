@@ -4,7 +4,8 @@
 - Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt`
 - Run all tests: `python test_system.py`
 - Run single test: `python -c "from test_system import test_retrieval; test_retrieval()"`
-- Run app: `python -m src.app`
+- Run web interface: `python run_web.py` or `streamlit run web_interface/app.py` (multipage app)
+- Run CLI app: `python -m src.app`
 - Process data: `python -m src.embeddings`
 - Test retrieval: `python -m src.retrieval`
 
