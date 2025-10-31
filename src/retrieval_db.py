@@ -29,6 +29,11 @@ class DatabaseRetriever:
         """Embed the query using the sentence transformer model."""
         return self.model.encode([query], convert_to_numpy=True)[0]
 
+    def retrieve(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """Retrieve relevant documents for a query."""
+        query_embedding = self.embed_query(query)
+        return self.search_vectors(query_embedding, top_k)
+
     def search_vectors(self, query_embedding: np.ndarray, top_k: int = 5) -> List[Dict[str, Any]]:
         """Search for similar vectors in Elasticsearch."""
         query = {

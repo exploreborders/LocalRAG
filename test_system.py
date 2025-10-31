@@ -8,7 +8,7 @@ def test_retrieval():
     print("Testing Retrieval System...")
     retriever = DatabaseRetriever()
     query = "What is RAG?"
-    results = retriever.search_vectors(retriever.embed_query(query), top_k=2)
+    results = retriever.retrieve(query, top_k=2)
     print(f"Query: {query}")
     print(f"Found {len(results)} results")
     for i, result in enumerate(results, 1):
@@ -24,7 +24,7 @@ def test_rag_pipeline():
         question = "What is Retrieval-Augmented Generation?"
         result = rag.query(question)
         print(f"Question: {question}")
-        print(f"Answer: {result[:200]}...")
+        print(f"Answer: {result['answer'][:200]}...")
         print("✓ RAG pipeline test passed\n")
     except Exception as e:
         print(f"✗ RAG pipeline test failed: {e}")

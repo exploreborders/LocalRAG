@@ -155,3 +155,78 @@ class DocumentProcessor:
             'content': chunk.content,
             'embedding_model': chunk.embedding_model
         } for chunk in chunks]
+
+    def process_existing_documents(self, model_name: str = "all-mpnet-base-v2", chunk_size: int = 1000, overlap: int = 200):
+        """
+        Process all existing documents in the database that haven't been processed yet.
+        
+        Args:
+            model_name (str): Embedding model to use
+            chunk_size (int): Size of text chunks
+            overlap (int): Overlap between chunks
+        """
+        from .embeddings import create_embeddings
+        from .data_loader import load_pdf, load_docx, load_pptx, load_xlsx, split_documents
+        
+        # Get documents that are not processed
+        docs = self.db.query(Document).filter(Document.status != 'processed').all()
+        
+        if not docs:
+            print("No unprocessed documents found.")
+            return
+        
+        print(f"Found {len(docs)} documents to process.")
+        
+        for doc in docs:
+            if os.path.exists(doc.filepath) and os.path.isfile(doc.filepath):
+                print(f"🔄 Processing {doc.filename}...")
+                try:
+                    # Load document content based on type
+                    if doc.content_type == 'pdf':
+                        documents = load_pdf(doc.filepath)
+                    elif doc.content_type == 'docx':
+                        documents = load_docx(doc.filepath)
+                    elif doc.content_type == 'pptx':
+                        documents = load_pptx(doc.filepath)
+                    elif doc.content_type == 'xlsx':
+                        documents = load_xlsx(doc.filepath)
+                    elif doc.content_type == 'txt':
+                        # For txt, create Document object
+                        with open(doc.filepath, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        from langchain_core.documents import Document as LangchainDocument
+                        documents = [LangchainDocument(page_content=content, metadata={"source": doc.filepath})]
+                    else:
+                        print(f"⚠️ Unsupported content type: {doc.content_type}")
+                        continue
+                    
+                    # Split into chunks
+                    chunks = split_documents(documents, chunk_size, overlap)
+                    
+                    if not chunks:
+                        print(f"⚠️ No chunks generated for {doc.filename}")
+                        continue
+                    
+                    # Generate embeddings
+                    embeddings_array, _ = create_embeddings(chunks, model_name)
+                    
+                    # Save chunks to database
+                    self.save_chunks(doc.id, chunks, model_name, chunk_size, overlap)
+                    
+                    # Save embeddings to Elasticsearch
+                    self.save_embeddings_to_es(chunks, embeddings_array, model_name, doc.id)
+                    
+                    # Update document status
+                    doc.status = 'processed'
+                    doc.last_modified = datetime.now()
+                    self.db.commit()
+                    
+                    print(f"✅ Processed {doc.filename}: {len(chunks)} chunks created")
+                    
+                except Exception as e:
+                    print(f"❌ Failed to process {doc.filename}: {e}")
+                    self.db.rollback()
+            else:
+                print(f"⚠️ File not found, skipping: {doc.filepath}")
+        
+        print("🎉 Finished processing existing documents.")

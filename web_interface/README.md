@@ -1,6 +1,6 @@
 # Local RAG System - Web Interface
 
-A modern multipage web interface for the Local RAG (Retrieval-Augmented Generation) system built with Streamlit.
+A modern multipage web interface for the Local RAG system, featuring database-backed document storage and Elasticsearch vector search, built with Streamlit.
 
 ## Features
 
@@ -39,14 +39,12 @@ A modern multipage web interface for the Local RAG (Retrieval-Augmented Generati
 ### 📁 Documents - File Management
 - **Multi-Format Upload**: Support for PDF, DOCX, XLSX, PPTX, TXT files
 - **Document Library**: Browse and manage your knowledge base
-- **Batch Processing**: Reprocess all documents to update embeddings
-- **Processing Status**: Real-time feedback on document ingestion
+- **Automatic Processing**: Documents are automatically chunked and embedded on upload
+- **Database Storage**: All documents and chunks stored in PostgreSQL
 
 ### ⚙️ Settings - Configuration
-- **Retrieval Parameters**: Adjust chunk size, overlap, and k-values
-- **AI Generation Settings**: Configure temperature, max tokens, and models
-- **Embedding Models**: Choose from different sentence-transformers models
-- **Interface Preferences**: Theme, language, and display options
+- **AI Generation Settings**: Configure temperature, max tokens, and Ollama models
+- **Interface Preferences**: Theme selection and display options
 
 ### 📊 Analytics - Performance Dashboard
 - **Usage Metrics**: Query counts, response times, and trends

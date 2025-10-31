@@ -1,20 +1,17 @@
 # Local RAG System
 
-A local Retrieval-Augmented Generation system built with Python, Ollama, and FAISS.
+A local Retrieval-Augmented Generation system built with Python, PostgreSQL, Elasticsearch, and Ollama.
 
 ## Features
 
-- **Multi-Model Support**: Choose from multiple embedding models (all-MiniLM-L6-v2, all-mpnet-base-v2, etc.)
-- **Smart Caching**: Avoid reprocessing documents when content hasn't changed
-- **Batch Processing**: Process documents with multiple models simultaneously
-- **Model Comparison**: Side-by-side performance comparison of different embedding models
-- Document loading and text chunking (supports .txt, .pdf, .docx, .pptx, .xlsx)
-- Embedding creation using sentence-transformers with GPU acceleration
-- Optimized vector storage with FAISS (IVF-PQ for large datasets)
-- Retrieval system for similarity search
-- Integration with Ollama LLMs for generation
-- Comprehensive web interface with analytics and settings
-- Command-line interface
+- **Database-Backed Storage**: Documents and chunks stored in PostgreSQL with pgvector
+- **Vector Search**: High-performance similarity search using Elasticsearch with dense vectors
+- **Hybrid Retrieval**: Combine vector similarity with BM25 text search
+- **Document Processing**: Automatic chunking and embedding of uploaded documents
+- **Multi-Format Support**: Load documents from .txt, .pdf, .docx, .pptx, .xlsx files
+- **Ollama Integration**: Local LLM generation with context from retrieved documents
+- **Web Interface**: Modern Streamlit UI for querying, document management, and analytics
+- **Scalable Architecture**: Designed for production use with proper database indexing
 
 ## Setup
 
@@ -31,14 +28,21 @@ A local Retrieval-Augmented Generation system built with Python, Ollama, and FAI
    pip install -r requirements.txt
    ```
 
-4. **Install and setup Ollama:**
+4. **Set up databases:**
+   - **PostgreSQL**: Install PostgreSQL and create a database. Enable pgvector extension.
+   - **Elasticsearch**: Run via Docker: `docker run -d -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" elasticsearch:8.11.0`
+   - Update `.env` file with database credentials
+
+5. **Initialize databases:**
+   ```bash
+   python scripts/migrate_to_db.py  # Create tables and migrate data if needed
+   python src/database/opensearch_setup.py  # Set up Elasticsearch indices
+   ```
+
+6. **Install and setup Ollama:**
    - Download from https://ollama.ai
    - Pull a model: `ollama pull llama2`
    - Start server: `ollama serve`
-
-5. **Prepare data:**
-    - Add your documents to the `data/` directory (currently supports .txt files)
-    - Run data processing: `python -m src.embeddings` (single model) or `python -m src.embeddings --all` (all models)
 
 ## Usage
 
@@ -51,10 +55,10 @@ Or directly:
 streamlit run web_interface/app.py
 ```
 Then open http://localhost:8501 in your browser for a comprehensive multipage experience with:
-- **🏠 Home**: Query interface and system control
-- **📁 Documents**: File upload, management, and multi-model processing
-- **⚙️ Settings**: Configuration options with dynamic model detection
-- **📊 Analytics**: Performance monitoring and model comparison
+- **🏠 Home**: Query interface with RAG and retrieval-only modes
+- **📁 Documents**: Upload and manage documents with automatic processing
+- **⚙️ Settings**: Configure generation parameters and interface options
+- **📊 Analytics**: Monitor system performance and query statistics
 
 ### Command Line Interface:
 ```bash
@@ -65,21 +69,10 @@ Choose between:
 - **Retrieval only**: Search for relevant documents
 - **Full RAG**: Get AI-generated answers with context
 
-### Manual testing:
-
-**Test retrieval:**
+### Testing:
 ```bash
-python -m src.retrieval
-```
-
-**Test vector store:**
-```bash
-python -m src.vector_store
-```
-
-**Run web interface:**
-```bash
-streamlit run web_interface/app.py
+python test_system.py  # Run system tests
+python test_performance.py  # Performance benchmarking
 ```
 
 ## Project Structure
@@ -87,28 +80,44 @@ streamlit run web_interface/app.py
 ```
 LocalRAG/
 ├── src/
+│   ├── __init__.py
+│   ├── app.py              # CLI interface
 │   ├── data_loader.py      # Document loading and chunking
-│   ├── embeddings.py       # Embedding creation
-│   ├── vector_store.py     # FAISS vector operations
-│   ├── retrieval.py        # Retrieval system
-│   ├── rag_pipeline.py     # RAG with Ollama integration
-│   └── app.py              # CLI interface
-├── data/                   # Document storage
-├── models/                 # Saved models and indices
-├── plan.md                 # Implementation plan and progress
+│   ├── document_processor.py # Database document processing
+│   ├── embeddings.py       # Embedding creation utilities
+│   ├── rag_pipeline_db.py  # RAG pipeline with database
+│   ├── retrieval_db.py     # Database-backed retrieval
+│   └── database/
+│       ├── models.py       # SQLAlchemy models
+│       ├── opensearch_setup.py # Elasticsearch configuration
+│       └── schema.sql      # Database schema
+├── web_interface/
+│   ├── app.py              # Main Streamlit app
+│   ├── pages/              # Individual pages
+│   └── components/         # Reusable UI components
+├── scripts/
+│   └── migrate_to_db.py    # Database migration script
+├── test_system.py          # System tests
+├── test_performance.py     # Performance benchmarks
 ├── requirements.txt        # Python dependencies
+├── plan.md                 # Implementation plan
 └── README.md               # This file
 ```
 
-## Implementation Steps Completed
+## Architecture
 
-See `plan.md` for detailed implementation progress.
+- **Document Processing**: Documents are loaded, chunked, and embedded using sentence-transformers
+- **Storage**: Chunks and metadata stored in PostgreSQL, embeddings indexed in Elasticsearch
+- **Retrieval**: Hybrid search combining vector similarity and BM25 text search
+- **Generation**: Context from retrieved documents fed to Ollama LLMs for answer generation
 
-## Notes
+## Requirements
 
-- **Multi-Model Support**: The system supports multiple embedding models. Each model stores its own embeddings and vector index for optimal performance.
-- **Smart Caching**: Documents are only reprocessed when their content changes, saving time and resources.
-- **Model Selection**: Choose the best embedding model for your use case. Larger models generally provide better accuracy but require more resources.
-- The system currently uses sample data. Add your own documents to `data/` for real use cases.
-- Full RAG functionality requires Ollama running locally.
-- Embeddings are cached in `models/` for faster subsequent runs.
+- Python 3.8+
+- PostgreSQL with pgvector extension
+- Elasticsearch 8.x
+- Ollama for local LLM inference
+
+## Implementation Status
+
+See `plan.md` for detailed implementation progress. The system is fully operational with database-backed storage and vector search.

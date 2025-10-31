@@ -10,7 +10,7 @@ from langchain_core.prompts import PromptTemplate
 from .retrieval_db import DatabaseRetriever
 
 class RAGPipelineDB:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", llm_model: str = "llama2"):
+    def __init__(self, model_name: str = "all-mpnet-base-v2", llm_model: str = "llama2"):
         self.retriever = DatabaseRetriever(model_name)
         self.llm = OllamaLLM(model=llm_model)
         self.prompt_template = PromptTemplate(
