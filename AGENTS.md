@@ -8,7 +8,7 @@
 - Run CLI app: `python -m src.app`
 - Process data: `python -m src.embeddings`
 - Set up databases: `docker-compose up -d` (PostgreSQL + Elasticsearch)
-- Run migration: `python scripts/migrate_to_db.py`
+- Run migration: `python scripts/migrate_to_db.py` (processes documents and creates chunks)
 - Set up indices: `python src/database/opensearch_setup.py`
 - Performance tests: `python test_performance.py`
 - Stop databases: `docker-compose down`

@@ -29,7 +29,7 @@ This project implements a production-ready Local RAG (Retrieval-Augmented Genera
 - Verify installation: `ollama list`
 
 ### 4. Initialize the System
-- Run database migrations: `python scripts/migrate_to_db.py`
+- Run database migrations: `python scripts/migrate_to_db.py` (processes documents and creates chunks)
 - Set up Elasticsearch indices: `python src/database/opensearch_setup.py`
 
 ### 5. Process Documents

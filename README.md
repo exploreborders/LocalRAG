@@ -46,10 +46,10 @@ A local Retrieval-Augmented Generation system built with Python, PostgreSQL, Ela
     - Update `.env` file with database credentials (see comments in `.env` for Docker vs local settings)
 
 5. **Initialize databases:**
-   ```bash
-   python scripts/migrate_to_db.py  # Create tables and migrate data if needed
-   python src/database/opensearch_setup.py  # Set up Elasticsearch indices
-   ```
+    ```bash
+    python scripts/migrate_to_db.py  # Process documents and create chunks/embeddings
+    python src/database/opensearch_setup.py  # Set up Elasticsearch indices
+    ```
 
 6. **Install and setup Ollama:**
    - Download from https://ollama.ai

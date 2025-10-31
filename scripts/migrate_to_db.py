@@ -66,7 +66,8 @@ def migrate_documents_to_postgres():
     Migrate document metadata from filesystem to PostgreSQL database.
 
     Scans the data directory and creates document records for all supported
-    file types (.txt, .pdf, .docx, .pptx, .xlsx).
+    file types (.txt, .pdf, .docx, .pptx, .xlsx). Documents are initially
+    marked as 'pending' and will be processed to create chunks.
     """
     print("Migrating documents to PostgreSQL...")
 
@@ -86,7 +87,7 @@ def migrate_documents_to_postgres():
                 file_path.suffix[1:],  # content_type
                 datetime.now(),
                 datetime.now(),
-                'processed'
+                'pending'  # Start as pending, will be processed later
             ))
 
     if documents:
@@ -98,20 +99,50 @@ def migrate_documents_to_postgres():
     conn.commit()
     cursor.close()
     conn.close()
-    print(f"Migrated {len(documents)} documents")
+    print(f"Migrated {len(documents)} documents (marked as pending)")
 
 def migrate_chunks_to_postgres():
     """
-    Migrate document chunks to PostgreSQL database.
+    Process documents and create chunks in PostgreSQL database.
 
-    Note: Currently a placeholder - implementation depends on existing
-    chunk storage format.
+    Runs the document processor to handle all pending documents.
     """
-    print("Migrating document chunks to PostgreSQL...")
+    print("Processing documents and creating chunks...")
 
-    # This would require loading the existing chunk data
-    # For now, placeholder - actual implementation would depend on how chunks are stored
-    pass
+    import subprocess
+    import os
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_dir = os.path.join(script_dir, '..')
+
+    try:
+        # Run the document processor
+        cmd = [
+            'python', '-c',
+            'from src.document_processor import DocumentProcessor; '
+            'p = DocumentProcessor(); '
+            'p.process_existing_documents()'
+        ]
+
+        result = subprocess.run(
+            cmd,
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            env={**os.environ, 'PYTHONPATH': os.path.join(project_dir, 'src')}
+        )
+
+        if result.returncode == 0:
+            print("Document processing completed successfully")
+            if result.stdout:
+                print(result.stdout)
+        else:
+            print(f"Error during document processing: {result.stderr}")
+            raise Exception(f"Document processing failed: {result.stderr}")
+
+    except Exception as e:
+        print(f"Error during document processing: {e}")
+        raise
 
 def migrate_embeddings_to_opensearch():
     """
@@ -168,10 +199,26 @@ def migrate_embeddings_to_opensearch():
             print(f"Migrated {len(actions)} vectors for {model_name}")
 
 if __name__ == "__main__":
+    print("Starting database migration...")
+    print("This will:")
+    print("1. Create document records for files in data/ directory")
+    print("2. Process documents to create chunks and embeddings")
+    print("3. Store everything in PostgreSQL and Elasticsearch")
+    print()
+
     try:
+        print("Step 1: Migrating document metadata...")
         migrate_documents_to_postgres()
+
+        print("\nStep 2: Processing documents and creating chunks...")
         migrate_chunks_to_postgres()
+
+        print("\nStep 3: Migrating legacy embeddings (if any)...")
         migrate_embeddings_to_opensearch()
-        print("Migration completed successfully!")
+
+        print("\n🎉 Migration completed successfully!")
+        print("All documents have been processed and chunks/embeddings created.")
+
     except Exception as e:
-        print(f"Migration failed: {e}")
+        print(f"\n❌ Migration failed: {e}")
+        print("You may need to check your database connections and try again.")

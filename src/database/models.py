@@ -3,9 +3,11 @@ SQLAlchemy models for the RAG system database.
 Defines tables for documents, chunks, and processing jobs.
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, TIMESTAMP, ForeignKey, func
+from sqlalchemy import create_engine, Integer, String, Text, TIMESTAMP, ForeignKey, func
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, Mapped, mapped_column
+from typing import Optional
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -18,14 +20,14 @@ class Document(Base):
     """
     __tablename__ = 'documents'
 
-    id = Column(Integer, primary_key=True)
-    filename = Column(String(255), nullable=False)
-    filepath = Column(String(500), nullable=False)
-    file_hash = Column(String(64), nullable=False, unique=True)
-    content_type = Column(String(100))
-    upload_date = Column(TIMESTAMP, default=func.current_timestamp())
-    last_modified = Column(TIMESTAMP, default=func.current_timestamp())
-    status = Column(String(50), default='processed')
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    filepath: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    content_type: Mapped[Optional[str]] = mapped_column(String(100))
+    upload_date: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
+    last_modified: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
+    status: Mapped[str] = mapped_column(String(50), default='processed')
 
     chunks = relationship("DocumentChunk", back_populates="document")
     jobs = relationship("ProcessingJob", back_populates="document")
@@ -39,14 +41,14 @@ class DocumentChunk(Base):
     """
     __tablename__ = 'document_chunks'
 
-    id = Column(Integer, primary_key=True)
-    document_id = Column(Integer, ForeignKey('documents.id'), nullable=False)
-    chunk_index = Column(Integer, nullable=False)
-    content = Column(Text, nullable=False)
-    embedding_model = Column(String(100), nullable=False)
-    chunk_size = Column(Integer)
-    overlap = Column(Integer)
-    created_at = Column(TIMESTAMP, default=func.current_timestamp())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey('documents.id'), nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding_model: Mapped[str] = mapped_column(String(100), nullable=False)
+    chunk_size: Mapped[Optional[int]] = mapped_column(Integer)
+    overlap: Mapped[Optional[int]] = mapped_column(Integer)
+    created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
 
     document = relationship("Document", back_populates="chunks")
 
@@ -59,14 +61,14 @@ class ProcessingJob(Base):
     """
     __tablename__ = 'processing_jobs'
 
-    id = Column(Integer, primary_key=True)
-    document_id = Column(Integer, ForeignKey('documents.id'), nullable=False)
-    job_type = Column(String(50), nullable=False)
-    status = Column(String(50), default='pending')
-    started_at = Column(TIMESTAMP)
-    completed_at = Column(TIMESTAMP)
-    error_message = Column(Text)
-    created_at = Column(TIMESTAMP, default=func.current_timestamp())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey('documents.id'), nullable=False)
+    job_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default='pending')
+    started_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
+    error_message: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
 
     document = relationship("Document", back_populates="jobs")
 
