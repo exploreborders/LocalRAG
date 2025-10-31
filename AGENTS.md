@@ -12,6 +12,11 @@
 - Process data: `python -m src.embeddings`
 - Stop databases: `docker-compose down`
 
+## Environment Configuration
+- **Local Development**: Use `.env` with localhost settings (currently active)
+- **Docker Deployment**: Environment variables are set automatically in docker-compose.yml
+- **Database Switching**: Comment/uncomment sections in `.env` based on deployment method
+
 ## Code Style Guidelines
 - **Imports**: Group stdlib/third-party/local, sort alphabetically, use relative imports
 - **Formatting**: 4 spaces, 88 char limit, double quotes, docstrings for public APIs
