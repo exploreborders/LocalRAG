@@ -165,6 +165,9 @@ def process_query(query, mode="retrieval"):
 
 def main():
     """Main page content"""
+    # Initialize session state first
+    initialize_session_state()
+
     st.markdown('<h1 class="page-header">🏠 Local RAG - Ask Questions</h1>', unsafe_allow_html=True)
     st.markdown("Ask questions about your documents and get AI-powered answers")
 
