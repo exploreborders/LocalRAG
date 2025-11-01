@@ -85,9 +85,11 @@ Kontext:
 
 Frage: {question}
 
+KRITISCH WICHTIG: Sie MÜSSEN diese Frage AUSSCHLIESSLICH auf DEUTSCH beantworten. Es ist VERBOTEN, englische Wörter oder Sätze zu verwenden. Antworten Sie nur auf Deutsch!
+
 Bitte geben Sie eine umfassende und genaue Antwort basierend auf dem obigen Kontext. Wenn Sie Informationen aus bestimmten Quellen referenzieren, fügen Sie den Quellverweis in Klammern ein, z.B. [Quelle 1: dateiname.pdf]. Wenn der Kontext nicht genügend Informationen enthält, um die Frage zu beantworten, sagen Sie das.
 
-Antwort:"""
+Antwort auf Deutsch:"""
             ),
             'fr': PromptTemplate(
                 input_variables=["context", "question"],
@@ -99,9 +101,11 @@ Contexte:
 
 Question: {question}
 
+CRITIQUEMENT IMPORTANT: Vous DEVEZ répondre à cette question UNIQUEMENT en FRANÇAIS. Il est INTERDIT d'utiliser des mots ou des phrases anglais. Répondez seulement en français!
+
 Veuillez fournir une réponse complète et précise basée sur le contexte ci-dessus. Lorsque vous référencez des informations provenant de sources spécifiques, incluez la référence de source entre crochets comme [Source 1: nomfichier.pdf]. Si le contexte ne contient pas suffisamment d'informations pour répondre à la question, dites-le.
 
-Réponse:"""
+Réponse en français:"""
             ),
             'es': PromptTemplate(
                 input_variables=["context", "question"],
