@@ -77,6 +77,18 @@ def initialize_system(show_ui=True):
 
 def _do_initialization():
     """Core initialization logic without UI"""
+    import warnings
+    import logging
+
+    # Suppress common PyTorch warnings that are usually harmless
+    warnings.filterwarnings("ignore", message=".*torch.classes.*")
+    warnings.filterwarnings("ignore", message=".*Examining the path of torch.classes.*")
+
+    # Reduce logging verbosity for cleaner output
+    logging.getLogger("transformers").setLevel(logging.WARNING)
+    logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+    logging.getLogger("torch").setLevel(logging.WARNING)
+
     # Get configured models from settings
     from utils.session_manager import load_settings
     settings = load_settings()

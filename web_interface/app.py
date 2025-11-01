@@ -5,6 +5,21 @@ Main entry point for the multipage Streamlit application
 """
 
 import streamlit as st
+import warnings
+import logging
+
+# Suppress common warnings that are usually harmless
+warnings.filterwarnings("ignore", message=".*torch.classes.*")
+warnings.filterwarnings("ignore", message=".*Examining the path of torch.classes.*")
+warnings.filterwarnings("ignore", message=".*huggingface/tokenizers.*")
+warnings.filterwarnings("ignore", message=".*Tried to instantiate class.*")
+warnings.filterwarnings("ignore", message=".*does not exist.*")
+
+# Reduce logging verbosity for cleaner output
+logging.getLogger("transformers").setLevel(logging.WARNING)
+logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+logging.getLogger("torch").setLevel(logging.WARNING)
+logging.getLogger("huggingface").setLevel(logging.WARNING)
 
 # Page configuration
 st.set_page_config(
