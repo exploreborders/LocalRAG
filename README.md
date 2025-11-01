@@ -16,7 +16,43 @@ A local Retrieval-Augmented Generation system built with Python, PostgreSQL, Ela
 - **Web Interface**: Modern Streamlit UI for querying, document management, and analytics
 - **Scalable Architecture**: Designed for production use with proper database indexing
 
-## Setup
+## Quick Start
+
+Choose your preferred setup method:
+
+### 🚀 Option 1: Automated Setup (Recommended)
+```bash
+# One-command setup (handles everything automatically)
+python setup_all.py
+```
+This will:
+- ✅ Check dependencies and environment
+- ✅ Start databases with Docker
+- ✅ Initialize database schema and OpenSearch
+- ✅ Download required language models
+- ✅ Run tests to verify everything works
+- ✅ Create a startup script for future use
+
+Then start the system:
+```bash
+./start.sh  # Start everything automatically
+# OR
+streamlit run web_interface/app.py  # Start web interface only
+```
+
+### 🐳 Option 2: Docker Setup (Fully Containerized)
+```bash
+# Fully containerized setup
+./docker_setup.sh
+```
+This provides a complete containerized environment with all dependencies pre-installed.
+
+### 🔧 Option 3: Manual Setup
+See the Manual Setup section below for step-by-step instructions.
+
+## Manual Setup
+
+If you prefer to set up manually or need more control:
 
 1. **Clone or navigate to the project directory**
 

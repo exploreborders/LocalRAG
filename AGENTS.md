@@ -1,7 +1,9 @@
 # AGENTS.md
 
 ## Build/Lint/Test Commands
-- Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt && python -m spacy download de_core_news_sm fr_core_news_sm es_core_news_sm it_core_news_sm pt_core_news_sm nl_core_news_sm sv_core_news_sm pl_core_news_sm zh_core_web_sm ja_core_news_sm ko_core_news_sm`
+- Quick Setup: `python setup_all.py` (automated setup of everything)
+- Docker Setup: `./docker_setup.sh` (fully containerized setup)
+- Manual Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt && python -m spacy download de_core_news_sm fr_core_news_sm es_core_news_sm it_core_news_sm pt_core_news_sm nl_core_news_sm sv_core_news_sm pl_core_news_sm zh_core_web_sm ja_core_news_sm ko_core_news_sm`
 - Set up databases: `python setup_databases.py docker` (or `docker-compose up -d`)
 - Initialize databases: `python scripts/migrate_to_db.py && python scripts/migrate_add_language.py && python src/database/opensearch_setup.py`
 - Run all tests: `python tests/run_all_tests.py` (runs all test files)

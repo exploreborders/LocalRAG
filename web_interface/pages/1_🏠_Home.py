@@ -50,34 +50,59 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def initialize_system():
-    """Initialize the RAG system components"""
+def initialize_system(show_ui=True):
+    """Initialize the RAG system components
+
+    Args:
+        show_ui (bool): Whether to show UI feedback during initialization
+    """
     try:
-        with st.spinner("🔄 Initializing Local RAG System..."):
-            # Get configured models from settings
-            from utils.session_manager import load_settings
-            settings = load_settings()
-            embedding_model = settings.get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')
-            llm_model = settings.get('generation', {}).get('model', 'llama2')
+        if show_ui:
+            with st.spinner("🔄 Initializing Local RAG System..."):
+                result = _do_initialization()
+            if result['success']:
+                st.success(f"✅ System initialized successfully with {result['embedding_model']} embeddings!")
+            if result['rag_error']:
+                st.warning(f"⚠️ RAG mode unavailable: {result['rag_error']}")
+        else:
+            result = _do_initialization()
 
-            # Initialize retriever with configured embedding model
-            st.session_state.retriever = DatabaseRetriever(embedding_model)
-
-            # Try to initialize RAG pipeline with configured LLM (may fail if Ollama not running)
-            try:
-                st.session_state.rag_pipeline = RAGPipelineDB(embedding_model, llm_model)
-                st.session_state.rag_available = True
-            except Exception as e:
-                st.session_state.rag_pipeline = None
-                st.session_state.rag_available = False
-                st.warning(f"⚠️ RAG mode unavailable: {str(e)}")
-
-            st.session_state.system_initialized = True
-            st.success(f"✅ System initialized successfully with {embedding_model} embeddings!")
+        return result
 
     except Exception as e:
-        st.error(f"❌ Failed to initialize system: {str(e)}")
+        if show_ui:
+            st.error(f"❌ Failed to initialize system: {str(e)}")
         st.session_state.system_initialized = False
+        return {'success': False, 'error': str(e)}
+
+def _do_initialization():
+    """Core initialization logic without UI"""
+    # Get configured models from settings
+    from utils.session_manager import load_settings
+    settings = load_settings()
+    embedding_model = settings.get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')
+    llm_model = settings.get('generation', {}).get('model', 'llama2')
+
+    # Initialize retriever with configured embedding model
+    st.session_state.retriever = DatabaseRetriever(embedding_model)
+
+    # Try to initialize RAG pipeline with configured LLM (may fail if Ollama not running)
+    rag_error = None
+    try:
+        st.session_state.rag_pipeline = RAGPipelineDB(embedding_model, llm_model)
+        st.session_state.rag_available = True
+    except Exception as e:
+        st.session_state.rag_pipeline = None
+        st.session_state.rag_available = False
+        rag_error = str(e)
+
+    st.session_state.system_initialized = True
+
+    return {
+        'success': True,
+        'embedding_model': embedding_model,
+        'rag_error': rag_error
+    }
 
 def process_query(query, mode="retrieval"):
     """Process a query and return results"""
@@ -128,19 +153,13 @@ def process_query(query, mode="retrieval"):
 
 def main():
     """Main page content"""
-    # Initialize session state
-    initialize_session_state()
+    st.markdown('<h1 class="page-header">🏠 Local RAG - Ask Questions</h1>', unsafe_allow_html=True)
+    st.markdown("Ask questions about your documents and get AI-powered answers")
 
-    # Header
-    st.markdown('<h1 class="main-header">🏠 Local RAG System</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="welcome-text">Retrieval-Augmented Generation for local document analysis</p>', unsafe_allow_html=True)
-
-    # System initialization check
+    # Auto-initialize system if not already done
     if not st.session_state.get('system_initialized', False):
-        st.warning("⚠️ System not initialized. Please initialize the system first.")
-        if st.button("🚀 Initialize System", type="primary"):
-            initialize_system()
-        return
+        initialize_system(show_ui=True)
+        # Continue to render the interface below
 
     # Success message
     col1, col2 = st.columns(2)

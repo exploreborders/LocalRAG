@@ -147,7 +147,7 @@ def main():
 
     with st.expander("🔧 System Setup"):
         st.markdown("""
-        1. **Initialize the system** using the Home page
+        1. **System auto-initializes** when you first visit the Home page
         2. **Upload documents** via the Documents page
         3. **Reprocess documents** to create embeddings
         4. **Start asking questions!**
