@@ -379,17 +379,9 @@ class DocumentProcessor:
         if not other_docs:
             return
 
-        # Configure Docling pipeline options for optimal performance
-        pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_ocr = False  # Disable OCR for speed
-        pipeline_options.do_table_structure = False  # Disable table extraction for maximum speed
-
-        # Create converter once and reuse (major performance improvement)
-        doc_converter = DocumentConverter(
-            format_options={
-                InputFormat.PDF: pipeline_options,
-            }
-        )
+        # Create converter with default options due to docling 2.60.0 backend bug
+        # TODO: Re-enable custom pipeline options when docling backend issue is fixed
+        doc_converter = DocumentConverter()
 
         # Process documents in batches with memory monitoring
         for i in range(0, len(other_docs), batch_size):
@@ -535,17 +527,9 @@ class DocumentProcessor:
 
         results = []
 
-        # Configure Docling pipeline options for optimal performance in worker
-        pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_ocr = False  # Disable OCR for speed
-        pipeline_options.do_table_structure = False  # Disable table extraction for maximum speed
-
-        # Create converter for this worker
-        doc_converter = DocumentConverter(
-            format_options={
-                InputFormat.PDF: pipeline_options,
-            }
-        )
+        # Create converter with default options due to docling 2.60.0 backend bug
+        # TODO: Re-enable custom pipeline options when docling backend issue is fixed
+        doc_converter = DocumentConverter()
 
         for doc_data in batch:
             filepath = doc_data['filepath']

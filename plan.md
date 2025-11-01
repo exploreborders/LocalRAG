@@ -286,7 +286,7 @@ This plan provides a high-level overview. Each step may require additional resea
 - ✅ **Batch Document Processing**: Implemented docling's convert_all() for multiple documents with configurable batch sizes
 - ✅ **Converter Reuse**: Single DocumentConverter instance created once and reused across all operations
 - ✅ **Parallel Processing**: Multi-worker processing using ProcessPoolExecutor for large document sets (fully SQLAlchemy-safe)
-- ✅ **Pipeline Optimization**: Disabled table extraction and OCR for maximum speed while maintaining accuracy
+- ✅ **Pipeline Optimization**: Using default docling options due to v2.60.0 backend attribute bug (OCR/table processing enabled)
 - ✅ **Memory Management**: Added memory monitoring and automatic batch size adjustment
 - ✅ **Smart Processing**: Separate optimized paths for text files vs. complex documents
 - ✅ **Serialization Safety**: Workers use only serializable data structures to prevent pickling errors
