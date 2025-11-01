@@ -18,10 +18,11 @@
 
 ## Performance Optimization Settings
 - **Batch Processing**: Documents processed in configurable batches (default: 5)
-- **Parallel Processing**: Multi-worker processing for large document sets (default: 4 workers)
+- **Parallel Processing**: Multi-worker processing for large document sets (default: 4 workers, SQLAlchemy-safe)
 - **Memory Management**: Automatic memory monitoring with configurable limits (default: 500MB)
 - **Pipeline Optimization**: OCR disabled, table extraction optimized for speed
 - **Converter Reuse**: Single DocumentConverter instance reused across operations
+- **Smart Routing**: Separate optimized paths for text files vs. complex documents
 
 ## Environment Configuration
 - **Local Development**: Use `.env` with localhost settings (currently active)

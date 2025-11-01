@@ -485,7 +485,7 @@ class DocumentProcessor:
 
         # Process batches in parallel
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all batches for processing
+            # Submit all batches for processing (pass only serializable data)
             future_to_batch = {
                 executor.submit(self._process_document_batch_worker, batch, model_name, chunk_size, overlap): batch
                 for batch in worker_batches
@@ -496,13 +496,18 @@ class DocumentProcessor:
                 batch = future_to_batch[future]
                 try:
                     results = future.result()
-                    # Save results to database
-                    for doc, chunks, embeddings_array in results:
-                        self.save_chunks(doc.id, chunks, model_name, chunk_size, overlap)
-                        self.save_embeddings_to_es(chunks, embeddings_array, model_name, doc.id)
-                        doc.status = 'processed'
-                        doc.last_modified = datetime.now()
-                        print(f"✅ Processed {doc.filename}: {len(chunks)} chunks created")
+                    # Save results to database (main process handles DB operations)
+                    for doc_data in results:
+                        doc_id, chunks, embeddings_array, filename = doc_data
+                        self.save_chunks(doc_id, chunks, model_name, chunk_size, overlap)
+                        self.save_embeddings_to_es(chunks, embeddings_array, model_name, doc_id)
+
+                        # Update document status
+                        doc = self.db.query(Document).filter(Document.id == doc_id).first()
+                        if doc:
+                            doc.status = 'processed'
+                            doc.last_modified = datetime.now()
+                            print(f"✅ Processed {filename}: {len(chunks)} chunks created")
                 except Exception as e:
                     print(f"❌ Failed to process batch: {e}")
 
@@ -510,7 +515,7 @@ class DocumentProcessor:
         self.db.commit()
 
     def _process_document_batch_worker(self, batch, model_name, chunk_size, overlap):
-        """Worker function for parallel document processing."""
+        """Worker function for parallel document processing. Returns serializable data only."""
         from docling.document_converter import DocumentConverter
         from docling.datamodel.pipeline_options import PdfPipelineOptions
         from docling.datamodel.base_models import InputFormat
@@ -558,7 +563,8 @@ class DocumentProcessor:
                 # Generate embeddings
                 embeddings_array, _ = create_embeddings(chunks, model_name)
 
-                results.append((doc, chunks, embeddings_array))
+                # Return serializable data: (doc_id, chunks, embeddings_array, filename)
+                results.append((doc.id, chunks, embeddings_array, doc.filename))
 
             except Exception as e:
                 print(f"❌ Worker failed to process {doc.filename}: {e}")
