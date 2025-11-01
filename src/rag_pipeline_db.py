@@ -85,9 +85,11 @@ Kontext:
 
 Frage: {question}
 
+WICHTIG: Beantworten Sie diese Frage AUSSCHLIESSLICH auf DEUTSCH. Verwenden Sie keine englischen Wörter oder Sätze in Ihrer Antwort.
+
 Bitte geben Sie eine umfassende und genaue Antwort basierend auf dem obigen Kontext. Wenn Sie Informationen aus bestimmten Quellen referenzieren, fügen Sie den Quellverweis in Klammern ein, z.B. [Quelle 1: dateiname.pdf]. Wenn der Kontext nicht genügend Informationen enthält, um die Frage zu beantworten, sagen Sie das.
 
-Antwort:"""
+Antwort auf Deutsch:"""
             ),
             'fr': PromptTemplate(
                 input_variables=["context", "question"],
@@ -99,9 +101,11 @@ Contexte:
 
 Question: {question}
 
+IMPORTANT: Répondez à cette question UNIQUEMENT en FRANÇAIS. N'utilisez pas de mots ou de phrases anglais dans votre réponse.
+
 Veuillez fournir une réponse complète et précise basée sur le contexte ci-dessus. Lorsque vous référencez des informations provenant de sources spécifiques, incluez la référence de source entre crochets comme [Source 1: nomfichier.pdf]. Si le contexte ne contient pas suffisamment d'informations pour répondre à la question, dites-le.
 
-Réponse:"""
+Réponse en français:"""
             ),
             'es': PromptTemplate(
                 input_variables=["context", "question"],
@@ -113,9 +117,11 @@ Contexto:
 
 Pregunta: {question}
 
+IMPORTANTE: Responde a esta pregunta ÚNICAMENTE en ESPAÑOL. No uses palabras o frases en inglés en tu respuesta.
+
 Por favor proporciona una respuesta completa y precisa basada en el contexto anterior. Cuando hagas referencia a información de fuentes específicas, incluye la referencia de fuente entre corchetes como [Fuente 1: nombrearchivo.pdf]. Si el contexto no contiene suficiente información para responder la pregunta, dilo.
 
-Respuesta:"""
+Respuesta en español:"""
             ),
             'it': PromptTemplate(
                 input_variables=["context", "question"],
@@ -127,9 +133,11 @@ Contesto:
 
 Domanda: {question}
 
+IMPORTANTE: Rispondi a questa domanda SOLO in ITALIANO. Non usare parole o frasi in inglese nella tua risposta.
+
 Fornisci una risposta completa e accurata basata sul contesto sopra. Quando fai riferimento a informazioni da fonti specifiche, includi il riferimento alla fonte tra parentesi quadre come [Fonte 1: nomefile.pdf]. Se il contesto non contiene informazioni sufficienti per rispondere alla domanda, dillo.
 
-Risposta:"""
+Risposta in italiano:"""
             ),
             'pt': PromptTemplate(
                 input_variables=["context", "question"],
@@ -141,9 +149,11 @@ Contexto:
 
 Pergunta: {question}
 
+IMPORTANTE: Responda a esta pergunta APENAS em PORTUGUÊS. Não use palavras ou frases em inglês na sua resposta.
+
 Forneça uma resposta completa e precisa baseada no contexto acima. Quando fizer referência a informações de fontes específicas, inclua a referência da fonte entre colchetes como [Fonte 1: nomearquivo.pdf]. Se o contexto não contiver informações suficientes para responder à pergunta, diga isso.
 
-Resposta:"""
+Resposta em português:"""
             ),
             'nl': PromptTemplate(
                 input_variables=["context", "question"],
@@ -155,9 +165,11 @@ Context:
 
 Vraag: {question}
 
+BELANGRIJK: Beantwoord deze vraag ALLEEN in het NEDERLANDS. Gebruik geen Engelse woorden of zinnen in je antwoord.
+
 Geef een uitgebreide en nauwkeurige antwoord gebaseerd op de bovenstaande context. Wanneer je verwijst naar informatie uit specifieke bronnen, neem dan de bronverwijzing op tussen vierkante haken zoals [Bron 1: bestandsnaam.pdf]. Als de context niet genoeg informatie bevat om de vraag te beantwoorden, zeg dat dan.
 
-Antwoord:"""
+Antwoord in het Nederlands:"""
             ),
             'sv': PromptTemplate(
                 input_variables=["context", "question"],
@@ -169,9 +181,11 @@ Kontext:
 
 Fråga: {question}
 
+VIKTIGT: Svara på denna fråga ENDAST på SVENSKA. Använd inga engelska ord eller meningar i ditt svar.
+
 Vänligen ge ett omfattande och korrekt svar baserat på kontexten ovan. När du refererar till information från specifika källor, inkludera källreferensen inom hakparenteser som [Källa 1: filnamn.pdf]. Om kontexten inte innehåller tillräcklig information för att besvara frågan, säg det.
 
-Svar:"""
+Svar på svenska:"""
             ),
             'pl': PromptTemplate(
                 input_variables=["context", "question"],
@@ -183,9 +197,11 @@ Kontekst:
 
 Pytanie: {question}
 
+WAŻNE: Odpowiedz na to pytanie WYŁĄCZNIE w JĘZYKU POLSKIM. Nie używaj angielskich słów ani zdań w swojej odpowiedzi.
+
 Proszę podać wyczerpującą i dokładną odpowiedź w oparciu o powyższy kontekst. Jeśli kontekst nie zawiera wystarczających informacji, aby odpowiedzieć na pytanie, powiedz to. Gdy odwołujesz się do informacji z konkretnych źródeł, uwzględnij odniesienie do źródła w nawiasach kwadratowych, np. [Źródło 1: nazwapliku.pdf].
 
-Odpowiedź:"""
+Odpowiedź w języku polskim:"""
             ),
             'zh': PromptTemplate(
                 input_variables=["context", "question"],
@@ -197,9 +213,11 @@ Odpowiedź:"""
 
 问题：{question}
 
+重要：请仅用中文回答这个问题。不要在回答中使用英文单词或句子。
+
 请根据上述上下文提供全面准确的答案。当引用特定来源的信息时，请在方括号中包含来源引用，如[来源1：文件名.pdf]。如果上下文不包含足够的信息来回答问题，请说明。
 
-答案："""
+中文答案："""
             ),
             'ja': PromptTemplate(
                 input_variables=["context", "question"],
@@ -211,9 +229,11 @@ Odpowiedź:"""
 
 質問：{question}
 
+重要：この質問には日本語でのみ回答してください。回答に英語の単語や文を使用しないでください。
+
 上記のコンテキストに基づいて、包括的で正確な回答を提供してください。具体的なソースからの情報を参照する場合、[ソース1：ファイル名.pdf]のように角括弧内にソース参照を含めてください。コンテキストに質問に答えるのに十分な情報が含まれていない場合は、そう言ってください。
 
-回答："""
+日本語での回答："""
             ),
             'ko': PromptTemplate(
                 input_variables=["context", "question"],
@@ -225,9 +245,11 @@ Odpowiedź:"""
 
 질문：{question}
 
+중요: 이 질문에 한국어로만 답변하십시오. 답변에 영어 단어 나 문장을 사용하지 마십시오.
+
 위의 컨텍스트를 기반으로 포괄적이고 정확한 답변을 제공하십시오. 특정 소스의 정보를 참조할 때는 [소스 1: 파일명.pdf]처럼 대괄호 안에 소스 참조를 포함하십시오. 컨텍스트에 질문에 답할 충분한 정보가 포함되어 있지 않으면 그렇게 말하십시오.
 
-답변："""
+한국어 답변："""
             )
         }
 
