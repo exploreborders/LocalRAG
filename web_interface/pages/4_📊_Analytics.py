@@ -109,6 +109,44 @@ def get_system_metrics():
     except Exception:
         metrics['search_connected'] = False
 
+    # Cache metrics
+    try:
+        # Check if system is initialized and RAG pipeline exists
+        if (hasattr(st.session_state, 'system_initialized') and
+            st.session_state.get('system_initialized', False) and
+            hasattr(st.session_state, 'rag_pipeline') and
+            st.session_state.rag_pipeline is not None):
+
+            cache_stats = st.session_state.rag_pipeline.get_cache_stats()
+            metrics.update({
+                'cache_enabled': cache_stats.get('cache_enabled', False),
+                'cache_connected': cache_stats.get('total_keys', 0) >= 0,  # Simple connectivity check
+                'cached_responses': cache_stats.get('total_keys', 0),
+                'cache_memory': cache_stats.get('memory_used', 'unknown'),
+                'cache_hit_rate': cache_stats.get('hit_rate', 0),
+                'cache_uptime_days': cache_stats.get('uptime_days', 0)
+            })
+        else:
+            # System not initialized or RAG pipeline not available
+            metrics.update({
+                'cache_enabled': False,
+                'cache_connected': False,
+                'cached_responses': 0,
+                'cache_memory': 'Not initialized',
+                'cache_hit_rate': 0,
+                'cache_uptime_days': 0
+            })
+    except Exception as e:
+        # Any error in cache checking
+        metrics.update({
+            'cache_enabled': False,
+            'cache_connected': False,
+            'cached_responses': 0,
+            'cache_memory': f'Error: {str(e)[:20]}...',
+            'cache_hit_rate': 0,
+            'cache_uptime_days': 0
+        })
+
     return metrics
 
 def format_file_size(size_bytes):
@@ -138,7 +176,7 @@ def create_query_history_chart():
     df = pd.DataFrame(df_data)
 
     # Group by hour and mode
-    df['hour'] = df['timestamp'].dt.floor('H')
+    df['hour'] = df['timestamp'].dt.floor('h')
     df_grouped = df.groupby(['hour', 'mode']).size().unstack(fill_value=0)
 
     return df_grouped
@@ -162,10 +200,46 @@ def create_performance_chart():
     df = pd.DataFrame(df_data)
     return df
 
+def initialize_system_if_needed():
+    """Initialize the RAG system if not already done"""
+    if not st.session_state.get('system_initialized', False):
+        try:
+            # Import system components
+            from src.retrieval_db import DatabaseRetriever
+            from src.rag_pipeline_db import RAGPipelineDB
+            from utils.session_manager import load_settings
+
+            # Get configured models from settings
+            settings = load_settings()
+            embedding_model = settings.get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')
+            llm_model = settings.get('generation', {}).get('model', 'llama2')
+            cache_enabled = settings.get('cache', {}).get('enabled', True)
+            cache_settings = settings.get('cache', {})
+
+            # Initialize retriever
+            st.session_state.retriever = DatabaseRetriever(embedding_model)
+
+            # Try to initialize RAG pipeline
+            try:
+                st.session_state.rag_pipeline = RAGPipelineDB(embedding_model, llm_model, cache_enabled=cache_enabled, cache_settings=cache_settings)
+                st.session_state.rag_available = True
+            except Exception:
+                st.session_state.rag_pipeline = None
+                st.session_state.rag_available = False
+
+            st.session_state.system_initialized = True
+
+        except Exception as e:
+            st.error(f"❌ Failed to initialize system: {str(e)}")
+            st.session_state.system_initialized = False
+
 def main():
     """Main page content"""
     # Initialize session state
     initialize_session_state()
+
+    # Initialize system if needed
+    initialize_system_if_needed()
 
     st.markdown('<h1 class="page-header">📊 Analytics Dashboard</h1>', unsafe_allow_html=True)
     st.markdown("Monitor your Local RAG system performance and usage")
@@ -219,7 +293,7 @@ def main():
     # System Status
     st.markdown("### 🔧 System Status")
 
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
 
     with col1:
         status = "✅ Online" if metrics['system_initialized'] else "❌ Offline"
@@ -280,6 +354,60 @@ def main():
             <div class="metric-label">Search Engine</div>
         </div>
         """, unsafe_allow_html=True)
+
+    with col7:
+        cache_enabled = metrics.get('cache_enabled', False)
+        cache_connected = metrics.get('cache_connected', False)
+        cache_memory = metrics.get('cache_memory', 'unknown')
+
+        if cache_enabled and cache_connected:
+            status = "✅ Active"
+            color = "#28a745"
+        elif cache_enabled and not cache_connected:
+            status = "⚠️ Enabled"
+            color = "#ffc107"
+        elif not st.session_state.get('system_initialized', False):
+            status = "⏳ Not initialized"
+            color = "#6c757d"
+        else:
+            status = "❌ Disabled"
+            color = "#dc3545"
+
+        st.markdown(f"""
+        <div class="metric-card">
+            <div style="color: {color}; font-size: 1.2rem;">{status}</div>
+            <div class="metric-label">LLM Cache</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Cache Performance Metrics
+    if (metrics.get('cache_enabled', False) and
+        metrics.get('cache_connected', False) and
+        st.session_state.get('system_initialized', False)):
+
+        st.markdown("### 🚀 Cache Performance")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            cached_responses = metrics.get('cached_responses', 0)
+            st.metric("Cached Responses", cached_responses)
+
+        with col2:
+            cache_memory = metrics.get('cache_memory', 'unknown')
+            st.metric("Cache Memory", cache_memory)
+
+        with col3:
+            hit_rate = metrics.get('cache_hit_rate', 0)
+            st.metric("Hit Rate", f"{hit_rate:.1%}")
+
+        with col4:
+            uptime = metrics.get('cache_uptime_days', 0)
+            st.metric("Uptime", f"{uptime} days")
+
+    elif st.session_state.get('system_initialized', False):
+        st.markdown("### 🚀 Cache Status")
+        st.info("ℹ️ Cache is disabled or Redis is not available. Go to Settings to configure caching.")
 
     # Query History Chart
     st.markdown("### 📊 Query Activity")

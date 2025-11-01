@@ -7,8 +7,13 @@ from typing import List, Dict, Any, Optional
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 from langdetect import detect, detect_langs, LangDetectException
+import os
+import hashlib
+import logging
 
 from .retrieval_db import DatabaseRetriever
+
+logger = logging.getLogger(__name__)
 
 class RAGPipelineDB:
     """
@@ -16,16 +21,43 @@ class RAGPipelineDB:
     and Ollama LLM for answer generation.
     """
 
-    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", llm_model: str = "llama2"):
+    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", llm_model: str = "llama2", cache_enabled: Optional[bool] = None, cache_settings: Optional[Dict[str, Any]] = None):
         """
         Initialize the RAG pipeline.
 
         Args:
             model_name (str): Embedding model for retrieval
             llm_model (str): Ollama model for generation
+            cache_enabled (bool): Whether to enable caching (overrides env var)
+            cache_settings (dict): Cache configuration settings
         """
         self.retriever = DatabaseRetriever(model_name)
         self.llm = OllamaLLM(model=llm_model)
+
+        # Initialize cache if enabled
+        if cache_enabled is None:
+            cache_enabled = os.getenv('CACHE_ENABLED', 'false').lower() == 'true'
+
+        if cache_enabled:
+            try:
+                from .cache.redis_cache import RedisCache
+                cache_config = cache_settings or {}
+                self.cache = RedisCache(
+                    host=cache_config.get('host', os.getenv('REDIS_HOST', 'localhost')),
+                    port=int(cache_config.get('port', os.getenv('REDIS_PORT', 6379))),
+                    password=cache_config.get('password', os.getenv('REDIS_PASSWORD')) or None,
+                    db=int(cache_config.get('db', os.getenv('REDIS_DB', 0))),
+                    ttl_hours=int(cache_config.get('ttl_hours', os.getenv('CACHE_TTL_HOURS', 24)))
+                )
+                self.cache_enabled = True
+                logger.info("LLM caching enabled with Redis")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Redis cache: {e}")
+                self.cache = None
+                self.cache_enabled = False
+        else:
+            self.cache = None
+            self.cache_enabled = False
 
         # Multilingual prompt templates
         self.prompt_templates = {
@@ -259,6 +291,25 @@ Odpowiedź:"""
         except LangDetectException:
             return 'en'
 
+    def generate_cache_key(self, query: str, context_docs: List[Dict], query_lang: str, model: str, temp: float, max_tokens: int) -> str:
+        """Generate deterministic cache key"""
+        # Normalize query
+        normalized_query = query.lower().strip()
+
+        # Create document fingerprint (sort by ID for consistency)
+        doc_ids = sorted([str(doc.get('id', '')) for doc in context_docs])
+        docs_hash = hashlib.md5(','.join(doc_ids).encode()).hexdigest()[:12]
+
+        # Include generation parameters
+        params_str = f"{model}:{temp}:{max_tokens}:{query_lang}"
+        params_hash = hashlib.md5(params_str.encode()).hexdigest()[:8]
+
+        # Combine components
+        key_components = [normalized_query, docs_hash, params_hash]
+        full_hash = hashlib.md5(':'.join(key_components).encode()).hexdigest()
+
+        return f"llm:{full_hash}"
+
     def retrieve(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """
         Retrieve relevant document chunks for a query.
@@ -274,7 +325,7 @@ Odpowiedź:"""
 
     def generate_answer(self, query: str, context_docs: List[Dict[str, Any]]) -> str:
         """
-        Generate an answer using retrieved context and LLM.
+        Generate an answer using retrieved context and LLM with caching.
 
         Args:
             query (str): Original question
@@ -285,6 +336,23 @@ Odpowiedź:"""
         """
         # Detect query language
         query_lang = self.detect_query_language(query)
+
+        # Check cache first
+        cache_key = None
+        if self.cache_enabled and self.cache:
+            cache_key = self.generate_cache_key(
+                query, context_docs, query_lang,
+                self.llm.model if hasattr(self.llm, 'model') else 'unknown',
+                0.7, 500  # Default parameters - should come from settings
+            )
+
+            cached_response = self.cache.get(cache_key)
+            if cached_response:
+                logger.info(f"Cache hit for query: {query[:50]}...")
+                # Increment hit counter
+                cached_response['cache_hits'] = cached_response.get('cache_hits', 0) + 1
+                self.cache.set(cache_key, cached_response)
+                return cached_response['answer']
 
         # Combine context from retrieved documents with source information
         context_parts = []
@@ -306,6 +374,18 @@ Odpowiedź:"""
         # Generate answer
         try:
             answer = self.llm.invoke(prompt)
+
+            # Cache the response
+            if self.cache_enabled and self.cache:
+                cache_entry = {
+                    'answer': answer,
+                    'query_language': query_lang,
+                    'model_used': self.llm.model if hasattr(self.llm, 'model') else 'unknown',
+                    'num_docs': len(context_docs),
+                    'cache_hits': 0
+                }
+                self.cache.set(cache_key, cache_entry)
+
             return answer
         except Exception as e:
             return f"Error generating answer: {e}"
@@ -337,6 +417,32 @@ Odpowiedź:"""
             'num_docs': len(retrieved_docs),
             'query_language': query_lang
         }
+
+    def invalidate_document_cache(self, document_id: str) -> int:
+        """Invalidate all cache entries for a specific document"""
+        if not self.cache_enabled or not self.cache:
+            return 0
+
+        # Clear cache entries that might contain this document
+        # This is a broad invalidation - could be optimized with better tracking
+        pattern = f"llm:*"
+        return self.cache.clear_pattern(pattern)
+
+    def invalidate_query_cache(self, query_pattern: str) -> int:
+        """Invalidate cache entries matching query pattern"""
+        if not self.cache_enabled or not self.cache:
+            return 0
+
+        return self.cache.clear_pattern(f"llm:*{query_pattern}*")
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache performance statistics"""
+        if not self.cache_enabled or not self.cache:
+            return {'cache_enabled': False}
+
+        stats = self.cache.get_stats()
+        stats['cache_enabled'] = True
+        return stats
 
 def format_results_db(results: List[Dict[str, Any]]) -> str:
     """Format retrieval results for display."""

@@ -369,6 +369,61 @@ def main():
 
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # Cache Settings
+    st.markdown("### 🚀 Cache Settings")
+    with st.container():
+        st.markdown('<div class="setting-group">', unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            cache_enabled = st.checkbox(
+                "Enable LLM Response Caching",
+                value=settings.get('cache', {}).get('enabled', True),
+                help="Cache LLM responses to improve performance for repeated queries"
+            )
+
+            cache_ttl = st.slider(
+                "Cache TTL (hours)",
+                min_value=1,
+                max_value=168,  # 1 week
+                value=settings.get('cache', {}).get('ttl_hours', 24),
+                help="How long to keep cached responses (in hours)"
+            )
+
+        with col2:
+            # Cache status and controls
+            try:
+                if hasattr(st.session_state, 'rag_pipeline') and st.session_state.rag_pipeline:
+                    cache_stats = st.session_state.rag_pipeline.get_cache_stats()
+                    if cache_stats.get('cache_enabled', False):
+                        st.metric("Cached Responses", cache_stats.get('total_keys', 0))
+                        st.metric("Memory Used", cache_stats.get('memory_used', 'unknown'))
+                        st.metric("Hit Rate", f"{cache_stats.get('hit_rate', 0):.1%}")
+
+                        # Clear cache button
+                        if st.button("🗑️ Clear Cache", type="secondary"):
+                            cleared = st.session_state.rag_pipeline.cache.clear_pattern("llm:*")
+                            st.success(f"✅ Cleared {cleared} cached responses")
+                            st.rerun()
+                    else:
+                        st.info("ℹ️ Cache is disabled or not configured")
+                else:
+                    st.info("ℹ️ RAG pipeline not initialized")
+            except Exception as e:
+                st.error(f"❌ Cache status error: {e}")
+
+        # Update settings if changed
+        if (cache_enabled != settings.get('cache', {}).get('enabled', True) or
+            cache_ttl != settings.get('cache', {}).get('ttl_hours', 24)):
+            settings_changed = True
+            settings['cache'] = {
+                'enabled': cache_enabled,
+                'ttl_hours': cache_ttl
+            }
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
     # Action buttons
     st.markdown("---")
 

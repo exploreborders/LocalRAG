@@ -14,6 +14,9 @@ def main():
     Checks for virtual environment and required dependencies before
     launching the web application on localhost:8501.
     """
+    # Set environment variables to suppress warnings
+    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
     # Check if we're in the virtual environment
     if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
         print("⚠️  Warning: Virtual environment not detected. Please activate 'rag_env' first:")

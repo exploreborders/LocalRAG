@@ -34,6 +34,21 @@ services:
       timeout: 10s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: localrag-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   rag_app:
     build: .
     ports:
@@ -48,10 +63,19 @@ services:
       - OPENSEARCH_PORT=9200
       - OPENSEARCH_USER=elastic
       - OPENSEARCH_PASSWORD=changeme
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_DB=0
+      - CACHE_ENABLED=true
+      - CACHE_TYPE=redis
+      - CACHE_TTL_HOURS=24
     depends_on:
       postgres:
         condition: service_healthy
       elasticsearch:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - .:/app
@@ -61,3 +85,4 @@ services:
 volumes:
   postgres_data:
   elasticsearch_data:
+  redis_data:
