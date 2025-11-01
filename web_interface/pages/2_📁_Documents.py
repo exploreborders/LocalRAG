@@ -268,43 +268,82 @@ def main():
     st.markdown("---")
     st.markdown("### 🔧 Processing Status")
 
-    # Get available models and check status for each
-    available_models = ["nomic-ai/nomic-embed-text-v1.5"]
+    # Check database and Elasticsearch status
+    try:
+        processor = DocumentProcessor()
 
-    st.markdown("**Available Embedding Models:**")
-    for model in available_models:
-        safe_model_name = model.replace('/', '_').replace('-', '_')
-        embeddings_file = Path(f"models/embeddings_{safe_model_name}.pkl")
-        index_file = Path(f"models/faiss_index_{safe_model_name}.pkl")
+        # Check database connectivity and document count
+        docs = processor.get_documents()
+        total_docs = len(docs)
+        processed_docs = len([doc for doc in docs if doc['status'] == 'processed'])
 
         col1, col2, col3 = st.columns([2, 1, 1])
 
         with col1:
-            st.write(f"**{model}**")
+            st.markdown("**Database Status**")
 
         with col2:
-            if embeddings_file.exists():
-                st.success("✅ Embeddings")
+            if total_docs > 0:
+                st.success(f"✅ {total_docs} Documents")
             else:
-                st.warning("⚠️ No Embeddings")
+                st.warning("⚠️ No Documents")
 
         with col3:
-            if index_file.exists():
-                st.success("✅ Index")
+            if processed_docs > 0:
+                st.success(f"✅ {processed_docs} Processed")
             else:
-                st.warning("⚠️ No Index")
+                st.warning("⚠️ None Processed")
+
+        # Check Elasticsearch connectivity
+        st.markdown("**Vector Search Status**")
+        col1, col2, col3 = st.columns([2, 1, 1])
+
+        with col1:
+            st.markdown("**Elasticsearch**")
+
+        with col2:
+            try:
+                # Check if ES is accessible
+                es_info = processor.es.info()
+                st.success("✅ Connected")
+            except Exception:
+                st.error("❌ Not Connected")
+
+        with col3:
+            try:
+                # Check if rag_vectors index exists and has documents
+                index_stats = processor.es.indices.stats(index="rag_vectors")
+                doc_count = index_stats['indices']['rag_vectors']['total']['docs']['count']
+                if doc_count > 0:
+                    st.success(f"✅ {doc_count} Vectors")
+                else:
+                    st.warning("⚠️ No Vectors")
+            except Exception:
+                st.warning("⚠️ Index Missing")
+
+    except Exception as e:
+        st.error(f"❌ System Status Check Failed: {e}")
 
     # Overall status
     st.markdown("---")
-    has_any_embeddings = any(
-        Path(f"models/embeddings_{model.replace('/', '_').replace('-', '_')}.pkl").exists()
-        for model in available_models
-    )
+    try:
+        has_processed_docs = processed_docs > 0 if 'processed_docs' in locals() else False
+        has_vectors = False
+        try:
+            index_stats = processor.es.indices.stats(index="rag_vectors")
+            doc_count = index_stats['indices']['rag_vectors']['total']['docs']['count']
+            has_vectors = doc_count > 0
+        except:
+            pass
 
-    if not has_any_embeddings:
+        if has_processed_docs and has_vectors:
+            st.success("✅ System is ready for queries")
+        elif total_docs > 0:
+            st.info("💡 Click 'Reprocess Documents' to generate embeddings and vector index")
+        else:
+            st.info("📭 Upload some documents to get started")
+    except:
         st.info("💡 Click 'Reprocess Documents' to generate embeddings and vector index")
-    else:
-        st.success("✅ Documents have been processed with embeddings")
 
 if __name__ == "__main__":
     main()
