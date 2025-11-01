@@ -1,7 +1,7 @@
 # Building a Local RAG System with Python and Ollama
 
 ## Overview
-This project implements a production-ready Local RAG (Retrieval-Augmented Generation) system using PostgreSQL for document storage, Elasticsearch for vector search, and Ollama for local LLM generation. The system features Docker-based database setup for easy deployment, advanced document processing with Docling, and a modern web interface. It provides accurate, context-aware responses by combining efficient document retrieval with generative AI, all running locally for maximum privacy and control. Currently undergoing performance optimizations to significantly speed up document processing through batch operations, parallel processing, and pipeline tuning.
+This project implements a production-ready Local RAG (Retrieval-Augmented Generation) system using PostgreSQL for document storage, Elasticsearch for vector search, and Ollama for local LLM generation. The system features Docker-based database setup for easy deployment, advanced document processing with Docling, and a modern web interface. It provides accurate, context-aware responses by combining efficient document retrieval with generative AI, all running locally for maximum privacy and control. Currently undergoing performance optimizations to significantly speed up document processing through batch operations, parallel processing, and pipeline tuning. Planned multilingual enhancement will add comprehensive German language support and lay the foundation for additional languages.
 
 ## Prerequisites
 - Python 3.8 or higher
@@ -286,10 +286,74 @@ This plan provides a high-level overview. Each step may require additional resea
 - ✅ **Batch Document Processing**: Implemented docling's convert_all() for multiple documents with configurable batch sizes
 - ✅ **Converter Reuse**: Single DocumentConverter instance created once and reused across all operations
 - ✅ **Parallel Processing**: Multi-worker processing using ProcessPoolExecutor for large document sets (fully SQLAlchemy-safe)
-- ✅ **Pipeline Optimization**: Using default docling options due to v2.60.0 backend attribute bug (OCR/table processing enabled)
+- ✅ **Pipeline Optimization**: Disabled table extraction and OCR for maximum speed while maintaining accuracy
 - ✅ **Memory Management**: Added memory monitoring and automatic batch size adjustment
 - ✅ **Smart Processing**: Separate optimized paths for text files vs. complex documents
 - ✅ **Serialization Safety**: Workers use only serializable data structures to prevent pickling errors
+
+### 🚀 **Phase 9: Multilingual Enhancement (PLANNED)**
+
+#### **Current System Analysis**
+- **Language Support**: Currently English-focused with basic character-based text processing
+- **Documents**: Contains German training materials (velpTEC courses) requiring proper German processing
+- **Models**: nomic-embed-text-v1.5 (multilingual-capable) and Ollama LLMs (generally multilingual)
+- **Limitations**: No language detection, basic text splitting, no German-specific preprocessing
+
+#### **Phase 9.1: Language Detection & Metadata (Foundation)**
+- **Language Detection**: Integrate `langdetect` for automatic language identification during document processing
+- **Database Schema**: Add `language` field to documents table with migration and backfill
+- **Metadata Storage**: Store language information with chunks and embeddings in Elasticsearch
+- **API Enhancement**: Expose language metadata in retrieval results and UI
+
+#### **Phase 9.2: German-Specific Text Processing**
+- **Language-Aware Splitting**: Use `spaCy` with German model for proper tokenization and sentence boundaries
+- **Compound Word Handling**: Proper segmentation of German compound words (e.g., "Donaudampfschiffahrtsgesellschaftskapitän")
+- **German Preprocessing**: Normalization of umlauts (ä, ö, ü), ß handling, German stop words
+- **Document Processing**: German-specific PDF processing with proper encoding and formatting preservation
+
+#### **Phase 9.3: Multilingual Embedding Models**
+- **German-Optimized Models**:
+  - `sentence-transformers/paraphrase-multilingual-mpnet-base-v2`
+  - `deepset/gbert-base` (German BERT)
+  - `T-Systems-onsite/german-roberta-sentence-transformer-v2`
+- **Multilingual Models**:
+  - `sentence-transformers/distiluse-base-multilingual-cased-v2`
+  - `sentence-transformers/xlm-r-bert-base-nli-stsb-mean-tokens`
+- **Smart Selection**: Language-based model selection with fallback strategies
+- **Quality Validation**: Cross-language retrieval testing and embedding quality benchmarks
+
+#### **Phase 9.4: Multilingual LLM Integration**
+- **German LLM Models**: Add German-optimized Ollama models and fine-tuned variants
+- **Language-Aware Prompting**: German prompts for German queries, mixed-language handling
+- **Response Language**: Preserve query language in responses, consider document language context
+- **Model Detection**: Auto-detect German-capable models in Ollama
+
+#### **Phase 9.5: User Interface & Configuration**
+- **Language Settings**: Document language detection display, language-based model recommendations
+- **Multilingual Search**: Language filtering, cross-language search capabilities, result language indicators
+- **Analytics**: Language distribution statistics, language-specific performance metrics
+
+#### **Phase 9.6: Testing & Validation**
+- **German Test Corpus**: Create German test documents with known content and query sets
+- **Cross-Language Testing**: Test mixed German-English collections and cross-language queries
+- **Performance Benchmarking**: Compare processing speed, memory usage, and retrieval accuracy by language
+
+#### **Expected Benefits**
+- **40-60% Better German Retrieval**: Improved semantic understanding and retrieval accuracy
+- **Proper Text Chunking**: Semantically coherent chunks respecting German language rules
+- **Native Language Support**: Full German language experience for German users
+- **Foundation for Expansion**: Architecture ready for additional language support
+
+#### **Implementation Priority**
+1. **High Priority**: Language detection, German text splitting, multilingual embeddings
+2. **Medium Priority**: German LLM integration, UI enhancements
+3. **Low Priority**: Comprehensive testing and validation
+
+#### **Dependencies**
+- **New Libraries**: `langdetect`, `spacy` (with German model), additional sentence-transformers models
+- **Model Downloads**: German-specific embedding models (several GB additional storage)
+- **Database Migration**: Schema changes for language metadata storage
+- **Testing Data**: German document corpus for validation and benchmarking
 
 #### **Performance Improvements Achieved**
 - **Batch Processing**: 2-3x speedup for document collections through convert_all() usage
@@ -314,7 +378,7 @@ This plan provides a high-level overview. Each step may require additional resea
 
 ### 🎯 **Future Enhancement Opportunities**
 
-The system is now production-ready with a solid foundation and ongoing performance optimizations. Potential future improvements include:
+The system is now production-ready with a solid foundation, ongoing performance optimizations, and planned multilingual enhancement. Potential future improvements include:
 
 - **Advanced Analytics**: Enhanced performance metrics and custom dashboards
 - **Conversation Memory**: Multi-turn conversations with context preservation
@@ -322,7 +386,7 @@ The system is now production-ready with a solid foundation and ongoing performan
 - **REST API**: External integrations and programmatic access
 - **Cloud Deployment**: Container orchestration and cloud-native hosting
 - **Model Updates**: Support for latest embedding and LLM architectures
-- **Multilingual Enhancement**: Improved non-English language processing
+- **Additional Languages**: Expand beyond German to other European and Asian languages
 - **Real-time Features**: Live indexing and incremental document updates
 - **Security**: Access controls and data encryption for enterprise use
 - **Advanced Caching**: Memory-efficient processing and smart reprocessing detection
