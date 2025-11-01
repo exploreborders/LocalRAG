@@ -1,6 +1,6 @@
 torch==2.4.1
 langchain==1.0.3
-langchain-community==1.0.0
+langchain-community==0.4.1
 langchain-ollama==1.0.0
 sentence-transformers==5.1.2
 ollama==0.6.0
@@ -13,4 +13,8 @@ alembic==1.12.1
 opensearch-py==2.4.2
 elasticsearch==8.11.0
 langdetect==1.0.9
-spacy==3.7.2
+spacy==3.8.0
+de-core-news-sm
+fr-core-news-sm
+es-core-news-sm
+it-core-news-sm

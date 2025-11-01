@@ -5,9 +5,10 @@ A modern multipage web interface for the Local RAG system, featuring database-ba
 ## Features
 
 - **🏠 Home Page**: Interactive query interface with dual mode support
-- **📁 Documents Page**: File upload and document library management
+- **📁 Documents Page**: File upload and document library management with multilingual support
 - **⚙️ Settings Page**: Comprehensive configuration options
 - **📊 Analytics Page**: Performance monitoring and usage statistics
+- **Multilingual Support**: Automatic language detection for English, German, French, and Spanish documents
 - **Query History**: Track and revisit previous queries across sessions
 - **Responsive Design**: Works on desktop and mobile devices
 - **Real-time Feedback**: Loading indicators and status updates

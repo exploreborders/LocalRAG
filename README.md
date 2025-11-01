@@ -9,6 +9,7 @@ A local Retrieval-Augmented Generation system built with Python, PostgreSQL, Ela
 - **Hybrid Retrieval**: Combine vector similarity with BM25 text search
 - **Advanced Document Processing**: Docling-powered parsing with layout awareness and table extraction
 - **Multi-Format Support**: Load documents from .txt, .pdf, .docx, .pptx, .xlsx files with unified processing
+- **Multilingual Support**: Automatic language detection and processing for English, German, French, and Spanish
 - **Ollama Integration**: Local LLM generation with context from retrieved documents
 - **Web Interface**: Modern Streamlit UI for querying, document management, and analytics
 - **Scalable Architecture**: Designed for production use with proper database indexing

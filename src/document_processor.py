@@ -104,6 +104,60 @@ class DocumentProcessor:
             print(f"German preprocessing failed: {e}, using original text")
             return text
 
+    def preprocess_french_text(self, text: str) -> str:
+        """
+        Preprocess French text using spaCy for better chunking and embedding.
+
+        Args:
+            text (str): Raw French text
+
+        Returns:
+            str: Preprocessed text with improved tokenization
+        """
+        try:
+            nlp = spacy.load('fr_core_news_sm')
+            doc = nlp(text)
+
+            # Extract sentences and clean them
+            sentences = []
+            for sent in doc.sents:
+                # Remove extra whitespace and normalize
+                clean_sent = ' '.join(sent.text.split())
+                if clean_sent:
+                    sentences.append(clean_sent)
+
+            return ' '.join(sentences)
+        except Exception as e:
+            print(f"French preprocessing failed: {e}, using original text")
+            return text
+
+    def preprocess_spanish_text(self, text: str) -> str:
+        """
+        Preprocess Spanish text using spaCy for better chunking and embedding.
+
+        Args:
+            text (str): Raw Spanish text
+
+        Returns:
+            str: Preprocessed text with improved tokenization
+        """
+        try:
+            nlp = spacy.load('es_core_news_sm')
+            doc = nlp(text)
+
+            # Extract sentences and clean them
+            sentences = []
+            for sent in doc.sents:
+                # Remove extra whitespace and normalize
+                clean_sent = ' '.join(sent.text.split())
+                if clean_sent:
+                    sentences.append(clean_sent)
+
+            return ' '.join(sentences)
+        except Exception as e:
+            print(f"Spanish preprocessing failed: {e}, using original text")
+            return text
+
     def document_exists(self, file_hash: str) -> bool:
         """
         Check if a document with the given hash already exists in the database.
@@ -299,6 +353,18 @@ class DocumentProcessor:
             # Update documents with processed content
             if processed_content != full_content:
                 documents = [LangchainDocument(page_content=processed_content, metadata={"source": str(file_path), "language": detected_language})]
+        elif detected_language == 'fr':
+            # Apply French-specific preprocessing
+            processed_content = self.preprocess_french_text(full_content)
+            # Update documents with processed content
+            if processed_content != full_content:
+                documents = [LangchainDocument(page_content=processed_content, metadata={"source": str(file_path), "language": detected_language})]
+        elif detected_language == 'es':
+            # Apply Spanish-specific preprocessing
+            processed_content = self.preprocess_spanish_text(full_content)
+            # Update documents with processed content
+            if processed_content != full_content:
+                documents = [LangchainDocument(page_content=processed_content, metadata={"source": str(file_path), "language": detected_language})]
 
         chunks = split_documents(documents, chunk_size=chunk_size, chunk_overlap=overlap)
 
@@ -441,9 +507,17 @@ class DocumentProcessor:
                     full_content = ' '.join([doc.page_content for doc in documents])
                     detected_language = self.detect_language(full_content)
 
-                    # Apply German preprocessing if needed
+                    # Apply language-specific preprocessing if needed
                     if detected_language == 'de':
                         processed_content = self.preprocess_german_text(full_content)
+                        if processed_content != full_content:
+                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": str(file_path), "language": detected_language})]
+                    elif detected_language == 'fr':
+                        processed_content = self.preprocess_french_text(full_content)
+                        if processed_content != full_content:
+                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": str(file_path), "language": detected_language})]
+                    elif detected_language == 'es':
+                        processed_content = self.preprocess_spanish_text(full_content)
                         if processed_content != full_content:
                             documents = [LangchainDocument(page_content=processed_content, metadata={"source": str(file_path), "language": detected_language})]
 
@@ -594,11 +668,33 @@ class DocumentProcessor:
                 except:
                     detected_language = 'unknown'
 
-                # Apply German preprocessing if detected
+                # Apply language-specific preprocessing if detected
                 if detected_language == 'de':
                     try:
                         import spacy
                         nlp = spacy.load('de_core_news_sm')
+                        doc = nlp(full_content[:5000])  # Process first 5000 chars for speed
+                        sentences = [sent.text for sent in doc.sents]
+                        processed_content = ' '.join(sentences)
+                        if processed_content:
+                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": filepath, "language": detected_language})]
+                    except:
+                        pass  # Skip preprocessing if spaCy fails
+                elif detected_language == 'fr':
+                    try:
+                        import spacy
+                        nlp = spacy.load('fr_core_news_sm')
+                        doc = nlp(full_content[:5000])  # Process first 5000 chars for speed
+                        sentences = [sent.text for sent in doc.sents]
+                        processed_content = ' '.join(sentences)
+                        if processed_content:
+                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": filepath, "language": detected_language})]
+                    except:
+                        pass  # Skip preprocessing if spaCy fails
+                elif detected_language == 'es':
+                    try:
+                        import spacy
+                        nlp = spacy.load('es_core_news_sm')
                         doc = nlp(full_content[:5000])  # Process first 5000 chars for speed
                         sentences = [sent.text for sent in doc.sents]
                         processed_content = ' '.join(sentences)

@@ -238,6 +238,12 @@ def main():
                         st.markdown("🇺🇸 English")
                     elif lang == 'DE':
                         st.markdown("🇩🇪 German")
+                    elif lang == 'FR':
+                        st.markdown("🇫🇷 French")
+                    elif lang == 'ES':
+                        st.markdown("🇪🇸 Spanish")
+                    elif lang == 'IT':
+                        st.markdown("🇮🇹 Italian")
                     elif lang == 'UNKNOWN':
                         st.markdown("❓ Unknown")
                     else:
