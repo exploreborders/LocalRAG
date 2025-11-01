@@ -477,11 +477,20 @@ class DocumentProcessor:
 
         print(f"🔄 Processing {len(other_docs)} documents with {max_workers} parallel workers...")
 
-        # Split documents into worker batches
+        # Convert documents to serializable data before multiprocessing
+        serializable_docs = []
+        for doc in other_docs:
+            serializable_docs.append({
+                'id': doc.id,
+                'filepath': doc.filepath,
+                'filename': doc.filename
+            })
+
+        # Split serializable documents into worker batches
         worker_batches = []
-        docs_per_worker = max(1, len(other_docs) // max_workers)
-        for i in range(0, len(other_docs), docs_per_worker):
-            worker_batches.append(other_docs[i:i + docs_per_worker])
+        docs_per_worker = max(1, len(serializable_docs) // max_workers)
+        for i in range(0, len(serializable_docs), docs_per_worker):
+            worker_batches.append(serializable_docs[i:i + docs_per_worker])
 
         # Process batches in parallel
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
@@ -514,7 +523,8 @@ class DocumentProcessor:
         # Commit all changes
         self.db.commit()
 
-    def _process_document_batch_worker(self, batch, model_name, chunk_size, overlap):
+    @staticmethod
+    def _process_document_batch_worker(batch, model_name, chunk_size, overlap):
         """Worker function for parallel document processing. Returns serializable data only."""
         from docling.document_converter import DocumentConverter
         from docling.datamodel.pipeline_options import PdfPipelineOptions
@@ -537,19 +547,23 @@ class DocumentProcessor:
             }
         )
 
-        for doc in batch:
-            if not (os.path.exists(doc.filepath) and os.path.isfile(doc.filepath)):
+        for doc_data in batch:
+            filepath = doc_data['filepath']
+            filename = doc_data['filename']
+            doc_id = doc_data['id']
+
+            if not (os.path.exists(filepath) and os.path.isfile(filepath)):
                 continue
 
             try:
                 # Convert document
-                result = doc_converter.convert(doc.filepath)
+                result = doc_converter.convert(filepath)
                 text_content = result.document.export_to_markdown()
 
                 documents = [LangchainDocument(
                     page_content=text_content,
                     metadata={
-                        "source": doc.filepath,
+                        "source": filepath,
                         "docling_metadata": result.document.origin.model_dump() if result.document.origin else {}
                     }
                 )]
@@ -564,9 +578,9 @@ class DocumentProcessor:
                 embeddings_array, _ = create_embeddings(chunks, model_name)
 
                 # Return serializable data: (doc_id, chunks, embeddings_array, filename)
-                results.append((doc.id, chunks, embeddings_array, doc.filename))
+                results.append((doc_id, chunks, embeddings_array, filename))
 
             except Exception as e:
-                print(f"❌ Worker failed to process {doc.filename}: {e}")
+                print(f"❌ Worker failed to process {filename}: {e}")
 
         return results

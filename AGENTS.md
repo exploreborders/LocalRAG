@@ -23,6 +23,7 @@
 - **Pipeline Optimization**: OCR disabled, table extraction optimized for speed
 - **Converter Reuse**: Single DocumentConverter instance reused across operations
 - **Smart Routing**: Separate optimized paths for text files vs. complex documents
+- **Serialization Safety**: Workers use only serializable data to avoid SQLAlchemy pickling issues
 
 ## Environment Configuration
 - **Local Development**: Use `.env` with localhost settings (currently active)
