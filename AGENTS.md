@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Build/Lint/Test Commands
-- Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt && python -m spacy download de_core_news_sm`
+- Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt && python -m spacy download de_core_news_sm fr_core_news_sm es_core_news_sm it_core_news_sm pt_core_news_sm nl_core_news_sm sv_core_news_sm pl_core_news_sm zh_core_web_sm ja_core_news_sm ko_core_news_sm`
 - Set up databases: `python setup_databases.py docker` (or `docker-compose up -d`)
 - Initialize databases: `python scripts/migrate_to_db.py && python scripts/migrate_add_language.py && python src/database/opensearch_setup.py`
 - Run all tests: `python test_system.py`
@@ -26,6 +26,13 @@
 - **Smart Routing**: Separate optimized paths for text files vs. complex documents
 - **Serialization Safety**: Workers use only serializable data to avoid SQLAlchemy pickling issues
 
+## Multilingual Support
+- **Language Detection**: Automatic language detection using `langdetect` for 12 supported languages
+- **Text Preprocessing**: Language-specific spaCy models for proper tokenization and sentence segmentation
+- **LLM Responses**: Language-aware prompt templates ensure responses in the user's query language
+- **Source Citations**: LLM answers include references to source documents ([Source 1: filename.pdf])
+- **Supported Languages**: English, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Polish, Chinese, Japanese, Korean
+
 ## Environment Configuration
 - **Local Development**: Use `.env` with localhost settings (currently active)
 - **Docker Deployment**: Environment variables are set automatically in docker-compose.yml
@@ -46,6 +53,8 @@
 - **Text Files**: Direct loading for simple .txt files
 
 ## Model Requirements
-- **Default model: nomic-ai/nomic-embed-text-v1.5**: Primary embedding model for all operations (requires einops)
+- **Default model: nomic-ai/nomic-embed-text-v1.5**: Primary multilingual embedding model for all operations (requires einops)
+- **Language Support**: 12 languages with automatic detection and processing
+- **spaCy Models**: 11 language-specific models for text preprocessing (de, fr, es, it, pt, nl, sv, pl, zh, ja, ko)
 - **Smart Caching**: Document hash comparison prevents reprocessing
 - **Batch Processing**: Efficient document processing with single model

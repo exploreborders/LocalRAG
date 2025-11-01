@@ -1,7 +1,7 @@
 # Building a Local RAG System with Python and Ollama
 
 ## Overview
-This project implements a production-ready Local RAG (Retrieval-Augmented Generation) system using PostgreSQL for document storage, Elasticsearch for vector search, and Ollama for local LLM generation. The system features Docker-based database setup for easy deployment, advanced document processing with Docling, and a modern web interface. It provides accurate, context-aware responses by combining efficient document retrieval with generative AI, all running locally for maximum privacy and control. Recent performance optimizations achieved 5-10x speedup in document processing through batch operations, parallel processing, and pipeline tuning. Comprehensive multilingual enhancement adds support for German, French, and Spanish languages with automatic language detection, language-specific text processing using spaCy, and language-aware UI components.
+This project implements a production-ready Local RAG (Retrieval-Augmented Generation) system using PostgreSQL for document storage, Elasticsearch for vector search, and Ollama for local LLM generation. The system features Docker-based database setup for easy deployment, advanced document processing with Docling, and a modern web interface. It provides accurate, context-aware responses by combining efficient document retrieval with generative AI, all running locally for maximum privacy and control. Recent performance optimizations achieved 5-10x speedup in document processing through batch operations, parallel processing, and pipeline tuning. Comprehensive multilingual enhancement adds support for 12 languages (English, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Polish, Chinese, Japanese, Korean) with automatic language detection, language-specific text processing using spaCy, language-aware LLM responses, and source citations in generated answers.
 
 ## Prerequisites
 - Python 3.8 or higher
@@ -170,6 +170,9 @@ This plan provides a high-level overview. Each step may require additional resea
 - Hybrid retrieval combining vector similarity and BM25 text search
 - Advanced document processing with Docling (layout-aware parsing, table extraction)
 - Multi-format document processing (PDF, DOCX, XLSX, PPTX, TXT)
+- **12-Language Multilingual Support**: Automatic language detection and processing
+- **Language-Aware LLM Responses**: Answers generated in the user's query language
+- **Source Citations**: LLM answers include references to source documents
 - Ollama integration for local LLM generation
 - Modern web interface with document management and analytics
 - CLI tools for processing and testing
@@ -178,7 +181,8 @@ This plan provides a high-level overview. Each step may require additional resea
 **📊 System Metrics:**
 - **Database**: PostgreSQL with pgvector + Elasticsearch with dense vectors
 - **Documents Processed**: 34 files with Docling-powered parsing and chunking
-- **Vector Dimensions**: 768 (nomic-embed-text-v1.5 model)
+- **Vector Dimensions**: 768 (nomic-embed-text-v1.5 multilingual model)
+- **Languages Supported**: 12 (English, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Polish, Chinese, Japanese, Korean)
 - **Web Interface**: 4-page Streamlit application with real-time processing
 - **Performance**: Sub-second query responses with accurate retrieval
 - **Scalability**: Supports large document collections with efficient indexing
@@ -374,7 +378,7 @@ This plan provides a high-level overview. Each step may require additional resea
 
 ### 🎯 **Future Enhancement Opportunities**
 
-The system is now production-ready with a solid foundation, ongoing performance optimizations, and planned multilingual enhancement. Potential future improvements include:
+The system is now production-ready with comprehensive multilingual support and source citations. Potential future improvements include:
 
 - **Advanced Analytics**: Enhanced performance metrics and custom dashboards
 - **Conversation Memory**: Multi-turn conversations with context preservation
@@ -382,11 +386,12 @@ The system is now production-ready with a solid foundation, ongoing performance 
 - **REST API**: External integrations and programmatic access
 - **Cloud Deployment**: Container orchestration and cloud-native hosting
 - **Model Updates**: Support for latest embedding and LLM architectures
-- **Additional Languages**: Expand beyond German to other European and Asian languages
+- **Additional Languages**: Expand to more languages (Russian, Arabic, etc.) as spaCy models become available
 - **Real-time Features**: Live indexing and incremental document updates
 - **Security**: Access controls and data encryption for enterprise use
 - **Advanced Caching**: Memory-efficient processing and smart reprocessing detection
 - **Distributed Processing**: Multi-node document processing for large-scale deployments
+- **Scientific Optimizations**: Enhanced processing for mathematical content, citations, and technical terminology
 
 ### ✅ **Phase 10: Scientific Literature Language Support (COMPLETED)**
 
@@ -403,6 +408,38 @@ Based on major scientific databases, the primary languages in science papers are
 - **French**: ~1-2% (Phase 10.1 - COMPLETED)
 - **Spanish**: ~1-2% (Phase 10.2 - COMPLETED)
 - **Italian**: ~0.5-1% (Phase 10.3 - CANCELLED: spaCy model unavailable)
+
+### ✅ **Phase 11: Extended Multilingual Support & Source Citations (COMPLETED)**
+
+#### **Phase 11.1: Extended European Language Support**
+- ✅ **Italian Support**: Added `it_core_news_sm` spaCy model for Italian text processing
+- ✅ **Portuguese Support**: Added `pt_core_news_sm` spaCy model for Portuguese text processing
+- ✅ **Dutch Support**: Added `nl_core_news_sm` spaCy model for Dutch text processing
+- ✅ **Swedish Support**: Added `sv_core_news_sm` spaCy model for Swedish text processing
+- ✅ **Polish Support**: Added `pl_core_news_sm` spaCy model for Polish text processing
+
+#### **Phase 11.2: Asian Language Support**
+- ✅ **Chinese Support**: Added `zh_core_web_sm` spaCy model for Chinese text processing
+- ✅ **Japanese Support**: Added `ja_core_news_sm` spaCy model for Japanese text processing
+- ✅ **Korean Support**: Added `ko_core_news_sm` spaCy model for Korean text processing
+
+#### **Phase 11.3: Language-Aware LLM Responses**
+- ✅ **Multilingual Prompts**: Created 12 language-specific prompt templates for LLM generation
+- ✅ **Language Detection**: Automatic query language detection using `langdetect`
+- ✅ **Response Language**: LLM responds in the same language as the user's query
+- ✅ **Fallback Handling**: Graceful fallback to English for unsupported languages
+
+#### **Phase 11.4: Source Citations in LLM Answers**
+- ✅ **Context Enhancement**: Include source file references in LLM context ([Source 1: filename.pdf])
+- ✅ **Citation Instructions**: LLM prompted to include source references in responses
+- ✅ **Web Interface Display**: Source documents shown with relevance scores and metadata
+- ✅ **CLI Enhancement**: Source information displayed in terminal output
+
+#### **Phase 11.5: UI Enhancements**
+- ✅ **Language Indicators**: Language detection display in query results
+- ✅ **Source Document Display**: Enhanced document source information with deduplication
+- ✅ **Multilingual Settings**: Language configuration options in settings page
+- ✅ **Analytics Updates**: Language distribution tracking and display
 
 #### **Phase 10.1: French Language Support (COMPLETED)**
 - ✅ **Scientific Usage**: Major in mathematics, physics, chemistry, social sciences
@@ -463,3 +500,7 @@ Based on major scientific databases, the primary languages in science papers are
 - ✅ **Phase 10.4**: 0.5 weeks (UI enhancements) - COMPLETED
 - ⏳ **Phase 10.5-10.6**: 2-4 weeks (scientific optimizations and LLM integration) - PENDING
 - **Total**: 3-6 weeks remaining for complete scientific multilingual support
+
+### ✅ **Phase 11: Extended Multilingual Support & Source Citations (COMPLETED)**
+
+**Status**: All major multilingual and source citation features have been successfully implemented and tested. The system now supports 12 languages with proper language detection, language-aware LLM responses, and comprehensive source citations in generated answers.

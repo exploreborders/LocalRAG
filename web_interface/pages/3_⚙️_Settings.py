@@ -101,59 +101,9 @@ def get_installed_ollama_models():
 
 def get_available_embedding_models():
     """Get list of available sentence-transformers models"""
-    # Common embedding models to check - focus on the most commonly used ones
-    candidate_models = [
-        "nomic-ai/nomic-embed-text-v1.5"  # Primary model
-    ]
-
-    available_models = []
-
-    try:
-        from sentence_transformers import SentenceTransformer
-        import threading
-
-        def test_model(model_name, results, index):
-            """Test if a model can be loaded within timeout"""
-            try:
-                # Try to load model with a short timeout
-                # This will download if not cached, but should be fast for cached models
-                model = SentenceTransformer(model_name, device='cpu')
-                results[index] = model_name
-                del model  # Clean up
-            except Exception:
-                results[index] = None
-
-        # Test models with timeout (since downloading can take time)
-        threads = []
-        results = [None] * len(candidate_models)
-
-        for i, model_name in enumerate(candidate_models):
-            thread = threading.Thread(target=test_model, args=(model_name, results, i))
-            thread.daemon = True
-            threads.append(thread)
-            thread.start()
-
-        # Wait for all threads with timeout
-        for thread in threads:
-            thread.join(timeout=10)  # 10 second timeout per model
-
-        # Collect successful results
-        for result in results:
-            if result is not None:
-                available_models.append(result)
-
-    except ImportError:
-        st.warning("sentence-transformers not available. Using default model list.")
-        return ["nomic-ai/nomic-embed-text-v1.5"]
-    except Exception as e:
-        st.warning(f"Error checking embedding models: {e}")
-        return ["nomic-ai/nomic-embed-text-v1.5"]
-
-    # Always include at least the default model
-    if not available_models:
-        available_models = ["nomic-ai/nomic-embed-text-v1.5"]
-
-    return available_models
+    # Currently only one model is supported for multilingual embeddings
+    # nomic-ai/nomic-embed-text-v1.5 is the only model that supports all 12 languages
+    return ["nomic-ai/nomic-embed-text-v1.5"]
 
 def update_streamlit_theme(config_path, theme):
     """Update Streamlit theme configuration"""
@@ -277,9 +227,13 @@ def main():
             installed_models = get_installed_ollama_models()
             current_model = settings.get('generation', {}).get('model', 'llama2')
 
+            # Ensure installed_models is a list
+            if not isinstance(installed_models, list) or not installed_models:
+                installed_models = ['llama2']
+
             # Ensure current model is in the list, otherwise use first available
             if current_model not in installed_models:
-                current_model = installed_models[0] if installed_models else 'llama2'
+                current_model = installed_models[0]
 
             model_name = st.selectbox(
                 "LLM Model",
@@ -300,6 +254,67 @@ def main():
                 'max_tokens': max_tokens,
                 'ollama_host': ollama_host,
                 'ollama_port': 11434
+            }
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Retrieval Settings
+    st.markdown("### 🔍 Retrieval Settings")
+    with st.container():
+        st.markdown('<div class="setting-group">', unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            chunk_size = st.slider(
+                "Chunk Size",
+                min_value=500,
+                max_value=2000,
+                value=settings.get('retrieval', {}).get('chunk_size', 1000),
+                step=100,
+                help="Size of text chunks for embedding"
+            )
+
+            chunk_overlap = st.slider(
+                "Chunk Overlap",
+                min_value=0,
+                max_value=500,
+                value=settings.get('retrieval', {}).get('chunk_overlap', 200),
+                step=50,
+                help="Overlap between text chunks"
+            )
+
+        with col2:
+            k_retrieval = st.slider(
+                "Retrieval Count (k)",
+                min_value=1,
+                max_value=10,
+                value=settings.get('retrieval', {}).get('k_retrieval', 3),
+                help="Number of documents to retrieve for each query"
+            )
+
+            # Get available embedding models
+            available_embedding_models = get_available_embedding_models()
+            current_embedding_model = settings.get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')
+
+            embedding_model = st.selectbox(
+                "Embedding Model",
+                available_embedding_models,
+                index=available_embedding_models.index(current_embedding_model) if current_embedding_model in available_embedding_models else 0,
+                help="Model used for text embeddings"
+            )
+
+        # Update settings if changed
+        if (chunk_size != settings.get('retrieval', {}).get('chunk_size', 1000) or
+            chunk_overlap != settings.get('retrieval', {}).get('chunk_overlap', 200) or
+            k_retrieval != settings.get('retrieval', {}).get('k_retrieval', 3) or
+            embedding_model != settings.get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')):
+            settings_changed = True
+            settings['retrieval'] = {
+                'chunk_size': chunk_size,
+                'chunk_overlap': chunk_overlap,
+                'k_retrieval': k_retrieval,
+                'embedding_model': embedding_model
             }
 
         st.markdown('</div>', unsafe_allow_html=True)
@@ -368,8 +383,9 @@ def main():
 
                     # Check if embedding model changed and warn about reprocessing
                     old_embedding_model = st.session_state.get('settings', {}).get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')
-                    if embedding_model != old_embedding_model:
-                        st.warning(f"⚠️ **Embedding model changed from {old_embedding_model} to {embedding_model}**")
+                    current_embedding_model = settings.get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')
+                    if current_embedding_model != old_embedding_model:
+                        st.warning(f"⚠️ **Embedding model changed from {old_embedding_model} to {current_embedding_model}**")
                         st.info("📄 Go to the Documents page and click 'Reprocess Documents' to create embeddings with the new model")
 
                     if theme != settings.get('interface', {}).get('theme', 'light'):

@@ -48,8 +48,33 @@ def main():
                 question = input("\nQuestion: ").strip()
                 if question.lower() == 'quit':
                     break
-                result = rag.query(question)
-                print(format_answer_db(result))
+            result = rag.query(question)
+            query_lang = result.get('query_language', 'unknown')
+            if query_lang != 'unknown':
+                lang_names = {
+                    'en': 'English', 'de': 'German', 'fr': 'French', 'es': 'Spanish',
+                    'it': 'Italian', 'pt': 'Portuguese', 'nl': 'Dutch', 'sv': 'Swedish',
+                    'pl': 'Polish', 'zh': 'Chinese', 'ja': 'Japanese', 'ko': 'Korean'
+                }
+                lang_display = lang_names.get(query_lang, query_lang.upper())
+                print(f"🌍 Detected query language: {lang_display}")
+
+            print(format_answer_db(result['answer']))
+
+            # Show source documents
+            if 'retrieved_documents' in result and result['retrieved_documents']:
+                print("\n📚 Source Documents Used:")
+                doc_sources = {}
+                for doc in result['retrieved_documents']:
+                    doc_info = doc.get('document', {})
+                    filename = doc_info.get('filename', 'Unknown')
+                    if filename not in doc_sources:
+                        doc_sources[filename] = {'count': 0, 'score': 0}
+                    doc_sources[filename]['count'] += 1
+                    doc_sources[filename]['score'] = max(doc_sources[filename]['score'], doc.get('score', 0))
+
+                for i, (filename, info) in enumerate(doc_sources.items(), 1):
+                    print(f"  {i}. {filename} (chunks: {info['count']}, relevance: {info['score']:.3f})")
         except Exception as e:
             print(f"Error initializing RAG pipeline: {e}")
             print("Make sure Ollama is running: ollama serve")

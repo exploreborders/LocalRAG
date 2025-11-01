@@ -60,6 +60,18 @@ def render_retrieval_results(results):
 
 def render_rag_results(results):
     """Render RAG (generation) results"""
+    # Display query language if detected
+    result_data = results.get('result', {})
+    query_lang = result_data.get('query_language', 'unknown')
+    if query_lang != 'unknown':
+        lang_names = {
+            'en': 'English', 'de': 'German', 'fr': 'French', 'es': 'Spanish',
+            'it': 'Italian', 'pt': 'Portuguese', 'nl': 'Dutch', 'sv': 'Swedish',
+            'pl': 'Polish', 'zh': 'Chinese', 'ja': 'Japanese', 'ko': 'Korean'
+        }
+        lang_display = lang_names.get(query_lang, query_lang.upper())
+        st.info(f"🌍 Detected query language: {lang_display}")
+
     st.markdown("**🤖 AI-Generated Answer:**")
 
     # Display the generated answer
@@ -69,26 +81,42 @@ def render_rag_results(results):
     else:
         st.warning("No formatted answer available")
 
-    # Display source documents used
+    # Display source documents used for generation
     result_data = results.get('result', {})
-    if 'source_documents' in result_data:
-        st.markdown("**📚 Source Documents:**")
+    if 'retrieved_documents' in result_data:
+        st.markdown("**📚 Source Documents Used:**")
 
-        source_docs = result_data['source_documents']
-        for i, doc in enumerate(source_docs, 1):
-            with st.expander(f"📄 Source {i}"):
-                page_content = doc.page_content if hasattr(doc, 'page_content') else str(doc)
-                metadata = doc.metadata if hasattr(doc, 'metadata') else {}
+        # Group by document to avoid duplicates and show unique sources
+        doc_sources = {}
+        for doc in result_data['retrieved_documents']:
+            doc_info = doc.get('document', {})
+            filename = doc_info.get('filename', 'Unknown')
+            if filename not in doc_sources:
+                doc_sources[filename] = {
+                    'filename': filename,
+                    'filepath': doc_info.get('filepath', ''),
+                    'chunks': []
+                }
+            doc_sources[filename]['chunks'].append(doc)
 
-                # Content preview
-                content_preview = page_content[:300] + "..." if len(page_content) > 300 else page_content
-                st.write(content_preview)
+        # Display each unique document
+        for i, (filename, doc_data) in enumerate(doc_sources.items(), 1):
+            with st.expander(f"📄 Source {i}: {filename}"):
+                st.markdown(f"**File:** {filename}")
+                st.markdown(f"**Path:** {doc_data['filepath']}")
+                st.markdown(f"**Chunks used:** {len(doc_data['chunks'])}")
 
-                # Metadata
-                if metadata:
-                    st.markdown("*Metadata:*")
-                    for key, value in metadata.items():
-                        st.caption(f"{key}: {value}")
+                # Show relevance scores
+                scores = [chunk.get('score', 0) for chunk in doc_data['chunks']]
+                avg_score = sum(scores) / len(scores) if scores else 0
+                st.markdown(f"**Average relevance:** {avg_score:.3f}")
+
+                # Show preview of first chunk
+                if doc_data['chunks']:
+                    first_chunk = doc_data['chunks'][0]
+                    content_preview = first_chunk['content'][:300] + "..." if len(first_chunk['content']) > 300 else first_chunk['content']
+                    st.markdown("**Content preview:**")
+                    st.write(content_preview)
 
 def render_no_results():
     """Render message when no results are available"""

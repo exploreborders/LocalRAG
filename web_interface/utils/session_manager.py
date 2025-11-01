@@ -77,56 +77,9 @@ def clear_history():
 
 def get_available_embedding_models():
     """Get list of available sentence-transformers models"""
-    # Common embedding models to check - focus on the most commonly used ones
-    candidate_models = [
-        "nomic-ai/nomic-embed-text-v1.5"  # Primary model
-    ]
-
-    available_models = []
-
-    try:
-        from sentence_transformers import SentenceTransformer
-        import threading
-        import time
-
-        def test_model(model_name, results, index):
-            """Test if a model can be loaded within timeout"""
-            try:
-                start_time = time.time()
-                # Try to load model with a short timeout
-                # This will download if not cached, but should be fast for cached models
-                model = SentenceTransformer(model_name, device='cpu')
-                load_time = time.time() - start_time
-                print(f"Successfully loaded {model_name} in {load_time:.2f}s")
-                results[index] = model_name
-                del model  # Clean up
-            except Exception as e:
-                print(f"Failed to load {model_name}: {str(e)[:100]}...")
-                results[index] = None
-
-        # Test models sequentially to avoid threading issues with PyTorch
-        for model_name in candidate_models:
-            try:
-                model = SentenceTransformer(model_name, device='cpu')
-                available_models.append(model_name)
-                del model  # Clean up
-            except Exception:
-                continue
-
-    except ImportError:
-        print("sentence-transformers not available")
-        st.warning("sentence-transformers not available. Using default model list.")
-        return ["nomic-ai/nomic-embed-text-v1.5"]
-    except Exception as e:
-        print(f"Error checking embedding models: {e}")
-        st.warning(f"Error checking embedding models: {e}")
-        return ["nomic-ai/nomic-embed-text-v1.5"]
-
-    # Always include at least the default model
-    if not available_models:
-        available_models = ["nomic-ai/nomic-embed-text-v1.5"]
-
-    return available_models
+    # Currently only one model is supported for multilingual embeddings
+    # nomic-ai/nomic-embed-text-v1.5 is the only model that supports all 12 languages
+    return ["nomic-ai/nomic-embed-text-v1.5"]
 
 def get_system_status():
     """Get current system status"""
