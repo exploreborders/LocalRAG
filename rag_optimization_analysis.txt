@@ -2,7 +2,7 @@
 
 ## Performance Optimizations
 
-### 1. LLM Response Caching
+### 1. LLM Response Caching (done)
 - Current Issue: Every query calls Ollama LLM, even for identical questions
 - Optimization: Implement response caching based on query + retrieved document hash
 - Impact: 10-100x speedup for repeated queries
