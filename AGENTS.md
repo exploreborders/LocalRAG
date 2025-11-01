@@ -1,15 +1,16 @@
 # AGENTS.md
 
 ## Build/Lint/Test Commands
-- Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt`
+- Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt && python -m spacy download de_core_news_sm`
 - Set up databases: `python setup_databases.py docker` (or `docker-compose up -d`)
-- Initialize databases: `python scripts/migrate_to_db.py && python src/database/opensearch_setup.py`
+- Initialize databases: `python scripts/migrate_to_db.py && python scripts/migrate_add_language.py && python src/database/opensearch_setup.py`
 - Run all tests: `python test_system.py`
 - Run single test: `python -c "from test_system import test_retrieval; test_retrieval()"`
 - Performance tests: `python test_performance.py`
 - Run web interface: `python run_web.py` (or `streamlit run web_interface/app.py`)
 - Run CLI app: `python -m src.app`
 - Process data: `python -m src.embeddings`
+- Reprocess documents (for language detection): Click "🔄 Reprocess Documents" in web interface (uses batch processing, parallelization, and memory management)
 - Stop databases: `docker-compose down`
 
 ## Document Processing Commands
@@ -39,8 +40,9 @@
 - **Best Practices**: PEP 8, descriptive names, single responsibility, unit tests, no global state
 
 ## Document Processing
-- **Unified Loading**: Docling integration for better document parsing (PDF, DOCX, PPTX, XLSX)
-- **Fallback Support**: Graceful fallback to basic parsers if Docling fails
+- **Unified Loading**: Docling integration for high-quality document parsing (PDF, DOCX, PPTX, XLSX)
+- **Quality Processing**: Uses Docling for all document types including reprocessing for better text extraction
+- **Fallback Support**: PyPDF2 fallback for PDFs if Docling fails
 - **Text Files**: Direct loading for simple .txt files
 
 ## Model Requirements

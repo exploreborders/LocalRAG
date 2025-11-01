@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS documents (
     filepath VARCHAR(500) NOT NULL,
     file_hash VARCHAR(64) NOT NULL UNIQUE,
     content_type VARCHAR(100),
+    detected_language VARCHAR(10), -- ISO 639-1 language code (e.g., 'en', 'de')
     upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(50) DEFAULT 'processed'

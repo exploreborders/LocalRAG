@@ -95,6 +95,7 @@ def list_documents():
                 'size': 0,  # Size not stored in DB
                 'modified': doc['last_modified'],
                 'extension': doc['filename'].split('.')[-1] if '.' in doc['filename'] else '',
+                'detected_language': doc.get('detected_language', 'unknown'),
                 'status': doc['status']
             })
 
@@ -105,7 +106,7 @@ def list_documents():
         st.error(f"❌ Failed to load documents: {e}")
         return []
 
-def process_uploaded_files(uploaded_files, selected_model="nomic-ai/nomic-embed-text-v1.5"):
+def process_uploaded_files(uploaded_files):
     """Process uploaded files"""
     if not uploaded_files:
         return
@@ -138,7 +139,7 @@ def process_uploaded_files(uploaded_files, selected_model="nomic-ai/nomic-embed-
 
             # Process the file
             try:
-                processor.process_document(str(file_path), selected_model)
+                processor.process_document(str(file_path))
                 processed_count += 1
             except Exception as e:
                 st.error(f"❌ Failed to process {uploaded_file.name}: {e}")
@@ -148,90 +149,27 @@ def process_uploaded_files(uploaded_files, selected_model="nomic-ai/nomic-embed-
         st.success(f"✅ Successfully uploaded and processed {processed_count} file(s)")
         st.rerun()
 
-def reprocess_documents(selected_model="nomic-ai/nomic-embed-text-v1.5"):
-    """Reprocess all documents to update database and Elasticsearch"""
+def reprocess_documents():
+    """Reprocess all documents to update database and Elasticsearch with performance optimizations"""
     try:
-        with st.spinner("🔄 Processing documents..."):
+        with st.spinner("🔄 Reprocessing documents with performance optimizations..."):
             processor = DocumentProcessor()
-            processor.process_directory("data", selected_model)
+            processor.reprocess_all_documents(
+                batch_size=5,  # Process in batches of 5
+                use_parallel=True,  # Use parallel processing
+                max_workers=4,  # Use up to 4 workers
+                memory_limit_mb=500  # Memory limit
+            )
 
-            st.success("✅ Documents processed and stored in database")
+            st.success("✅ Documents reprocessed with performance optimizations")
 
             # Update session state to force reinitialization
             if 'system_initialized' in st.session_state:
                 st.session_state.system_initialized = False
     except Exception as e:
-        st.error(f"❌ Processing failed: {e}")
+        st.error(f"❌ Reprocessing failed: {e}")
 
-def batch_process_documents(selected_models):
-    """Process documents with multiple models in batch"""
-    try:
-        with st.spinner("🔄 Batch processing documents... This may take a while."):
 
-            # Load and split documents once
-            docs = load_documents()
-            chunks = split_documents(docs)
-
-            if not chunks:
-                st.warning("⚠️ No documents found to process")
-                return
-
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-
-            total_models = len(selected_models)
-            processed_models = 0
-
-            for model_name in selected_models:
-                status_text.text(f"Processing with {model_name}...")
-
-                # Check if already processed (smart caching)
-                from src.embeddings import get_documents_hash
-                current_hash = get_documents_hash(chunks)
-
-                safe_model_name = model_name.replace('/', '_').replace('-', '_')
-                embeddings_file = f"models/embeddings_{safe_model_name}.pkl"
-
-                needs_processing = True
-                if os.path.exists(embeddings_file):
-                    try:
-                        _, _, stored_hash = load_embeddings(model_name)
-                        if stored_hash == current_hash:
-                            st.info(f"✅ {model_name} already up to date")
-                            needs_processing = False
-                    except Exception:
-                        pass
-
-                if needs_processing:
-                    # Create embeddings
-                    from sentence_transformers import SentenceTransformer
-                    import torch
-                    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-                    model = SentenceTransformer(model_name, device=device)
-                    texts = [doc.page_content for doc in chunks]
-                    embeddings = model.encode(texts, show_progress_bar=False)
-
-                    # Save embeddings and index
-                    save_embeddings(embeddings, chunks, model_name)
-                    index = create_faiss_index(embeddings)
-                    save_faiss_index(index, model_name)
-
-                    st.success(f"✅ Processed {len(chunks)} chunks with {model_name}")
-
-                processed_models += 1
-                progress_bar.progress(processed_models / total_models)
-
-            progress_bar.empty()
-            status_text.empty()
-
-            st.success(f"✅ Batch processing completed! Processed documents with {len(selected_models)} models")
-
-            # Update session state to force reinitialization
-            if 'system_initialized' in st.session_state:
-                st.session_state.system_initialized = False
-
-    except Exception as e:
-        st.error(f"❌ Batch processing failed: {str(e)}")
 
 def main():
     """Main page content"""
@@ -242,15 +180,6 @@ def main():
     st.markdown("### 📤 Upload Documents")
     st.markdown("Supported formats: TXT, PDF, DOCX, PPTX, XLSX")
 
-    # Get available embedding models for upload
-    from utils.session_manager import get_available_embedding_models
-    available_models = get_available_embedding_models()
-    upload_model = st.selectbox(
-        "Embedding Model for Upload",
-        available_models,
-        help="Choose which embedding model to use for processing uploaded documents"
-    )
-
     uploaded_files = st.file_uploader(
         "Choose files to upload",
         accept_multiple_files=True,
@@ -259,7 +188,7 @@ def main():
 
     if uploaded_files:
         if st.button("📤 Upload Files", type="primary"):
-            process_uploaded_files(uploaded_files, upload_model)
+            process_uploaded_files(uploaded_files)
 
     st.markdown("---")
 
@@ -274,64 +203,27 @@ def main():
         st.info(f"📊 Found {len(documents)} document(s)")
 
         # Processing controls
-        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-
-        # Get available embedding models
-        from utils.session_manager import get_available_embedding_models
-        available_models = get_available_embedding_models()
-
-        # Debug: Show available models
-        if st.checkbox("🔍 Debug: Show available models", value=False):
-            st.write("Available models:", available_models)
-            st.write("Number of models:", len(available_models))
-
-        with col4:
-            if st.button("🔄 Refresh Models", help="Refresh the list of available models"):
-                st.rerun()
+        col1, col2, col3 = st.columns([1, 1, 1])
 
         with col1:
-            selected_model = st.selectbox(
-                "Embedding Model",
-                available_models,
-                help="Choose which embedding model to use for processing documents"
-            )
+            if st.button("🔄 Reprocess Documents", type="secondary", use_container_width=True):
+                reprocess_documents()
 
         with col2:
-            if st.button("🔄 Reprocess Documents", type="secondary", use_container_width=True):
-                reprocess_documents(selected_model)
-
-        with col3:
             if st.button("🗑️ Clear Documents", type="secondary", use_container_width=True):
                 # This would need more sophisticated handling
                 st.warning("⚠️ Document deletion not implemented yet")
 
-        # Batch processing section
-        st.markdown("### 🔄 Batch Processing")
-        st.markdown("Process documents with multiple models simultaneously")
+        with col3:
+            if st.button("🔄 Refresh", help="Refresh the document list"):
+                st.rerun()
 
-        # Get available models
-        available_models = get_available_embedding_models()
 
-        if len(available_models) > 1:
-            selected_batch_models = st.multiselect(
-                "Select models for batch processing",
-                available_models,
-                default=[available_models[0]],
-                help="Choose multiple models to process documents with"
-            )
-
-            if st.button("🚀 Process with Selected Models", type="primary", use_container_width=True):
-                if selected_batch_models:
-                    batch_process_documents(selected_batch_models)
-                else:
-                    st.warning("Please select at least one model")
-        else:
-            st.info("📝 Need multiple embedding models for batch processing")
 
         # Document list
         for doc in documents:
             with st.container():
-                col1, col2, col3 = st.columns([3, 1, 1])
+                col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
 
                 with col1:
                     st.markdown(f"**{doc['name']}**")
@@ -341,6 +233,17 @@ def main():
                     st.caption(f"Modified: {time.strftime('%Y-%m-%d %H:%M', time.localtime(int(doc['modified'].timestamp())))}")
 
                 with col3:
+                    lang = doc.get('detected_language', 'unknown').upper()
+                    if lang == 'EN':
+                        st.markdown("🇺🇸 English")
+                    elif lang == 'DE':
+                        st.markdown("🇩🇪 German")
+                    elif lang == 'UNKNOWN':
+                        st.markdown("❓ Unknown")
+                    else:
+                        st.markdown(f"🌍 {lang}")
+
+                with col4:
                     file_ext = doc['extension'].upper()
                     if file_ext == '.TXT':
                         st.markdown("📄 Text")
@@ -360,7 +263,7 @@ def main():
     st.markdown("### 🔧 Processing Status")
 
     # Get available models and check status for each
-    available_models = get_available_embedding_models()
+    available_models = ["nomic-ai/nomic-embed-text-v1.5"]
 
     st.markdown("**Available Embedding Models:**")
     for model in available_models:
@@ -393,9 +296,9 @@ def main():
     )
 
     if not has_any_embeddings:
-        st.info("💡 Select a model above and click 'Reprocess Documents' to generate embeddings and vector index")
+        st.info("💡 Click 'Reprocess Documents' to generate embeddings and vector index")
     else:
-        st.success("✅ At least one model has processed embeddings")
+        st.success("✅ Documents have been processed with embeddings")
 
 if __name__ == "__main__":
     main()

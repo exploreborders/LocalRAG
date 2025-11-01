@@ -25,6 +25,7 @@ class Document(Base):
     filepath: Mapped[str] = mapped_column(String(500), nullable=False)
     file_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     content_type: Mapped[Optional[str]] = mapped_column(String(100))
+    detected_language: Mapped[Optional[str]] = mapped_column(String(10))  # ISO 639-1 language code (e.g., 'en', 'de')
     upload_date: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
     last_modified: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
     status: Mapped[str] = mapped_column(String(50), default='processed')
