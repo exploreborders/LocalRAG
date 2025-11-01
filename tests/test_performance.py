@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 """
 Performance benchmarking for RAG system.
 Tests the database-backed system with Elasticsearch vector search.

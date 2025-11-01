@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 """
 Simple test script for language detection only.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.rag_pipeline_db import RAGPipelineDB
 
 def test_language_detection():

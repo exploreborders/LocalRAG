@@ -86,8 +86,9 @@ Choose between:
 
 ### Testing:
 ```bash
-python test_system.py  # Run system tests
-python test_performance.py  # Performance benchmarking
+python tests/run_all_tests.py  # Run all tests
+python tests/test_system.py    # Run system tests only
+python tests/test_performance.py  # Performance benchmarking
 ```
 
 ## Project Structure
@@ -112,9 +113,12 @@ LocalRAG/
 │   └── components/         # Reusable UI components
 ├── scripts/
 │   └── migrate_to_db.py    # Database migration script
+├── tests/
+│   ├── run_all_tests.py    # Test runner script
+│   ├── test_system.py      # System tests
+│   ├── test_performance.py # Performance benchmarks
+│   └── test_*.py           # Additional test files
 ├── setup_databases.py      # Database setup helper script
-├── test_system.py          # System tests
-├── test_performance.py     # Performance benchmarks
 ├── requirements.txt        # Python dependencies
 ├── docker-compose.yml      # Docker services configuration
 ├── plan.md                 # Implementation plan

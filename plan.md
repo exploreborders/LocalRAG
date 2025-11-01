@@ -40,7 +40,7 @@ This project implements a production-ready Local RAG (Retrieval-Augmented Genera
 ### 6. Start Using the System
 - **Web Interface**: `streamlit run web_interface/app.py` - Full-featured UI
 - **CLI**: `python -m src.app` - Command-line access
-- **Testing**: `python test_system.py` - Verify functionality
+- **Testing**: `python tests/test_system.py` - Verify functionality
 
 ## Additional Considerations
 - **Privacy**: Since this is local, data stays on your machine
