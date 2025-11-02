@@ -4,7 +4,7 @@ Updated retrieval system using Elasticsearch for vector search and PostgreSQL fo
 """
 
 import numpy as np
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from elasticsearch import Elasticsearch
 from sqlalchemy.orm import Session
 from sentence_transformers import SentenceTransformer
@@ -18,15 +18,32 @@ class DatabaseRetriever:
     and metadata queries in PostgreSQL.
     """
 
-    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5"):
+    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", use_batch_processing: bool = True):
         """
         Initialize the retriever with specified embedding model.
 
         Args:
             model_name (str): Name of the sentence-transformers model to use
+            use_batch_processing (bool): Whether to use batch embedding for improved performance
         """
         self.model_name = model_name
+        self.use_batch_processing = use_batch_processing
         self.model = get_embedding_model(model_name)
+
+        # Initialize batch embedding service if enabled
+        self.batch_service = None
+        if self.use_batch_processing:
+            try:
+                from .batch_embedding import BatchEmbeddingService
+                self.batch_service = BatchEmbeddingService(model_name)
+                print("✅ Batch embedding service enabled")
+            except ImportError as e:
+                print(f"⚠️ Batch embedding service not available: {e}")
+                self.use_batch_processing = False
+            except Exception as e:
+                print(f"⚠️ Failed to initialize batch service: {e}")
+                self.use_batch_processing = False
+
         self.es = Elasticsearch(
             hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}],
             verify_certs=False
@@ -41,15 +58,71 @@ class DatabaseRetriever:
         """
         Embed the query text using the configured model.
 
+        Uses batch processing service if available for improved performance,
+        otherwise falls back to direct embedding.
+
         Args:
             query (str): Query text to embed
 
         Returns:
             np.ndarray: Query embedding vector
         """
+        if self.use_batch_processing and self.batch_service:
+            try:
+                return self.batch_service.embed_query_sync(query)
+            except Exception as e:
+                print(f"⚠️ Batch embedding failed, falling back to direct: {e}")
+                # Fall back to direct embedding
+
+        # Direct embedding (original method)
         return self.model.encode([query], convert_to_numpy=True)[0]
 
+    def start_batch_processing(self):
+        """
+        Start the background batch processing service.
+        Should be called once when the retriever is ready to handle queries.
+        """
+        if self.batch_service and not self.batch_service.is_running:
+            import asyncio
+            try:
+                # Try to get existing event loop
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Create task in existing loop
+                    asyncio.create_task(self.batch_service.start_processing())
+                else:
+                    # Start in new loop
+                    asyncio.run(self.batch_service.start_processing())
+                print("🚀 Batch processing started")
+            except Exception as e:
+                print(f"⚠️ Failed to start batch processing: {e}")
 
+    def stop_batch_processing(self):
+        """
+        Stop the background batch processing service.
+        """
+        if self.batch_service and self.batch_service.is_running:
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(self.batch_service.stop_processing())
+                else:
+                    asyncio.run(self.batch_service.stop_processing())
+                print("🛑 Batch processing stopped")
+            except Exception as e:
+                print(f"⚠️ Failed to stop batch processing: {e}")
+
+    def get_batch_stats(self) -> Optional[Dict[str, Any]]:
+        """
+        Get batch processing performance statistics.
+
+        Returns:
+            dict: Performance statistics or None if batch processing not available
+        """
+        if self.batch_service:
+            return self.batch_service.get_stats()
+        return None
 
     def search_vectors(self, query_embedding: np.ndarray, top_k: int = 5) -> List[Dict[str, Any]]:
         """

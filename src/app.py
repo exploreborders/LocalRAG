@@ -283,6 +283,35 @@ class RAGCLI:
         else:
             print("⚡ Redis Cache: ❌ Not available")
 
+        # Batch processing status
+        try:
+            from .retrieval_db import DatabaseRetriever
+            temp_retriever = DatabaseRetriever()
+            batch_stats = temp_retriever.get_batch_stats()
+            if batch_stats:
+                device = batch_stats.get('device', 'unknown').upper()
+                if device == 'MPS':
+                    device_icon = '🍎'
+                elif device == 'CUDA':
+                    device_icon = '🖥️'
+                else:
+                    device_icon = '💻'
+
+                print(f"🚀 Batch Processing: ✅ Active ({device_icon} {device})")
+                total_queries = batch_stats.get('total_queries', 0)
+                if total_queries > 0:
+                    avg_time = batch_stats.get('avg_processing_time', 0)
+                    gpu_util = batch_stats.get('gpu_utilization', 0)
+                    print(f"   📊 Processed: {total_queries} queries")
+                    print(f"   ⏱️  Avg time: {avg_time:.3f}s")
+                    print(f"   🎯 GPU util: {gpu_util:.1%}")
+                else:
+                    print("🚀 Batch Processing: ✅ Available (not yet used)")
+            else:
+                print("🚀 Batch Processing: ❌ Not available")
+        except Exception as e:
+            print(f"🚀 Batch Processing: ❌ Error ({e})")
+
         # Ollama status
         try:
             import requests

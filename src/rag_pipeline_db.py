@@ -32,6 +32,8 @@ class RAGPipelineDB:
             cache_settings (dict): Cache configuration settings
         """
         self.retriever = DatabaseRetriever(model_name)
+        # Start batch processing for improved performance
+        self.retriever.start_batch_processing()
         self.llm = OllamaLLM(model=llm_model)
 
         # Initialize cache if enabled
