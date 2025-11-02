@@ -231,6 +231,10 @@ class RAGCLI:
         print("📊 SYSTEM STATUS")
         print("="*50)
 
+        # Initialize components if not already done
+        if not hasattr(self, 'cache') or self.cache is None:
+            self.initialize_components()
+
         # Database status
         try:
             from .database.models import SessionLocal, Document, DocumentChunk
