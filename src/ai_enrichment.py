@@ -31,10 +31,10 @@ class AIEnrichmentService:
         self.llm_client = llm_client
         if self.llm_client is None:
             try:
-                from .llm_client import LLMClient
-                self.llm_client = LLMClient()
+                from langchain_ollama import OllamaLLM
+                self.llm_client = OllamaLLM(model="llama2")  # Use same model as RAG pipeline
             except ImportError:
-                print("⚠️ LLM client not available for AI enrichment")
+                print("⚠️ Ollama LLM not available for AI enrichment")
                 self.llm_client = None
 
         self.db = SessionLocal()
@@ -118,8 +118,8 @@ class AIEnrichmentService:
 
         # Generate tags
         tags_prompt = f"""
-        Analyze the following document and suggest 3-5 relevant tags that would help categorize and find this document.
-        Return only the tags as a comma-separated list, no explanations.
+        Analyze the following document and suggest 3-5 relevant tags (single words or short phrases) that would help categorize and find this document.
+        Return only a comma-separated list of tags, no explanations or numbering.
 
         Document: {filename}
         Content: {analysis_content}
@@ -128,12 +128,31 @@ class AIEnrichmentService:
         """
 
         tags_response = self._call_llm(tags_prompt, max_tokens=50)
-        tags = [tag.strip() for tag in tags_response.split(',') if tag.strip()]
+        # Clean up the response - handle various formats (comma-separated, bullet points, numbered)
+        tags = []
+        # Split on common separators
+        for separator in [',', '\n', '*', '-', '•']:
+            if separator in tags_response:
+                candidates = tags_response.split(separator)
+                break
+        else:
+            candidates = [tags_response]
+
+        for tag in candidates:
+            tag = tag.strip()
+            # Remove numbering like "1. Tag" and bullet points
+            tag = re.sub(r'^\d+\.\s*', '', tag)
+            tag = re.sub(r'^[-•*]\s*', '', tag)
+            # Skip empty tags or very long ones
+            if tag and len(tag) <= 50 and len(tag) >= 2:  # At least 2 chars
+                tags.append(tag)
+
+        tags = tags[:5]  # Limit to 5 tags
 
         # Generate topics
         topics_prompt = f"""
         Extract the main topics/themes from the following document.
-        Return 2-4 key topics as a comma-separated list.
+        Return 2-4 key topics as a comma-separated list, no explanations.
 
         Document: {filename}
         Content: {analysis_content}
@@ -142,7 +161,16 @@ class AIEnrichmentService:
         """
 
         topics_response = self._call_llm(topics_prompt, max_tokens=50)
-        topics = [topic.strip() for topic in topics_response.split(',') if topic.strip()]
+        # Clean up the response
+        topics = []
+        for topic in topics_response.split(','):
+            topic = topic.strip()
+            # Remove numbering and clean up
+            topic = re.sub(r'^\d+\.\s*', '', topic)
+            topic = re.sub(r'^[-•*]\s*', '', topic)
+            if topic and len(topic) <= 100:  # Limit topic length
+                topics.append(topic)
+        topics = topics[:4]  # Limit to 4 topics
 
         # Estimate reading time (rough calculation: 200 words per minute)
         word_count = len(re.findall(r'\w+', content))
@@ -182,13 +210,18 @@ class AIEnrichmentService:
 
         # Create and assign tags
         for tag_name in enrichment_data.get('tags', []):
-            tag = self.tag_manager.get_tag_by_name(tag_name)
-            if not tag:
-                # Create new tag with default color
-                tag = self.tag_manager.create_tag(tag_name, color="#6c757d")  # Gray color
+            try:
+                tag = self.tag_manager.get_tag_by_name(tag_name)
+                if not tag:
+                    # Create new tag with default color
+                    tag = self.tag_manager.create_tag(tag_name, color="#6c757d")  # Gray color
 
-            # Add tag to document if not already assigned
-            self.tag_manager.add_tag_to_document(document.id, tag.id)
+                # Add tag to document if not already assigned
+                if tag:
+                    self.tag_manager.add_tag_to_document(document.id, tag.id)
+            except Exception as e:
+                print(f"Warning: Failed to add tag '{tag_name}': {e}")
+                continue
 
         self.db.commit()
 
@@ -207,14 +240,9 @@ class AIEnrichmentService:
             return "LLM not available"
 
         try:
-            # This assumes the LLM client has a generate method
-            # Adjust based on actual LLM client interface
-            response = self.llm_client.generate(
-                prompt=prompt,
-                max_tokens=max_tokens,
-                temperature=0.3  # Lower temperature for more consistent results
-            )
-            return response.get('text', response.get('response', ''))
+            # Use OllamaLLM invoke method
+            response = self.llm_client.invoke(prompt)
+            return response.strip() if response else ""
         except Exception as e:
             print(f"LLM call failed: {e}")
             return "Error generating response"
