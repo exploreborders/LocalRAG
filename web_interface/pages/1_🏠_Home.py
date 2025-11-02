@@ -118,7 +118,7 @@ def _do_initialization():
         'rag_error': rag_error
     }
 
-def process_query(query, mode="retrieval"):
+def process_query(query, mode="retrieval", filters=None):
     """Process a query and return results"""
     start_time = time.time()
 
@@ -127,7 +127,7 @@ def process_query(query, mode="retrieval"):
             if st.session_state.retriever is None:
                 raise Exception("Retriever not initialized")
 
-            results = st.session_state.retriever.retrieve(query, top_k=3)
+            results = st.session_state.retriever.retrieve(query, top_k=3, filters=filters or {})
             formatted_results = format_results_db(results)
 
             # Store results for display
@@ -135,14 +135,15 @@ def process_query(query, mode="retrieval"):
                 'type': 'retrieval',
                 'query': query,
                 'results': results,
-                'formatted': formatted_results
+                'formatted': formatted_results,
+                'filters': filters
             }
 
         elif mode == "rag":
             if st.session_state.rag_pipeline is None:
                 raise Exception("RAG pipeline not available. Please ensure Ollama is running.")
 
-            result = st.session_state.rag_pipeline.query(query, top_k=3)
+            result = st.session_state.rag_pipeline.query(query, top_k=3, filters=filters or {})
             formatted_answer = format_answer_db(result['answer'])
 
             # Store results for display
@@ -150,7 +151,8 @@ def process_query(query, mode="retrieval"):
                 'type': 'rag',
                 'query': query,
                 'result': result,
-                'formatted': formatted_answer
+                'formatted': formatted_answer,
+                'filters': filters
             }
 
         # Add to query history
@@ -191,12 +193,12 @@ def main():
     st.markdown("---")
 
     # Query interface
-    query, mode = render_query_input()
+    query, mode, filters = render_query_input()
 
     # Submit button and processing
     if render_submit_button(query, mode):
         with st.spinner("🔄 Processing query..."):
-            success = process_query(query.strip(), mode)
+            success = process_query(query.strip(), mode, filters)
             if success:
                 st.success("✅ Query processed successfully!")
                 st.rerun()

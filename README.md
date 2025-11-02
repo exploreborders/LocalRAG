@@ -18,7 +18,12 @@ A local Retrieval-Augmented Generation system built with Python, PostgreSQL, Ela
 - **Redis Caching**: High-performance LLM response caching with 172.5x speedup (3.45s → 0.02s) for repeated queries
 - **Document Metadata Caching**: Redis caching for document metadata lookups to reduce database round-trips
 - **Query Optimization**: Single aggregated database queries eliminate N+1 query problems
-- **Embedding Batch Processing**: GPU-accelerated batch processing for 2-5x faster query handling (Apple Silicon Metal support) during peak usage
+- **Embedding Batch Processing**: GPU-accelerated batch processing for 2-5x faster query handling (Apple Silicon Metal support)
+- **Advanced Document Management**: Tagging, categorization, and faceted search system for organizing large document collections
+- **AI-Powered Enrichment**: Automatic document summarization, topic extraction, and smart tagging using LLM
+- **Advanced Search Filters**: Filter by tags, categories, languages, dates, and authors with real-time facet counts
+- **Hierarchical Categories**: Nested category system for sophisticated document organization
+- **Rich Metadata**: Custom fields, reading time estimates, author information, and AI-generated summaries
 - **Apple Silicon Metal Support**: Native Metal GPU acceleration on M1/M2/M3 MacBook Pro (2-6x performance boost)
 - **Multilingual Responses**: LLM answers in the same language as user queries with explicit language enforcement
 - **Scalable Architecture**: Designed for production use with proper database indexing

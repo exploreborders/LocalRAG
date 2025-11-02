@@ -4,6 +4,7 @@ Query interface components for the Local RAG Web Interface
 
 import streamlit as st
 from datetime import datetime
+from typing import Optional, Dict, Any
 
 def render_query_input():
     """Render the main query input interface"""
@@ -36,10 +37,109 @@ def render_query_input():
             key="query_mode"
         )
 
+    # Advanced filters
+    filters = render_advanced_filters()
+
     # Update session state
     st.session_state.current_query = query
+    st.session_state.current_filters = filters
 
-    return query, mode
+    return query, mode, filters
+
+def render_advanced_filters() -> Dict[str, Any]:
+    """Render advanced search filters"""
+    filters = {}
+
+    with st.expander("🔧 Advanced Filters", expanded=False):
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            # Tag filter
+            try:
+                from src.document_managers import TagManager
+                from src.database.models import SessionLocal
+                db = SessionLocal()
+                tag_manager = TagManager(db)
+                tags = tag_manager.get_all_tags()
+                tag_names = [tag.name for tag in tags]
+                selected_tags = st.multiselect(
+                    "Filter by Tags",
+                    tag_names,
+                    help="Only search documents with these tags"
+                )
+                if selected_tags:
+                    filters['tags'] = selected_tags
+                db.close()
+            except Exception:
+                st.warning("Tag filtering unavailable")
+
+        with col2:
+            # Category filter
+            try:
+                from src.document_managers import CategoryManager
+                from src.database.models import SessionLocal
+                db = SessionLocal()
+                cat_manager = CategoryManager(db)
+                root_cats = cat_manager.get_root_categories()
+                cat_names = [cat.name for cat in root_cats]
+                selected_cats = st.multiselect(
+                    "Filter by Categories",
+                    cat_names,
+                    help="Only search documents in these categories"
+                )
+                if selected_cats:
+                    filters['categories'] = selected_cats
+                db.close()
+            except Exception:
+                st.warning("Category filtering unavailable")
+
+        with col3:
+            # Language filter
+            languages = ["en", "de", "fr", "es", "it", "pt", "nl", "sv", "pl", "zh", "ja", "ko"]
+            lang_labels = {
+                "en": "🇺🇸 English", "de": "🇩🇪 German", "fr": "🇫🇷 French", "es": "🇪🇸 Spanish",
+                "it": "🇮🇹 Italian", "pt": "🇵🇹 Portuguese", "nl": "🇳🇱 Dutch", "sv": "🇸🇪 Swedish",
+                "pl": "🇵🇱 Polish", "zh": "🇨🇳 Chinese", "ja": "🇯🇵 Japanese", "ko": "🇰🇷 Korean"
+            }
+            selected_lang = st.selectbox(
+                "Language",
+                ["All"] + languages,
+                format_func=lambda x: lang_labels.get(x, x.upper()) if x != "All" else "🌍 All Languages",
+                help="Filter by document language"
+            )
+            if selected_lang != "All":
+                filters['detected_language'] = selected_lang
+
+        # Date range filter
+        col1, col2 = st.columns(2)
+        with col1:
+            date_from = st.date_input(
+                "From Date",
+                value=None,
+                help="Only include documents uploaded after this date"
+            )
+            if date_from:
+                filters['date_from'] = date_from.isoformat()
+
+        with col2:
+            date_to = st.date_input(
+                "To Date",
+                value=None,
+                help="Only include documents uploaded before this date"
+            )
+            if date_to:
+                filters['date_to'] = date_to.isoformat()
+
+        # Author filter
+        author = st.text_input(
+            "Author",
+            placeholder="Filter by document author",
+            help="Only search documents by this author"
+        )
+        if author.strip():
+            filters['author'] = author.strip()
+
+    return filters
 
 def render_submit_button(query, mode):
     """Render the submit button and handle query processing"""

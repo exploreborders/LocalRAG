@@ -15,6 +15,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 # Import system components
 try:
     from src.document_processor import DocumentProcessor
+    from src.document_managers import TagManager, CategoryManager
+    from src.ai_enrichment import AIEnrichmentService
+    from src.database.models import SessionLocal
 except ImportError:
     st.error("❌ Could not import RAG system components.")
     st.stop()
@@ -169,6 +172,263 @@ def reprocess_documents():
     except Exception as e:
         st.error(f"❌ Reprocessing failed: {e}")
 
+def get_tag_manager():
+    """Get tag manager instance"""
+    db = SessionLocal()
+    return TagManager(db)
+
+def get_category_manager():
+    """Get category manager instance"""
+    db = SessionLocal()
+    return CategoryManager(db)
+
+def manage_tags():
+    """Tag management interface"""
+    st.markdown("### 🏷️ Tag Management")
+
+    tag_manager = get_tag_manager()
+
+    # Create new tag
+    with st.expander("➕ Create New Tag"):
+        col1, col2, col3 = st.columns([2, 1, 1])
+        with col1:
+            new_tag_name = st.text_input("Tag Name", key="new_tag_name")
+        with col2:
+            new_tag_color = st.color_picker("Color", "#FF5733", key="new_tag_color")
+        with col3:
+            new_tag_desc = st.text_input("Description (optional)", key="new_tag_desc")
+
+        if st.button("Create Tag", key="create_tag"):
+            if new_tag_name:
+                try:
+                    tag = tag_manager.create_tag(new_tag_name, new_tag_color, new_tag_desc or None)
+                    st.success(f"✅ Created tag '{tag.name}'")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Failed to create tag: {e}")
+            else:
+                st.error("❌ Tag name is required")
+
+    # List existing tags
+    tags = tag_manager.get_all_tags()
+    if tags:
+        st.markdown("**Existing Tags:**")
+        for tag in tags:
+            col1, col2, col3, col4 = st.columns([2, 1, 2, 1])
+            with col1:
+                st.markdown(f"🏷️ **{tag.name}**")
+            with col2:
+                st.markdown(f"🎨 {tag.color}")
+            with col3:
+                st.markdown(f"📝 {tag.description or 'No description'}")
+            with col4:
+                if st.button("🗑️", key=f"delete_tag_{tag.id}", help="Delete tag"):
+                    try:
+                        if tag_manager.delete_tag(tag.id):
+                            st.success(f"✅ Deleted tag '{tag.name}'")
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to delete tag")
+                    except Exception as e:
+                        st.error(f"❌ Failed to delete tag: {e}")
+    else:
+        st.info("📭 No tags created yet")
+
+def manage_categories():
+    """Category management interface"""
+    st.markdown("### 📂 Category Management")
+
+    cat_manager = get_category_manager()
+
+    # Create new category
+    with st.expander("➕ Create New Category"):
+        col1, col2, col3 = st.columns([2, 2, 1])
+        with col1:
+            new_cat_name = st.text_input("Category Name", key="new_cat_name")
+        with col2:
+            new_cat_desc = st.text_input("Description (optional)", key="new_cat_desc")
+        with col3:
+            # Get existing categories for parent selection
+            existing_cats = cat_manager.get_root_categories()
+            parent_options = ["None (Root Category)"] + [cat.name for cat in existing_cats]
+            selected_parent = st.selectbox("Parent Category", parent_options, key="new_cat_parent")
+
+        if st.button("Create Category", key="create_cat"):
+            if new_cat_name:
+                try:
+                    parent_id = None
+                    if selected_parent != "None (Root Category)":
+                        parent_cat = cat_manager.get_category_by_name(selected_parent)
+                        parent_id = parent_cat.id if parent_cat else None
+
+                    cat = cat_manager.create_category(new_cat_name, new_cat_desc or None, parent_id)
+                    st.success(f"✅ Created category '{cat.name}'")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Failed to create category: {e}")
+            else:
+                st.error("❌ Category name is required")
+
+    # List existing categories
+    root_cats = cat_manager.get_root_categories()
+    if root_cats:
+        st.markdown("**Category Tree:**")
+        for cat in root_cats:
+            display_category_tree(cat, cat_manager, level=0)
+    else:
+        st.info("📭 No categories created yet")
+
+def display_category_tree(category, cat_manager, level=0):
+    """Recursively display category tree"""
+    indent = "  " * level
+    col1, col2, col3 = st.columns([3, 2, 1])
+    with col1:
+        st.markdown(f"{indent}📂 **{category.name}**")
+    with col2:
+        st.markdown(f"{indent}📝 {category.description or 'No description'}")
+    with col3:
+        if st.button("🗑️", key=f"delete_cat_{category.id}", help="Delete category"):
+            try:
+                if cat_manager.delete_category(category.id):
+                    st.success(f"✅ Deleted category '{category.name}'")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to delete category")
+            except Exception as e:
+                st.error(f"❌ Failed to delete category: {e}")
+
+    # Display children
+    children = cat_manager.get_category_children(category.id)
+    for child in children:
+        display_category_tree(child, cat_manager, level + 1)
+
+def ai_enrich_documents():
+    """AI-powered document enrichment interface"""
+    st.markdown("### 🤖 AI Document Enrichment")
+    st.markdown("Use AI to automatically generate summaries, tags, and topics for your documents.")
+
+    try:
+        enrichment_service = AIEnrichmentService()
+
+        # Get unenriched documents
+        db = SessionLocal()
+        enriched_docs = db.query(Document).filter(
+            Document.custom_fields.op('->>')('ai_enriched') == 'true'
+        ).count()
+
+        total_docs = db.query(Document).count()
+        unenriched_docs = total_docs - enriched_docs
+        db.close()
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Documents", total_docs)
+        with col2:
+            st.metric("AI Enriched", enriched_docs)
+        with col3:
+            st.metric("Pending Enrichment", unenriched_docs)
+
+        # Enrichment options
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            if st.button("🔄 Enrich All Unenriched Documents", type="primary", use_container_width=True):
+                with st.spinner("🤖 AI enrichment in progress..."):
+                    try:
+                        db = SessionLocal()
+                        unenriched = db.query(Document).filter(
+                            ~Document.custom_fields.op('->>')('ai_enriched').isnot(None) |
+                            (Document.custom_fields.op('->>')('ai_enriched') != 'true')
+                        ).all()
+                        doc_ids = [doc.id for doc in unenriched]
+                        db.close()
+
+                        if doc_ids:
+                            results = enrichment_service.batch_enrich_documents(doc_ids)
+                            st.success(f"✅ Enriched {results['successful']} documents, {results['failed']} failed")
+                        else:
+                            st.info("ℹ️ All documents are already enriched")
+                    except Exception as e:
+                        st.error(f"❌ Enrichment failed: {e}")
+
+        with col2:
+            if st.button("🔄 Re-enrich All Documents", type="secondary", use_container_width=True):
+                with st.spinner("🤖 Re-enrichment in progress..."):
+                    try:
+                        db = SessionLocal()
+                        all_docs = db.query(Document).all()
+                        doc_ids = [doc.id for doc in all_docs]
+                        db.close()
+
+                        if doc_ids:
+                            results = enrichment_service.batch_enrich_documents(doc_ids, force=True)
+                            st.success(f"✅ Re-enriched {results['successful']} documents, {results['failed']} failed")
+                        else:
+                            st.info("ℹ️ No documents to enrich")
+                    except Exception as e:
+                        st.error(f"❌ Re-enrichment failed: {e}")
+
+        # Manual enrichment for specific document
+        st.markdown("---")
+        st.markdown("**Manual Enrichment**")
+
+        # Get document list for selection
+        try:
+            processor = DocumentProcessor()
+            docs = processor.get_documents()
+
+            if docs:
+                doc_options = ["Select a document..."] + [f"{doc['filename']} (ID: {doc['id']})" for doc in docs]
+                selected_doc = st.selectbox("Select document to enrich", doc_options)
+
+                if selected_doc != "Select a document...":
+                    # Extract document ID
+                    import re
+                    match = re.search(r'\(ID: (\d+)\)', selected_doc)
+                    if match:
+                        doc_id = int(match.group(1))
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("🤖 Enrich This Document", key=f"enrich_{doc_id}"):
+                                with st.spinner("🤖 Enriching document..."):
+                                    result = enrichment_service.enrich_document(doc_id)
+                                    if result['success']:
+                                        st.success("✅ Document enriched successfully!")
+
+                                        # Show enrichment results
+                                        enrichment = result['enrichment']
+                                        st.markdown("**Generated Summary:**")
+                                        st.info(enrichment.get('summary', 'No summary generated'))
+
+                                        if enrichment.get('tags'):
+                                            st.markdown("**Suggested Tags:**")
+                                            st.write(", ".join(enrichment['tags']))
+
+                                        if enrichment.get('topics'):
+                                            st.markdown("**Extracted Topics:**")
+                                            st.write(", ".join(enrichment['topics']))
+                                    else:
+                                        st.error(f"❌ Enrichment failed: {result['error']}")
+
+                        with col2:
+                            if st.button("🔄 Re-enrich (Force)", key=f"reenrich_{doc_id}"):
+                                with st.spinner("🤖 Re-enriching document..."):
+                                    result = enrichment_service.enrich_document(doc_id, force=True)
+                                    if result['success']:
+                                        st.success("✅ Document re-enriched successfully!")
+                                    else:
+                                        st.error(f"❌ Re-enrichment failed: {result['error']}")
+            else:
+                st.info("📭 No documents available for enrichment")
+
+        except Exception as e:
+            st.error(f"❌ Failed to load documents: {e}")
+
+    except Exception as e:
+        st.error(f"❌ AI enrichment service unavailable: {e}")
+        st.info("💡 Make sure Ollama is running and the LLM model is available for AI features.")
+
 
 
 def main():
@@ -192,77 +452,89 @@ def main():
 
     st.markdown("---")
 
-    # Document library
-    st.markdown("### 📚 Document Library")
+    # Organization management
+    tab1, tab2, tab3 = st.tabs(["📚 Documents", "🏷️ Tags", "📂 Categories"])
 
-    documents = list_documents()
+    with tab1:
+        st.markdown("### 📚 Document Library")
 
-    if not documents:
-        st.info("📭 No documents found. Upload some files to get started!")
-    else:
-        st.info(f"📊 Found {len(documents)} document(s)")
+        documents = list_documents()
 
-        # Processing controls
-        col1, col2, col3 = st.columns([1, 1, 1])
+        if not documents:
+            st.info("📭 No documents found. Upload some files to get started!")
+        else:
+            st.info(f"📊 Found {len(documents)} document(s)")
 
-        with col1:
-            if st.button("🔄 Reprocess Documents", type="secondary", use_container_width=True):
-                reprocess_documents()
+            # Processing controls
+            col1, col2, col3 = st.columns([1, 1, 1])
 
-        with col2:
-            if st.button("🗑️ Clear Documents", type="secondary", use_container_width=True):
-                # This would need more sophisticated handling
-                st.warning("⚠️ Document deletion not implemented yet")
+            with col1:
+                if st.button("🔄 Reprocess Documents", type="secondary", use_container_width=True):
+                    reprocess_documents()
 
-        with col3:
-            if st.button("🔄 Refresh", help="Refresh the document list"):
-                st.rerun()
+            with col2:
+                if st.button("🗑️ Clear Documents", type="secondary", use_container_width=True):
+                    # This would need more sophisticated handling
+                    st.warning("⚠️ Document deletion not implemented yet")
+
+            with col3:
+                if st.button("🔄 Refresh", help="Refresh the document list"):
+                    st.rerun()
 
 
 
-        # Document list
-        for doc in documents:
-            with st.container():
-                col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+            # Document list
+            for doc in documents:
+                with st.container():
+                    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
 
-                with col1:
-                    st.markdown(f"**{doc['name']}**")
-                    st.caption(f"Size: {format_file_size(doc['size'])}")
+                    with col1:
+                        st.markdown(f"**{doc['name']}**")
+                        st.caption(f"Size: {format_file_size(doc['size'])}")
 
-                with col2:
-                    st.caption(f"Modified: {time.strftime('%Y-%m-%d %H:%M', time.localtime(int(doc['modified'].timestamp())))}")
+                    with col2:
+                        st.caption(f"Modified: {time.strftime('%Y-%m-%d %H:%M', time.localtime(int(doc['modified'].timestamp())))}")
 
-                with col3:
-                    lang = doc.get('detected_language', 'unknown').upper()
-                    if lang == 'EN':
-                        st.markdown("🇺🇸 English")
-                    elif lang == 'DE':
-                        st.markdown("🇩🇪 German")
-                    elif lang == 'FR':
-                        st.markdown("🇫🇷 French")
-                    elif lang == 'ES':
-                        st.markdown("🇪🇸 Spanish")
-                    elif lang == 'IT':
-                        st.markdown("🇮🇹 Italian")
-                    elif lang == 'UNKNOWN':
-                        st.markdown("❓ Unknown")
-                    else:
-                        st.markdown(f"🌍 {lang}")
+                    with col3:
+                        lang = doc.get('detected_language', 'unknown').upper()
+                        if lang == 'EN':
+                            st.markdown("🇺🇸 English")
+                        elif lang == 'DE':
+                            st.markdown("🇩🇪 German")
+                        elif lang == 'FR':
+                            st.markdown("🇫🇷 French")
+                        elif lang == 'ES':
+                            st.markdown("🇪🇸 Spanish")
+                        elif lang == 'IT':
+                            st.markdown("🇮🇹 Italian")
+                        elif lang == 'UNKNOWN':
+                            st.markdown("❓ Unknown")
+                        else:
+                            st.markdown(f"🌍 {lang}")
 
-                with col4:
-                    file_ext = doc['extension'].upper()
-                    if file_ext == '.TXT':
-                        st.markdown("📄 Text")
-                    elif file_ext == '.PDF':
-                        st.markdown("📕 PDF")
-                    elif file_ext == '.DOCX':
-                        st.markdown("📝 Word")
-                    elif file_ext == '.PPTX':
-                        st.markdown("📊 PowerPoint")
-                    elif file_ext == '.XLSX':
-                        st.markdown("📈 Excel")
-                    else:
-                        st.markdown("📄 File")
+                    with col4:
+                        file_ext = doc['extension'].upper()
+                        if file_ext == '.TXT':
+                            st.markdown("📄 Text")
+                        elif file_ext == '.PDF':
+                            st.markdown("📕 PDF")
+                        elif file_ext == '.DOCX':
+                            st.markdown("📝 Word")
+                        elif file_ext == '.PPTX':
+                            st.markdown("📊 PowerPoint")
+                        elif file_ext == '.XLSX':
+                            st.markdown("📈 Excel")
+                        else:
+                            st.markdown("📄 File")
+
+    with tab2:
+        manage_tags()
+
+    with tab3:
+        manage_categories()
+
+    with st.expander("🤖 AI Enrichment", expanded=False):
+        ai_enrich_documents()
 
     # Processing status
     st.markdown("---")

@@ -6,7 +6,7 @@ Updated retrieval system using Elasticsearch for vector search and PostgreSQL fo
 import numpy as np
 from typing import List, Dict, Any, Tuple, Optional
 from elasticsearch import Elasticsearch
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sentence_transformers import SentenceTransformer
 
 from .database.models import SessionLocal, Document, DocumentChunk
@@ -18,7 +18,7 @@ class DatabaseRetriever:
     and metadata queries in PostgreSQL.
     """
 
-    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", use_batch_processing: bool = True):
+    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", use_batch_processing: bool = False):
         """
         Initialize the retriever with specified embedding model.
 
@@ -36,6 +36,20 @@ class DatabaseRetriever:
             try:
                 from .batch_embedding import BatchEmbeddingService
                 self.batch_service = BatchEmbeddingService(model_name)
+                # Start the batch processing
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # Create task in existing loop
+                        asyncio.create_task(self.batch_service.start_processing())
+                    else:
+                        # This will be a problem - we can't start async processing in sync context
+                        # Let's defer this to when it's actually needed
+                        pass
+                except RuntimeError:
+                    # No event loop, defer to when needed
+                    pass
                 print("✅ Batch embedding service enabled")
             except ImportError as e:
                 print(f"⚠️ Batch embedding service not available: {e}")
@@ -69,6 +83,21 @@ class DatabaseRetriever:
         """
         if self.use_batch_processing and self.batch_service:
             try:
+                # Ensure batch processing is started
+                if not self.batch_service.is_running:
+                    import asyncio
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if not loop.is_running():
+                            # We can start it in a new loop
+                            asyncio.run(self.batch_service.start_processing())
+                        # If loop is running, we can't start async processing
+                        # Fall back to direct embedding
+                        return self.model.encode([query], convert_to_numpy=True)[0]
+                    except RuntimeError:
+                        # No event loop, fall back
+                        return self.model.encode([query], convert_to_numpy=True)[0]
+
                 return self.batch_service.embed_query_sync(query)
             except Exception as e:
                 print(f"⚠️ Batch embedding failed, falling back to direct: {e}")
@@ -181,7 +210,7 @@ class DatabaseRetriever:
             }
         return {}
 
-    def retrieve(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
         Retrieve relevant documents based on query with enriched metadata.
         Uses optimized single-query approach to avoid N+1 problems.
@@ -189,6 +218,13 @@ class DatabaseRetriever:
         Args:
             query (str): Search query text
             top_k (int): Number of top results to return
+            filters (dict): Optional filters for advanced search
+                - tags: List of tag names to filter by
+                - categories: List of category names to filter by
+                - author: Author name to filter by
+                - detected_language: Language code to filter by
+                - date_from: ISO date string for minimum upload date
+                - date_to: ISO date string for maximum upload date
 
         Returns:
             list: List of search results with document metadata
@@ -201,6 +237,10 @@ class DatabaseRetriever:
 
         # Enrich with document metadata using optimized batch query
         enriched_results = self._enrich_with_batch_metadata(vector_results)
+
+        # Apply filters if provided
+        if filters:
+            enriched_results = self._apply_filters(enriched_results, filters)
 
         return enriched_results
 
@@ -240,9 +280,12 @@ class DatabaseRetriever:
             # Cache not available, proceed with database query
             cache_available = False
 
-        # Query database for uncached documents
+        # Query database for uncached documents with tags and categories
         if uncached_doc_ids:
-            docs = self.db.query(Document).filter(Document.id.in_(uncached_doc_ids)).all()
+            docs = self.db.query(Document).options(
+                joinedload(Document.tags),
+                joinedload(Document.categories)
+            ).filter(Document.id.in_(uncached_doc_ids)).all()
             for doc in docs:
                 # Convert datetime objects to strings for JSON serialization
                 metadata = {
@@ -253,7 +296,12 @@ class DatabaseRetriever:
                     'detected_language': doc.detected_language,
                     'status': doc.status,
                     'upload_date': doc.upload_date.isoformat() if doc.upload_date else None,
-                    'last_modified': doc.last_modified.isoformat() if doc.last_modified else None
+                    'last_modified': doc.last_modified.isoformat() if doc.last_modified else None,
+                    'author': doc.author,
+                    'reading_time': doc.reading_time,
+                    'custom_fields': doc.custom_fields,
+                    'tags': [{'id': tag.id, 'name': tag.name, 'color': tag.color} for tag in doc.tags],
+                    'categories': [{'id': cat.id, 'name': cat.name, 'description': cat.description} for cat in doc.categories]
                 }
                 doc_map[doc.id] = metadata
 
@@ -281,7 +329,12 @@ class DatabaseRetriever:
                             'filepath': doc['filepath'],
                             'status': doc['status'],
                             'detected_language': doc['detected_language'],
-                            'upload_date': doc['upload_date']
+                            'upload_date': doc['upload_date'],
+                            'author': doc.get('author'),
+                            'reading_time': doc.get('reading_time'),
+                            'custom_fields': doc.get('custom_fields'),
+                            'tags': doc.get('tags', []),
+                            'categories': doc.get('categories', [])
                         }
                     })
                 else:
@@ -294,7 +347,12 @@ class DatabaseRetriever:
                             'filepath': doc.filepath,
                             'status': doc.status,
                             'detected_language': doc.detected_language,
-                            'upload_date': doc.upload_date.isoformat() if doc.upload_date else None
+                            'upload_date': doc.upload_date.isoformat() if doc.upload_date else None,
+                            'author': doc.author,
+                            'reading_time': doc.reading_time,
+                            'custom_fields': doc.custom_fields,
+                            'tags': [{'id': tag.id, 'name': tag.name, 'color': tag.color} for tag in doc.tags],
+                            'categories': [{'id': cat.id, 'name': cat.name, 'description': cat.description} for cat in doc.categories]
                         }
                     })
             else:
@@ -305,6 +363,61 @@ class DatabaseRetriever:
                 })
 
         return enriched_results
+
+    def _apply_filters(self, results: List[Dict[str, Any]], filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Apply advanced filters to search results.
+
+        Args:
+            results: List of enriched search results
+            filters: Dictionary of filter criteria
+
+        Returns:
+            Filtered list of results
+        """
+        filtered_results = []
+
+        for result in results:
+            doc = result.get('document', {})
+            include_result = True
+
+            # Filter by tags
+            if 'tags' in filters and filters['tags']:
+                doc_tags = [tag['name'] for tag in doc.get('tags', [])]
+                if not any(tag in doc_tags for tag in filters['tags']):
+                    include_result = False
+
+            # Filter by categories
+            if 'categories' in filters and filters['categories']:
+                doc_categories = [cat['name'] for cat in doc.get('categories', [])]
+                if not any(cat in doc_categories for cat in filters['categories']):
+                    include_result = False
+
+            # Filter by author
+            if 'author' in filters and filters['author']:
+                if doc.get('author') != filters['author']:
+                    include_result = False
+
+            # Filter by detected language
+            if 'detected_language' in filters and filters['detected_language']:
+                if doc.get('detected_language') != filters['detected_language']:
+                    include_result = False
+
+            # Filter by date range
+            if 'date_from' in filters and filters['date_from']:
+                upload_date = doc.get('upload_date')
+                if upload_date and upload_date < filters['date_from']:
+                    include_result = False
+
+            if 'date_to' in filters and filters['date_to']:
+                upload_date = doc.get('upload_date')
+                if upload_date and upload_date > filters['date_to']:
+                    include_result = False
+
+            if include_result:
+                filtered_results.append(result)
+
+        return filtered_results
 
     def search_text(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """

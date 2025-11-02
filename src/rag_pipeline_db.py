@@ -316,7 +316,7 @@ Odpowiedź:"""
 
         return f"llm:{full_hash}"
 
-    def retrieve(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
         Retrieve relevant document chunks for a query.
 
@@ -327,7 +327,7 @@ Odpowiedź:"""
         Returns:
             list: Retrieved document chunks with content and metadata
         """
-        return self.retriever.retrieve(query, top_k)
+        return self.retriever.retrieve(query, top_k, filters)
 
     def generate_answer(self, query: str, context_docs: List[Dict[str, Any]]) -> str:
         """
@@ -396,13 +396,14 @@ Odpowiedź:"""
         except Exception as e:
             return f"Error generating answer: {e}"
 
-    def query(self, question: str, top_k: int = 5) -> Dict[str, Any]:
+    def query(self, question: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Execute full RAG pipeline: retrieve relevant documents and generate answer.
 
         Args:
             question (str): Question to answer
             top_k (int): Number of documents to retrieve
+            filters (dict): Optional filters for document retrieval
 
         Returns:
             dict: Response containing question, answer, retrieved docs, and metadata
@@ -411,7 +412,7 @@ Odpowiedź:"""
         query_lang = self.detect_query_language(question)
 
         # Retrieve relevant documents
-        retrieved_docs = self.retrieve(question, top_k)
+        retrieved_docs = self.retrieve(question, top_k, filters)
 
         # Generate answer
         answer = self.generate_answer(question, retrieved_docs)

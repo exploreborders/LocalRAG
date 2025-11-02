@@ -8,7 +8,7 @@
 - Impact: 10-100x speedup for repeated queries
 - Implementation: Add Redis/memory cache layer for LLM responses
 
-### 2. Embedding Batch Processing
+### 2. Embedding Batch Processing (done)
 - Current Issue: Queries embed one at a time
 - Optimization: Batch multiple queries together for GPU acceleration
 - Impact: 2-5x faster query processing during peak usage
