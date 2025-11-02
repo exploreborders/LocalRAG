@@ -74,7 +74,7 @@ class DocumentProcessor:
         try:
             lang = detect(text)
             return lang
-        except LangDetectException:
+        except LangDetectError:
             return 'unknown'
 
     def preprocess_german_text(self, text: str) -> str:
@@ -736,6 +736,34 @@ class DocumentProcessor:
             'upload_date': doc.upload_date,
             'last_modified': doc.last_modified
         } for doc in docs]
+
+    def get_documents_with_chunk_counts(self) -> List[Dict[str, Any]]:
+        """
+        Retrieve all documents with their chunk counts using a single optimized query.
+        Eliminates N+1 query problem by joining and counting chunks in one database call.
+
+        Returns:
+            list: List of dictionaries containing document metadata with chunk_count
+        """
+        from sqlalchemy import func
+
+        # Single query with join and count to get documents with chunk counts
+        results = self.db.query(
+            Document,
+            func.count(DocumentChunk.id).label('chunk_count')
+        ).outerjoin(DocumentChunk).group_by(Document.id).all()
+
+        return [{
+            'id': doc.id,
+            'filename': doc.filename,
+            'filepath': doc.filepath,
+            'content_type': doc.content_type,
+            'detected_language': doc.detected_language,
+            'status': doc.status,
+            'upload_date': doc.upload_date,
+            'last_modified': doc.last_modified,
+            'chunk_count': chunk_count
+        } for doc, chunk_count in results]
 
     def get_chunks(self, document_id: int) -> List[Dict[str, Any]]:
         """

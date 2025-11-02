@@ -84,10 +84,17 @@ def get_system_metrics():
     # System readiness metrics
     try:
         from src.database.models import SessionLocal, Document, DocumentChunk
+        from sqlalchemy import func
         db = SessionLocal()
-        # Check if there are any documents in the database
-        doc_count = db.query(Document).count()
-        chunk_count = db.query(DocumentChunk).count()
+        # Single optimized query to get both document and chunk counts
+        result = db.query(
+            func.count(Document.id).label('doc_count'),
+            func.count(DocumentChunk.id).label('chunk_count')
+        ).outerjoin(DocumentChunk).first()
+
+        doc_count = result.doc_count
+        chunk_count = result.chunk_count
+
         metrics['embeddings_exist'] = doc_count > 0 and chunk_count > 0
         metrics['index_exists'] = chunk_count > 0  # Chunks in DB indicate indexing is done
         metrics['database_connected'] = True

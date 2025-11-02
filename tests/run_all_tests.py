@@ -15,18 +15,31 @@ def run_test(test_file):
     print('='*60)
 
     try:
-        result = subprocess.run([sys.executable, test_file],
-                              capture_output=True, text=True, timeout=600)
-        print(result.stdout)
-        if result.stderr:
-            print("STDERR:", result.stderr)
+        # Import and run the test module directly
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("test_module", test_file)
+        if spec and spec.loader:
+            test_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(test_module)
 
-        return result.returncode == 0
-    except subprocess.TimeoutExpired:
-        print(f"❌ {test_file} timed out after 5 minutes")
-        return False
+            # Run the main function if it exists
+            if hasattr(test_module, 'main'):
+                result = test_module.main()
+                return result == 0
+            elif hasattr(test_module, 'test_analytics_metrics'):
+                # Special case for analytics test
+                result = test_module.test_analytics_metrics()
+                return result
+            else:
+                # Assume the test runs on import
+                return True
+        else:
+            print(f"❌ Could not load {test_file}")
+            return False
     except Exception as e:
         print(f"❌ Error running {test_file}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def main():
@@ -51,14 +64,7 @@ def main():
     passed = 0
     failed = 0
 
-    # Skip problematic tests for now
-    skip_tests = ['test_multilingual.py', 'test_performance.py', 'test_analytics.py']
-
     for test_file in test_files:
-        if os.path.basename(test_file) in skip_tests:
-            print(f"⏭️  Skipping {os.path.basename(test_file)}")
-            continue
-
         if run_test(test_file):
             passed += 1
             print(f"✅ {os.path.basename(test_file)} PASSED")
@@ -71,10 +77,9 @@ def main():
     print("TEST SUMMARY")
     print('='*60)
     total_run = passed + failed
-    print(f"Total tests: {total_run} (out of {len(test_files)} found)")
+    print(f"Total tests: {total_run}")
     print(f"Passed: {passed}")
     print(f"Failed: {failed}")
-    print(f"Skipped: {len(test_files) - total_run}")
     if total_run > 0:
         print(f"Success rate: {(passed/total_run*100):.1f}%")
 

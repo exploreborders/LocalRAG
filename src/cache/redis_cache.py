@@ -1,6 +1,7 @@
 import redis
 import json
 import hashlib
+import redis
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 import logging
@@ -90,6 +91,38 @@ class RedisCache:
         except Exception as e:
             logger.error(f"Cache stats error: {e}")
             return {}
+
+    def get_document_metadata(self, doc_ids: list) -> Optional[Dict[int, Dict[str, Any]]]:
+        """Retrieve cached document metadata for multiple documents"""
+        if not doc_ids:
+            return {}
+
+        try:
+            # Create pipeline for batch get
+            pipeline = self.redis.pipeline()
+            keys = [f"doc_meta:{doc_id}" for doc_id in doc_ids]
+            for key in keys:
+                pipeline.get(key)
+            results = pipeline.execute()
+
+            metadata = {}
+            for doc_id, data in zip(doc_ids, results):
+                if data:
+                    metadata[doc_id] = json.loads(data)
+            return metadata if metadata else None
+        except Exception as e:
+            logger.warning(f"Document metadata cache get error: {e}")
+        return None
+
+    def set_document_metadata(self, doc_id: int, metadata: Dict[str, Any]) -> bool:
+        """Cache document metadata"""
+        try:
+            key = f"doc_meta:{doc_id}"
+            data = json.dumps(metadata)
+            return bool(self.redis.setex(key, self.ttl_seconds, data))
+        except Exception as e:
+            logger.error(f"Document metadata cache set error for doc {doc_id}: {e}")
+            return False
 
     def health_check(self) -> bool:
         """Check if Redis is healthy"""

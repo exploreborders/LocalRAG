@@ -43,7 +43,15 @@ CREATE TABLE IF NOT EXISTS processing_jobs (
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(file_hash);
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
+CREATE INDEX IF NOT EXISTS idx_documents_modified ON documents(last_modified);
+CREATE INDEX IF NOT EXISTS idx_documents_language ON documents(detected_language);
 CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON document_chunks(document_id);
+CREATE INDEX IF NOT EXISTS idx_chunks_doc_id_index ON document_chunks(document_id, chunk_index);
 CREATE INDEX IF NOT EXISTS idx_chunks_model ON document_chunks(embedding_model);
+CREATE INDEX IF NOT EXISTS idx_chunks_created_at ON document_chunks(created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON processing_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_document_id ON processing_jobs(document_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_recent ON processing_jobs(created_at) WHERE created_at > NOW() - INTERVAL '7 days';
+
+-- Partial indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_documents_processed ON documents(status) WHERE status = 'processed';

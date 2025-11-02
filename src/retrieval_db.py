@@ -111,6 +111,7 @@ class DatabaseRetriever:
     def retrieve(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """
         Retrieve relevant documents based on query with enriched metadata.
+        Uses optimized single-query approach to avoid N+1 problems.
 
         Args:
             query (str): Search query text
@@ -125,14 +126,110 @@ class DatabaseRetriever:
         # Search for similar vectors
         vector_results = self.search_vectors(query_embedding, top_k)
 
-        # Enrich with document metadata
+        # Enrich with document metadata using optimized batch query
+        enriched_results = self._enrich_with_batch_metadata(vector_results)
+
+        return enriched_results
+
+    def _enrich_with_batch_metadata(self, vector_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Enrich vector results with document metadata using single batch query and Redis caching.
+        Avoids N+1 query problem by fetching all document metadata in one query with caching.
+
+        Args:
+            vector_results: List of vector search results
+
+        Returns:
+            list: Enriched results with document metadata
+        """
+        if not vector_results:
+            return []
+
+        # Extract unique document IDs
+        doc_ids = list(set(result['document_id'] for result in vector_results))
+
+        # Try to get cached metadata first
+        doc_map = {}
+        uncached_doc_ids = doc_ids.copy()
+
+        cache_available = False
+        cache = None
+        try:
+            from .cache.redis_cache import RedisCache
+            cache = RedisCache()
+            cache_available = True
+            cached_metadata = cache.get_document_metadata(doc_ids)
+            if cached_metadata:
+                doc_map.update(cached_metadata)
+                # Remove cached docs from query list
+                uncached_doc_ids = [doc_id for doc_id in doc_ids if doc_id not in cached_metadata]
+        except Exception:
+            # Cache not available, proceed with database query
+            cache_available = False
+
+        # Query database for uncached documents
+        if uncached_doc_ids:
+            docs = self.db.query(Document).filter(Document.id.in_(uncached_doc_ids)).all()
+            for doc in docs:
+                # Convert datetime objects to strings for JSON serialization
+                metadata = {
+                    'id': doc.id,
+                    'filename': doc.filename,
+                    'filepath': doc.filepath,
+                    'content_type': doc.content_type,
+                    'detected_language': doc.detected_language,
+                    'status': doc.status,
+                    'upload_date': doc.upload_date.isoformat() if doc.upload_date else None,
+                    'last_modified': doc.last_modified.isoformat() if doc.last_modified else None
+                }
+                doc_map[doc.id] = metadata
+
+                # Cache the metadata if cache is available
+                if cache_available and cache:
+                    try:
+                        cache.set_document_metadata(doc.id, metadata)
+                    except Exception:
+                        # Cache failure, continue
+                        pass
+
+        # Enrich results with pre-loaded metadata
         enriched_results = []
         for result in vector_results:
-            doc_info = self.get_document_info(result['document_id'])
-            enriched_results.append({
-                **result,
-                'document': doc_info
-            })
+            doc = doc_map.get(result['document_id'])
+            if doc:
+                # Handle both cached dict and database Document object
+                if isinstance(doc, dict):
+                    # From cache
+                    enriched_results.append({
+                        **result,
+                        'document': {
+                            'id': doc['id'],
+                            'filename': doc['filename'],
+                            'filepath': doc['filepath'],
+                            'status': doc['status'],
+                            'detected_language': doc['detected_language'],
+                            'upload_date': doc['upload_date']
+                        }
+                    })
+                else:
+                    # From database
+                    enriched_results.append({
+                        **result,
+                        'document': {
+                            'id': doc.id,
+                            'filename': doc.filename,
+                            'filepath': doc.filepath,
+                            'status': doc.status,
+                            'detected_language': doc.detected_language,
+                            'upload_date': doc.upload_date.isoformat() if doc.upload_date else None
+                        }
+                    })
+            else:
+                # Fallback to empty document info if not found
+                enriched_results.append({
+                    **result,
+                    'document': {}
+                })
 
         return enriched_results
 

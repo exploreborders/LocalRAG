@@ -49,8 +49,10 @@ A modern multipage web interface for the Local RAG system, featuring database-ba
 
 ### 📊 Analytics - Performance Dashboard
 - **Usage Metrics**: Query counts, response times, and trends
-- **System Health**: Monitor component status and resource usage
+- **System Health**: Monitor component status, resource usage, and database performance
+- **Cache Performance**: Real-time Redis cache metrics (hit rate, memory usage, uptime)
 - **Performance Charts**: Visualize query patterns and response times
+- **Database Optimization**: Monitor query performance and optimization impact
 - **Data Export**: Download query history and metrics as CSV/JSON
 
 ## Usage Guide
