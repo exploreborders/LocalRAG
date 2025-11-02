@@ -13,7 +13,7 @@
 - Cache tests: `python tests/test_cache.py` (test Redis caching functionality)
 - Cache performance: `python tests/test_cache_performance.py` (measure cache speedup)
 - Run web interface: `python run_web.py` (or `streamlit run web_interface/app.py`)
-- Run CLI app: `python -m src.app`
+- Run CLI app: `python -m src.app` (⚠️ **MUST** be run as module - `python src/app.py` will not work)
 - Process data: `python -m src.embeddings`
 - Reprocess documents (for language detection): Click "🔄 Reprocess Documents" in web interface (uses batch processing, parallelization, and memory management)
 - Stop databases: `docker-compose down`
