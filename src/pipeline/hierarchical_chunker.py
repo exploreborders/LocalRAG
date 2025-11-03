@@ -133,12 +133,13 @@ class HierarchicalChunker:
         # Look for chapter markers in text
         patterns = [
             rf'(?i)(chapter|section)\s*{chapter_path}\b.*?$(.*?)(?=(chapter|section)\s*\d|\Z)',
-            rf'(?i){re.escape(chapter_title)}.*?$(.*?)(?=(chapter|section)\s*\d|\Z)',
+            rf'(?i){re.escape(chapter_title)}.*?$(.*?)(?=(chapter|section)\s*\d|#+\s|\Z)',
+            rf'#+\s*{re.escape(chapter_title)}.*?$(.*?)(?=#+\s|\Z)',  # Markdown headers
         ]
 
         for pattern in patterns:
             match = re.search(pattern, full_text, re.DOTALL | re.MULTILINE)
-            if match and len(match.groups()) > 1:
+            if match and len(match.groups()) > 1 and match.group(2):
                 return match.group(2).strip()
 
         # Fallback: estimate based on hierarchy

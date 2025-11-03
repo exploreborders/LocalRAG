@@ -22,7 +22,7 @@ def test_ai_pipeline_components():
 
     # Test vision fallback
     try:
-        from pipeline.vision_fallback import VisionFallbackProcessor
+        from src.pipeline.vision_fallback import VisionFallbackProcessor
         vision = VisionFallbackProcessor()
         available = vision.is_available()
         print(f"✅ Vision Fallback: {'Available' if available else 'Not Available'}")
@@ -31,7 +31,7 @@ def test_ai_pipeline_components():
 
     # Test structure extractor
     try:
-        from pipeline.structure_extractor import StructureExtractor
+        from src.pipeline.structure_extractor import StructureExtractor
         structure = StructureExtractor()
         available = structure.is_available()
         print(f"✅ Structure Extractor: {'Available' if available else 'Not Available'}")
@@ -40,7 +40,7 @@ def test_ai_pipeline_components():
 
     # Test hierarchical chunker
     try:
-        from pipeline.hierarchical_chunker import HierarchicalChunker
+        from src.pipeline.hierarchical_chunker import HierarchicalChunker
         chunker = HierarchicalChunker()
         print("✅ Hierarchical Chunker: Initialized")
     except Exception as e:
@@ -48,7 +48,7 @@ def test_ai_pipeline_components():
 
     # Test relevance scorer
     try:
-        from pipeline.relevance_scorer import RelevanceScorer
+        from src.pipeline.relevance_scorer import RelevanceScorer
         scorer = RelevanceScorer()
         print("✅ Relevance Scorer: Initialized")
     except Exception as e:
@@ -56,7 +56,7 @@ def test_ai_pipeline_components():
 
     # Test topic classifier
     try:
-        from pipeline.topic_classifier import TopicClassifier
+        from src.pipeline.topic_classifier import TopicClassifier
         classifier = TopicClassifier()
         available = classifier.is_available()
         print(f"✅ Topic Classifier: {'Available' if available else 'Not Available'}")
@@ -71,7 +71,7 @@ def test_enhanced_processor():
     print("=" * 50)
 
     try:
-        from pipeline.enhanced_processor import EnhancedDocumentProcessor
+        from src.pipeline.enhanced_processor import EnhancedDocumentProcessor
 
         processor = EnhancedDocumentProcessor()
         status = processor.get_processing_status()
@@ -103,7 +103,7 @@ def test_enhanced_processor():
         """
 
         print("\n🧪 Testing structure extraction...")
-        from pipeline.structure_extractor import StructureExtractor
+        from src.pipeline.structure_extractor import StructureExtractor
         extractor = StructureExtractor()
 
         structure = extractor.extract_structure(sample_text, "test_document.txt")
@@ -112,7 +112,7 @@ def test_enhanced_processor():
         print(f"   Primary topic: {structure.get('primary_topic')}")
 
         print("\n🧪 Testing hierarchical chunking...")
-        from pipeline.hierarchical_chunker import HierarchicalChunker
+        from src.pipeline.hierarchical_chunker import HierarchicalChunker
         chunker = HierarchicalChunker()
 
         chunks = chunker.chunk_document(sample_text, structure, "test_document.txt")
@@ -123,7 +123,7 @@ def test_enhanced_processor():
             print(f"   Sample chunk type: {chunks[0].get('section_type', 'N/A')}")
 
         print("\n🧪 Testing relevance scoring...")
-        from pipeline.relevance_scorer import RelevanceScorer
+        from src.pipeline.relevance_scorer import RelevanceScorer
         scorer = RelevanceScorer()
 
         scored_chunks = scorer.score_chunks(chunks, ['machine learning'], structure)
@@ -143,7 +143,7 @@ def test_topic_classification():
     print("=" * 50)
 
     try:
-        from pipeline.topic_classifier import TopicClassifier
+        from src.pipeline.topic_classifier import TopicClassifier
 
         classifier = TopicClassifier()
 
@@ -194,7 +194,7 @@ def test_enhanced_retrieval():
     print("=" * 50)
 
     try:
-        from enhanced_retrieval import EnhancedRetriever
+        from src.enhanced_retrieval import EnhancedRetriever
 
         # Note: This will fail without proper database setup, but we can test initialization
         print("🧪 Testing retrieval system initialization...")
@@ -257,6 +257,7 @@ def main():
         print("\n" + "=" * 60)
         print("✅ All tests completed successfully!")
         print("🎯 Enhanced system is ready for production use.")
+        return 0
 
     except Exception as e:
         print(f"\n❌ Testing failed: {e}")

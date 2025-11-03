@@ -20,10 +20,6 @@
 - Use Case: Integration with other applications, automation scripts
 - Implementation: FastAPI-based REST endpoints for query and document management
 
-### 3. Advanced Document Management (done)
-- Missing: Document tagging, categorization, and advanced search filters
-- Use Case: Organizing large document collections by topic/domain
-- Implementation: Metadata tagging system with faceted search
 
 ### 4. Real-time Document Updates (next)
 - Missing: Incremental indexing for document changes

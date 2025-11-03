@@ -488,21 +488,7 @@ def main():
     # File upload section
     st.markdown("### 📤 Upload Documents")
 
-    # Enhanced feature highlights
-    st.markdown("""
-    <div class="feature-highlight">
-        <h4>🚀 AI-Powered Document Intelligence</h4>
-        <ul>
-            <li>🤖 <strong>AI Document Summaries</strong> - Automatic content summarization</li>
-            <li>🏷️ <strong>Topic Classification</strong> - Intelligent topic extraction and tagging</li>
-            <li>📚 <strong>Hierarchical Structure</strong> - Chapter/section-aware processing</li>
-            <li>⏱️ <strong>Reading Time Estimation</strong> - Smart content analysis</li>
-            <li>🌍 <strong>Multilingual Support</strong> - 12 languages with auto-detection</li>
-            <li>⚡ <strong>Parallel Processing</strong> - GPU-accelerated batch processing</li>
-            <li>🔍 <strong>Advanced Retrieval</strong> - BM25 + vector hybrid search</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+
 
     st.markdown("**Supported formats:** TXT, PDF, DOCX, PPTX, XLSX")
 
