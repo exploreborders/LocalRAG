@@ -5,6 +5,7 @@ New document processor with database storage and Elasticsearch integration.
 
 import os
 import hashlib
+import re
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -16,7 +17,7 @@ from langdetect import detect, LangDetectException as LangDetectError
 import spacy
 from langchain_core.documents import Document as LangchainDocument
 
-from .database.models import Document, DocumentChunk, ProcessingJob, SessionLocal
+from .database.models import Document, DocumentChunk, SessionLocal
 from .data_loader import load_documents, split_documents
 from .embeddings import get_embedding_model, create_embeddings
 from .database.opensearch_setup import get_elasticsearch_client
@@ -25,8 +26,12 @@ load_dotenv()
 
 class DocumentProcessor:
     """
-    Handles document processing, chunking, embedding generation, and storage
-    in both PostgreSQL database and Elasticsearch.
+    Legacy document processor for basic document operations.
+
+    This class provides basic document processing functionality and database queries.
+    For new uploads with enhanced structure extraction, use UploadProcessor instead.
+
+    Maintained for backward compatibility and basic operations.
     """
 
     def __init__(self):
@@ -57,6 +62,115 @@ class DocumentProcessor:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
+
+    def extract_author_from_docling(self, docling_document) -> Optional[str]:
+        """
+        Extract author information from a Docling document.
+
+        Tries multiple strategies to find author information:
+        1. Document metadata/properties
+        2. Text patterns in the document content
+        3. Header/footer analysis
+
+        Args:
+            docling_document: Docling document object
+
+        Returns:
+            str: Author name if found, None otherwise
+        """
+        # Strategy 1: Check document metadata/properties
+        if hasattr(docling_document, 'origin') and docling_document.origin:
+            origin_data = docling_document.origin.model_dump()
+            # Check for author in document properties
+            if 'author' in origin_data and origin_data['author']:
+                return origin_data['author'].strip()
+            if 'creator' in origin_data and origin_data['creator']:
+                return origin_data['creator'].strip()
+
+        # Strategy 2: Search for author patterns in text content
+        markdown_content = docling_document.export_to_markdown()
+        author = self._extract_author_from_text(markdown_content)
+
+        if author:
+            return author
+
+        # Strategy 3: Check document text items for author information
+        if hasattr(docling_document, 'texts'):
+            for text_item in docling_document.texts:
+                if hasattr(text_item, 'text') and text_item.text:
+                    author = self._extract_author_from_text(text_item.text)
+                    if author:
+                        return author
+
+        return None
+
+    def _extract_author_from_text(self, text: str) -> Optional[str]:
+        """
+        Extract author information from text using pattern matching.
+
+        Args:
+            text: Text content to search
+
+        Returns:
+            str: Author name if found, None otherwise
+        """
+        # Common author patterns
+        author_patterns = [
+            r'Author[:\-]?\s*([^\n\r]{1,100})',
+            r'By[:\-]?\s*([^\n\r]{1,100})',
+            r'Written by[:\-]?\s*([^\n\r]{1,100})',
+            r'Created by[:\-]?\s*([^\n\r]{1,100})',
+            r'^([^\n\r]{1,50})$',  # Single line that might be author (check first few lines)
+        ]
+
+        lines = text.split('\n')[:10]  # Check first 10 lines
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            for pattern in author_patterns:
+                match = re.search(pattern, line, re.IGNORECASE)
+                if match:
+                    author_candidate = match.group(1).strip()
+                    # Validate author candidate
+                    if self._is_valid_author(author_candidate):
+                        return author_candidate
+
+        return None
+
+    def _is_valid_author(self, author_candidate: str) -> bool:
+        """
+        Validate if a string looks like a valid author name.
+
+        Args:
+            author_candidate: Potential author name
+
+        Returns:
+            bool: True if it looks like a valid author name
+        """
+        if not author_candidate or len(author_candidate) < 2 or len(author_candidate) > 100:
+            return False
+
+        # Exclude common non-author text
+        exclude_patterns = [
+            r'^\d+$',  # Just numbers
+            r'^[^\w\s]+$',  # Just punctuation
+            r'(?i)(table|figure|page|chapter|section|volume)',  # Document structure words
+            r'(?i)(http|www|\.com|\.org|\.edu)',  # URLs
+            r'^.{1,3}$',  # Very short strings
+        ]
+
+        for pattern in exclude_patterns:
+            if re.search(pattern, author_candidate):
+                return False
+
+        # Check for reasonable name-like structure (contains letters, not too many numbers)
+        has_letters = bool(re.search(r'[a-zA-Z]', author_candidate))
+        number_ratio = len(re.findall(r'\d', author_candidate)) / len(author_candidate)
+
+        return has_letters and number_ratio < 0.5
 
     def detect_language(self, text: str) -> str:
         """
@@ -170,31 +284,45 @@ class DocumentProcessor:
         """
         return self.db.query(Document).filter(Document.file_hash == file_hash).first() is not None
 
-    def save_document(self, filename: str, filepath: str, file_hash: str, content_type: str, detected_language: Optional[str] = None) -> Document:
+    def save_document(self, filename: str, filepath: str, file_hash: str, content_type: Optional[str] = None, detected_language: Optional[str] = None) -> Document:
         """
-        Save document metadata to the database.
+        Save document metadata to database.
 
         Args:
-            filename (str): Name of the file
-            filepath (str): Path to the file
-            file_hash (str): MD5 hash of the file
-            content_type (str): File extension/type
+            filename (str): Name of the document file
+            filepath (str): Full path to the document file
+            file_hash (str): MD5 hash of the file for change detection
+            content_type (str): File content type/extension
             detected_language (str): Detected language code (ISO 639-1)
 
         Returns:
-            Document: The created Document database object
+            Document: The created or updated document object
         """
+        # Check if document already exists
+        existing_doc = self.db.query(Document).filter(Document.file_hash == file_hash).first()
+
+        if existing_doc:
+            # Update existing document
+            existing_doc.filename = filename
+            existing_doc.filepath = filepath
+            existing_doc.last_modified = datetime.now()
+            if content_type:
+                existing_doc.content_type = content_type
+            if detected_language:
+                existing_doc.detected_language = detected_language
+            self.db.commit()
+            return existing_doc
+
+        # Create new document
         doc = Document(
             filename=filename,
             filepath=filepath,
             file_hash=file_hash,
             content_type=content_type,
             detected_language=detected_language,
-            status='processing'
         )
         self.db.add(doc)
         self.db.commit()
-        self.db.refresh(doc)
         return doc
 
     def save_chunks(self, document_id: int, chunks: List, embedding_model: str, chunk_size: int, overlap: int):
@@ -209,13 +337,19 @@ class DocumentProcessor:
             overlap (int): Overlap between chunks
         """
         for i, chunk in enumerate(chunks):
+            # Extract caption metadata from chunk metadata
+            metadata = chunk.metadata or {}
+            chunk_type = metadata.get('chunk_type', 'standard')
+            has_captions = metadata.get('has_captions', False)
+            caption_text = metadata.get('caption_text')
+            caption_line = metadata.get('caption_line')
+            context_lines = metadata.get('context_lines')
+
             chunk_obj = DocumentChunk(
                 document_id=document_id,
                 chunk_index=i,
                 content=chunk.page_content,
-                embedding_model=embedding_model,
-                chunk_size=chunk_size,
-                overlap=overlap
+                embedding_model=embedding_model
             )
             self.db.add(chunk_obj)
         self.db.commit()
@@ -287,9 +421,10 @@ class DocumentProcessor:
             self.db.query(DocumentChunk).filter(DocumentChunk.document_id == existing_doc.id).delete()
             # Delete existing embeddings from Elasticsearch
             try:
-                self.es.delete_by_query(
+                # Note: This uses the older ES API syntax for compatibility
+                self.es.delete_by_query(  # type: ignore
                     index="rag_vectors",
-                    body={"query": {"term": {"document_id": existing_doc.id}}}
+                    body={"query": {"term": {"document_id": existing_doc.id}}}  # type: ignore
                 )
             except Exception as e:
                 print(f"Warning: Could not delete existing embeddings from Elasticsearch: {e}")
@@ -311,8 +446,6 @@ class DocumentProcessor:
             print(f"Processing {file_path} with Docling")
             try:
                 from docling.document_converter import DocumentConverter
-
-                # Use default Docling configuration for best quality
                 doc_converter = DocumentConverter()
                 result = doc_converter.convert(str(file_path))
                 text_content = result.document.export_to_markdown()
@@ -370,15 +503,15 @@ class DocumentProcessor:
 
         # Save or update document metadata
         if doc is None:
+            content_type = file_path.suffix[1:] if file_path.suffix else 'unknown'
             doc = self.save_document(file_path.name, str(file_path), file_hash, content_type, detected_language)
         else:
             # Update existing document
             doc.filename = file_path.name
             doc.filepath = str(file_path)
-            doc.content_type = content_type
             doc.detected_language = detected_language
+            # No author, content_type, or status fields to set
             doc.last_modified = datetime.now()
-            doc.status = 'processing'
             self.db.commit()
 
         # Generate embeddings
@@ -390,8 +523,7 @@ class DocumentProcessor:
         # Save embeddings to Elasticsearch
         self.save_embeddings_to_es(chunks, embeddings, model_name, doc.id)  # type: ignore
 
-        # Update document status
-        doc.status = 'processed'
+        # Update document last modified time
         doc.last_modified = datetime.now()
         self.db.commit()
 
@@ -414,309 +546,7 @@ class DocumentProcessor:
                 except Exception as e:
                     print(f"Error processing {file_path}: {e}")
 
-    def reprocess_all_documents(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", chunk_size: int = 1000, overlap: int = 200, batch_size: int = 5, use_parallel: bool = True, max_workers: int = 4, memory_limit_mb: int = 500):
-        """
-        Reprocess all documents in the data directory with performance optimizations.
-        Uses the same optimized processing as process_existing_documents but forces reprocessing of existing documents.
 
-        Args:
-            model_name (str): Embedding model to use
-            chunk_size (int): Size of text chunks
-            overlap (int): Overlap between chunks
-            batch_size (int): Number of documents to process in each batch
-            use_parallel (bool): Whether to use parallel processing for batches
-            max_workers (int): Maximum number of worker processes
-            memory_limit_mb (int): Memory limit for processing
-        """
-        from .embeddings import create_embeddings
-        from .data_loader import split_documents
-        from docling.document_converter import DocumentConverter
-
-        # Get all documents from the data directory
-        data_dir = Path("data")
-        file_paths = []
-        for file_path in data_dir.glob("*"):
-            if file_path.is_file() and file_path.suffix.lower() in ['.txt', '.pdf', '.docx', '.pptx', '.xlsx']:
-                file_paths.append(file_path)
-
-        if not file_paths:
-            print("No documents found in data directory.")
-            return
-
-        print(f"Found {len(file_paths)} documents to reprocess with performance optimizations.")
-
-        # Separate text files from other formats
-        text_files = [fp for fp in file_paths if fp.suffix.lower() == '.txt']
-        other_files = [fp for fp in file_paths if fp.suffix.lower() != '.txt']
-
-        # Process text files efficiently
-        for file_path in text_files:
-            try:
-                self.process_document(str(file_path), model_name, chunk_size=chunk_size, overlap=overlap, force_reprocess=True)
-            except Exception as e:
-                print(f"Error reprocessing {file_path}: {e}")
-
-        # Process other formats with optimized batch processing
-        if other_files:
-            if use_parallel and len(other_files) > batch_size:
-                workers = max_workers or min(4, len(other_files) // batch_size + 1)
-                self._reprocess_batch_documents_parallel(other_files, model_name, chunk_size, overlap, batch_size, workers, memory_limit_mb)
-            else:
-                self._reprocess_batch_documents(other_files, model_name, chunk_size, overlap, batch_size, memory_limit_mb)
-
-        print("🎉 Finished reprocessing all documents with performance optimizations.")
-
-    def _reprocess_batch_documents(self, file_paths, model_name, chunk_size, overlap, batch_size, memory_limit_mb):
-        """Reprocess documents in batches sequentially."""
-        from .embeddings import create_embeddings
-        from .data_loader import split_documents
-        from docling.document_converter import DocumentConverter
-
-        for i in range(0, len(file_paths), batch_size):
-            batch = file_paths[i:i + batch_size]
-            print(f"Processing batch {i//batch_size + 1}/{(len(file_paths) + batch_size - 1)//batch_size} ({len(batch)} documents)")
-
-            # Create converter (reuse for batch)
-            doc_converter = DocumentConverter()
-
-            for file_path in batch:
-                try:
-                    # Check if document exists and delete old data
-                    file_hash = self.calculate_file_hash(str(file_path))
-                    existing_doc = self.db.query(Document).filter(Document.file_hash == file_hash).first()
-
-                    if existing_doc:
-                        # Delete existing chunks and embeddings
-                        self.db.query(DocumentChunk).filter(DocumentChunk.document_id == existing_doc.id).delete()
-                        try:
-                            self.es.delete_by_query(
-                                index="rag_vectors",
-                                body={"query": {"term": {"document_id": existing_doc.id}}}
-                            )
-                        except Exception as e:
-                            print(f"Warning: Could not delete existing embeddings: {e}")
-
-                    # Process document with Docling
-                    result = doc_converter.convert(str(file_path))
-                    text_content = result.document.export_to_markdown()
-
-                    from langchain_core.documents import Document as LangchainDocument
-                    documents = [LangchainDocument(page_content=text_content, metadata={"source": str(file_path)})]
-
-                    # Detect language
-                    full_content = ' '.join([doc.page_content for doc in documents])
-                    detected_language = self.detect_language(full_content)
-
-                    # Apply language-specific preprocessing if needed
-                    if detected_language == 'de':
-                        processed_content = self.preprocess_german_text(full_content)
-                        if processed_content != full_content:
-                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": str(file_path), "language": detected_language})]
-                    elif detected_language == 'fr':
-                        processed_content = self.preprocess_french_text(full_content)
-                        if processed_content != full_content:
-                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": str(file_path), "language": detected_language})]
-                    elif detected_language == 'es':
-                        processed_content = self.preprocess_spanish_text(full_content)
-                        if processed_content != full_content:
-                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": str(file_path), "language": detected_language})]
-
-                    # Split documents
-                    chunks = split_documents(documents, chunk_size=chunk_size, chunk_overlap=overlap)
-
-                    # Create/update document record
-                    if existing_doc:
-                        doc = existing_doc
-                        doc.detected_language = detected_language
-                        doc.last_modified = datetime.now()
-                        doc.status = 'processing'
-                    else:
-                        doc = self.save_document(file_path.name, str(file_path), file_hash, file_path.suffix[1:], detected_language)
-
-                    # Generate embeddings
-                    embeddings, _ = create_embeddings(chunks, model_name)
-
-                    # Save chunks and embeddings
-                    self.save_chunks(doc.id, chunks, model_name, chunk_size, overlap)
-                    self.save_embeddings_to_es(chunks, embeddings, model_name, doc.id)
-
-                    # Update status
-                    doc.status = 'processed'
-                    self.db.commit()
-
-                    print(f"✅ Reprocessed {file_path.name}")
-
-                except Exception as e:
-                    print(f"❌ Error reprocessing {file_path}: {e}")
-                    self.db.rollback()
-
-    def _reprocess_batch_documents_parallel(self, file_paths, model_name, chunk_size, overlap, batch_size, max_workers, memory_limit_mb):
-        """Reprocess documents in batches using parallel processing."""
-        import multiprocessing as mp
-        from concurrent.futures import ProcessPoolExecutor, as_completed
-
-        # Convert file paths to serializable data
-        serializable_files = []
-        for file_path in file_paths:
-            # Calculate hash for each file
-            hash_md5 = hashlib.md5()
-            with open(file_path, "rb") as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    hash_md5.update(chunk)
-            file_hash = hash_md5.hexdigest()
-
-            serializable_files.append({
-                'filepath': str(file_path),
-                'filename': file_path.name,
-                'file_hash': file_hash
-            })
-
-        # Split into worker batches
-        worker_batches = []
-        files_per_worker = max(1, len(serializable_files) // max_workers)
-        for i in range(0, len(serializable_files), files_per_worker):
-            worker_batches.append(serializable_files[i:i + files_per_worker])
-
-        print(f"Processing {len(worker_batches)} worker batches with {max_workers} workers")
-
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all batches for processing (pass only serializable data)
-            future_to_batch = {
-                executor.submit(self._process_reprocess_batch_worker, batch, model_name, chunk_size, overlap): batch
-                for batch in worker_batches
-            }
-
-            # Collect results as they complete
-            for future in as_completed(future_to_batch):
-                batch = future_to_batch[future]
-                try:
-                    results = future.result()
-                    # Save results to database (main process handles DB operations)
-                    for file_data in results:
-                        filepath, file_hash, chunks, embeddings_array, detected_language, filename = file_data
-
-                        # Find or create document record
-                        existing_doc = self.db.query(Document).filter(Document.file_hash == file_hash).first()
-                        if existing_doc:
-                            # Update existing document
-                            doc = existing_doc
-                            doc.detected_language = detected_language
-                            doc.last_modified = datetime.now()
-                            doc.status = 'processing'
-                            # Delete old chunks
-                            self.db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).delete()
-                        else:
-                            # Create new document
-                            doc = Document(
-                                filename=filename,
-                                filepath=filepath,
-                                file_hash=file_hash,
-                                content_type=filepath.split('.')[-1] if '.' in filepath else 'unknown',
-                                detected_language=detected_language,
-                                status='processing'
-                            )
-                            self.db.add(doc)
-                            self.db.flush()
-
-                        # Save chunks and embeddings
-                        self.save_chunks(doc.id, chunks, model_name, chunk_size, overlap)
-                        self.save_embeddings_to_es(chunks, embeddings_array, model_name, doc.id)
-
-                        # Update status
-                        doc.status = 'processed'
-                        doc.last_modified = datetime.now()
-                        print(f"✅ Reprocessed {filename}: {len(chunks)} chunks created")
-
-                except Exception as e:
-                    print(f"❌ Batch failed: {e}")
-
-        # Commit all changes
-        self.db.commit()
-
-    @staticmethod
-    def _process_reprocess_batch_worker(batch, model_name, chunk_size, overlap):
-        """Worker function for parallel reprocessing. Returns serializable data only."""
-        from docling.document_converter import DocumentConverter
-        from langchain_core.documents import Document as LangchainDocument
-        from .embeddings import create_embeddings
-        from .data_loader import split_documents
-
-        results = []
-
-        # Create converter for this worker
-        doc_converter = DocumentConverter()
-
-        for file_data in batch:
-            filepath = file_data['filepath']
-            filename = file_data['filename']
-            file_hash = file_data['file_hash']
-
-            if not (os.path.exists(filepath) and os.path.isfile(filepath)):
-                continue
-
-            try:
-                # Process document with Docling
-                result = doc_converter.convert(filepath)
-                text_content = result.document.export_to_markdown()
-                documents = [LangchainDocument(page_content=text_content, metadata={"source": filepath})]
-
-                # Detect language (simplified version for worker)
-                full_content = ' '.join([doc.page_content for doc in documents])
-                try:
-                    from langdetect import detect
-                    detected_language = detect(full_content[:1000])  # Use first 1000 chars for speed
-                except:
-                    detected_language = 'unknown'
-
-                # Apply language-specific preprocessing if detected
-                if detected_language == 'de':
-                    try:
-                        import spacy
-                        nlp = spacy.load('de_core_news_sm')
-                        doc = nlp(full_content[:5000])  # Process first 5000 chars for speed
-                        sentences = [sent.text for sent in doc.sents]
-                        processed_content = ' '.join(sentences)
-                        if processed_content:
-                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": filepath, "language": detected_language})]
-                    except:
-                        pass  # Skip preprocessing if spaCy fails
-                elif detected_language == 'fr':
-                    try:
-                        import spacy
-                        nlp = spacy.load('fr_core_news_sm')
-                        doc = nlp(full_content[:5000])  # Process first 5000 chars for speed
-                        sentences = [sent.text for sent in doc.sents]
-                        processed_content = ' '.join(sentences)
-                        if processed_content:
-                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": filepath, "language": detected_language})]
-                    except:
-                        pass  # Skip preprocessing if spaCy fails
-                elif detected_language == 'es':
-                    try:
-                        import spacy
-                        nlp = spacy.load('es_core_news_sm')
-                        doc = nlp(full_content[:5000])  # Process first 5000 chars for speed
-                        sentences = [sent.text for sent in doc.sents]
-                        processed_content = ' '.join(sentences)
-                        if processed_content:
-                            documents = [LangchainDocument(page_content=processed_content, metadata={"source": filepath, "language": detected_language})]
-                    except:
-                        pass  # Skip preprocessing if spaCy fails
-
-                # Split and embed
-                chunks = split_documents(documents, chunk_size=chunk_size, chunk_overlap=overlap)
-                if not chunks:
-                    continue
-
-                embeddings_array, _ = create_embeddings(chunks, model_name)
-
-                # Return serializable data: (filepath, file_hash, chunks, embeddings_array, detected_language, filename)
-                results.append((filepath, file_hash, chunks, embeddings_array, detected_language, filename))
-
-            except Exception as e:
-                print(f"❌ Worker failed to process {filename}: {e}")
-
-        return results
 
     def get_documents(self) -> List[Dict[str, Any]]:
         """
@@ -783,289 +613,3 @@ class DocumentProcessor:
             'embedding_model': chunk.embedding_model
         } for chunk in chunks]
 
-    def process_existing_documents(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", chunk_size: int = 1000, overlap: int = 200, batch_size: int = 5, use_parallel: bool = True, max_workers: int = 4, memory_limit_mb: int = 500):
-        """
-        Process all existing documents in the database that haven't been processed yet.
-        Optimized with batch processing, converter reuse, and parallel processing for maximum performance.
-
-        Args:
-            model_name (str): Embedding model to use
-            chunk_size (int): Size of text chunks
-            overlap (int): Overlap between chunks
-            batch_size (int): Number of documents to process in each batch
-            use_parallel (bool): Whether to use parallel processing for batches
-            max_workers (int): Maximum number of worker processes (defaults to CPU count)
-        """
-        from .embeddings import create_embeddings
-        from .data_loader import split_documents
-        from docling.document_converter import DocumentConverter
-        from docling.datamodel.pipeline_options import PdfPipelineOptions
-        from docling.datamodel.base_models import InputFormat
-
-        # Get documents that are not processed
-        docs = self.db.query(Document).filter(Document.status != 'processed').all()
-
-        if not docs:
-            print("No unprocessed documents found.")
-            return
-
-        print(f"Found {len(docs)} documents to process.")
-
-        # Separate text files from other formats for different processing
-        text_docs = [doc for doc in docs if doc.content_type == 'txt']
-        other_docs = [doc for doc in docs if doc.content_type != 'txt']
-
-        # Process text files (simple and fast)
-        self._process_text_documents(text_docs, model_name, chunk_size, overlap, memory_limit_mb)
-
-        # Process other formats with optimized batch processing
-        if use_parallel and len(other_docs) > batch_size:
-            workers = max_workers or min(4, len(other_docs) // batch_size + 1)
-            self._process_batch_documents_parallel(other_docs, model_name, chunk_size, overlap, batch_size, workers, memory_limit_mb)
-        else:
-            self._process_batch_documents(other_docs, model_name, chunk_size, overlap, batch_size, memory_limit_mb)
-
-        print("🎉 Finished processing existing documents.")
-
-    def _process_text_documents(self, text_docs, model_name, chunk_size, overlap, memory_limit_mb=500):
-        """Process text documents efficiently."""
-        from .embeddings import create_embeddings
-        from .data_loader import split_documents
-        for doc in text_docs:
-            if not (os.path.exists(doc.filepath) and os.path.isfile(doc.filepath)):
-                print(f"⚠️ File not found, skipping: {doc.filepath}")
-                continue
-
-            print(f"🔄 Processing text file {doc.filename}...")
-            try:
-                # Simple text loading
-                with open(doc.filepath, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                documents = [LangchainDocument(page_content=content, metadata={"source": doc.filepath})]
-
-                # Split into chunks
-                chunks = split_documents(documents, chunk_size, overlap)
-
-                if not chunks:
-                    print(f"⚠️ No chunks generated for {doc.filename}")
-                    continue
-
-                # Generate embeddings
-                embeddings_array, _ = create_embeddings(chunks, model_name)
-
-                # Save chunks to database
-                self.save_chunks(doc.id, chunks, model_name, chunk_size, overlap)
-
-                # Save embeddings to Elasticsearch
-                self.save_embeddings_to_es(chunks, embeddings_array, model_name, doc.id)
-
-                # Update document status
-                doc.status = 'processed'
-                doc.last_modified = datetime.now()
-                self.db.commit()
-
-                print(f"✅ Processed {doc.filename}: {len(chunks)} chunks created")
-
-            except Exception as e:
-                print(f"❌ Failed to process {doc.filename}: {e}")
-                self.db.rollback()
-
-    def _process_batch_documents(self, other_docs, model_name, chunk_size, overlap, batch_size, memory_limit_mb=500):
-        """Process non-text documents using optimized batch processing."""
-        from .embeddings import create_embeddings
-        from .data_loader import split_documents
-        from docling.document_converter import DocumentConverter
-        from docling.datamodel.pipeline_options import PdfPipelineOptions
-        from docling.datamodel.base_models import InputFormat
-
-        if not other_docs:
-            return
-
-        # Create converter with default options due to docling 2.60.0 backend bug
-        # TODO: Re-enable custom pipeline options when docling backend issue is fixed
-        doc_converter = DocumentConverter()
-
-        # Process documents in batches with memory monitoring
-        for i in range(0, len(other_docs), batch_size):
-            batch = other_docs[i:i + batch_size]
-            print(f"🔄 Processing batch {i//batch_size + 1}/{(len(other_docs) + batch_size - 1)//batch_size} ({len(batch)} documents)...")
-
-            # Memory check (basic implementation)
-            try:
-                import psutil
-                memory_mb = psutil.virtual_memory().used / 1024 / 1024
-                if memory_mb > memory_limit_mb:
-                    print(f"⚠️ Memory usage high ({memory_mb:.1f}MB), processing smaller batch...")
-                    # Reduce batch size if memory is high
-                    current_batch_size = max(1, batch_size // 2)
-                    batch = batch[:current_batch_size]
-            except ImportError:
-                # psutil not available, skip memory check
-                pass
-
-            # Filter out missing files
-            valid_batch = [doc for doc in batch if os.path.exists(doc.filepath) and os.path.isfile(doc.filepath)]
-            if len(valid_batch) != len(batch):
-                missing = len(batch) - len(valid_batch)
-                print(f"⚠️ Skipped {missing} missing files in this batch")
-
-            if not valid_batch:
-                continue
-
-            # Batch convert documents (significant performance boost)
-            try:
-                file_paths = [doc.filepath for doc in valid_batch]
-                results = doc_converter.convert_all(file_paths)
-
-                # Process each result
-                for doc, result in zip(valid_batch, results):
-                    try:
-                        text_content = result.document.export_to_markdown()
-                        documents = [LangchainDocument(
-                            page_content=text_content,
-                            metadata={
-                                "source": doc.filepath,
-                                "docling_metadata": result.document.origin.model_dump() if result.document.origin else {}
-                            }
-                        )]
-
-                        # Split into chunks
-                        chunks = split_documents(documents, chunk_size, overlap)
-
-                        if not chunks:
-                            print(f"⚠️ No chunks generated for {doc.filename}")
-                            continue
-
-                        # Generate embeddings
-                        embeddings_array, _ = create_embeddings(chunks, model_name)
-
-                        # Save chunks to database
-                        self.save_chunks(doc.id, chunks, model_name, chunk_size, overlap)
-
-                        # Save embeddings to Elasticsearch
-                        self.save_embeddings_to_es(chunks, embeddings_array, model_name, doc.id)
-
-                        # Update document status
-                        doc.status = 'processed'
-                        doc.last_modified = datetime.now()
-
-                        print(f"✅ Processed {doc.filename}: {len(chunks)} chunks created")
-
-                    except Exception as e:
-                        print(f"❌ Failed to process {doc.filename}: {e}")
-
-                # Commit batch
-                self.db.commit()
-
-            except Exception as e:
-                print(f"❌ Failed to process batch: {e}")
-                self.db.rollback()
-
-    def _process_batch_documents_parallel(self, other_docs, model_name, chunk_size, overlap, batch_size, max_workers, memory_limit_mb=500):
-        """Process documents using parallel batch processing for maximum performance."""
-        import multiprocessing as mp
-        from concurrent.futures import ProcessPoolExecutor, as_completed
-
-        if not other_docs:
-            return
-
-        print(f"🔄 Processing {len(other_docs)} documents with {max_workers} parallel workers...")
-
-        # Convert documents to serializable data before multiprocessing
-        serializable_docs = []
-        for doc in other_docs:
-            serializable_docs.append({
-                'id': doc.id,
-                'filepath': doc.filepath,
-                'filename': doc.filename
-            })
-
-        # Split serializable documents into worker batches
-        worker_batches = []
-        docs_per_worker = max(1, len(serializable_docs) // max_workers)
-        for i in range(0, len(serializable_docs), docs_per_worker):
-            worker_batches.append(serializable_docs[i:i + docs_per_worker])
-
-        # Process batches in parallel
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all batches for processing (pass only serializable data)
-            future_to_batch = {
-                executor.submit(self._process_document_batch_worker, batch, model_name, chunk_size, overlap): batch
-                for batch in worker_batches
-            }
-
-            # Collect results as they complete
-            for future in as_completed(future_to_batch):
-                batch = future_to_batch[future]
-                try:
-                    results = future.result()
-                    # Save results to database (main process handles DB operations)
-                    for doc_data in results:
-                        doc_id, chunks, embeddings_array, filename = doc_data
-                        self.save_chunks(doc_id, chunks, model_name, chunk_size, overlap)
-                        self.save_embeddings_to_es(chunks, embeddings_array, model_name, doc_id)
-
-                        # Update document status
-                        doc = self.db.query(Document).filter(Document.id == doc_id).first()
-                        if doc:
-                            doc.status = 'processed'
-                            doc.last_modified = datetime.now()
-                            print(f"✅ Processed {filename}: {len(chunks)} chunks created")
-                except Exception as e:
-                    print(f"❌ Failed to process batch: {e}")
-
-        # Commit all changes
-        self.db.commit()
-
-    @staticmethod
-    def _process_document_batch_worker(batch, model_name, chunk_size, overlap):
-        """Worker function for parallel document processing. Returns serializable data only."""
-        from docling.document_converter import DocumentConverter
-        from docling.datamodel.pipeline_options import PdfPipelineOptions
-        from docling.datamodel.base_models import InputFormat
-        from .embeddings import create_embeddings
-        from .data_loader import split_documents
-
-        results = []
-
-        # Create converter with default options due to docling 2.60.0 backend bug
-        # TODO: Re-enable custom pipeline options when docling backend issue is fixed
-        doc_converter = DocumentConverter()
-
-        for doc_data in batch:
-            filepath = doc_data['filepath']
-            filename = doc_data['filename']
-            doc_id = doc_data['id']
-
-            if not (os.path.exists(filepath) and os.path.isfile(filepath)):
-                continue
-
-            try:
-                # Convert document
-                result = doc_converter.convert(filepath)
-                text_content = result.document.export_to_markdown()
-
-                documents = [LangchainDocument(
-                    page_content=text_content,
-                    metadata={
-                        "source": filepath,
-                        "docling_metadata": result.document.origin.model_dump() if result.document.origin else {}
-                    }
-                )]
-
-                # Split into chunks
-                chunks = split_documents(documents, chunk_size, overlap)
-
-                if not chunks:
-                    continue
-
-                # Generate embeddings
-                embeddings_array, _ = create_embeddings(chunks, model_name)
-
-                # Return serializable data: (doc_id, chunks, embeddings_array, filename)
-                results.append((doc_id, chunks, embeddings_array, filename))
-
-            except Exception as e:
-                print(f"❌ Worker failed to process {filename}: {e}")
-
-        return results

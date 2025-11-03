@@ -69,7 +69,7 @@ def render_rag_results(results):
             'it': 'Italian', 'pt': 'Portuguese', 'nl': 'Dutch', 'sv': 'Swedish',
             'pl': 'Polish', 'zh': 'Chinese', 'ja': 'Japanese', 'ko': 'Korean'
         }
-        lang_display = lang_names.get(query_lang, query_lang.upper())
+        lang_display = lang_names.get(query_lang, (query_lang or 'unknown').upper())
         st.info(f"🌍 Detected query language: {lang_display}")
 
     st.markdown("**🤖 AI-Generated Answer:**")

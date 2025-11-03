@@ -104,7 +104,7 @@ def render_advanced_filters() -> Dict[str, Any]:
             selected_lang = st.selectbox(
                 "Language",
                 ["All"] + languages,
-                format_func=lambda x: lang_labels.get(x, x.upper()) if x != "All" else "🌍 All Languages",
+                format_func=lambda x: lang_labels.get(x, (x or 'unknown').upper()) if x != "All" else "🌍 All Languages",
                 help="Filter by document language"
             )
             if selected_lang != "All":

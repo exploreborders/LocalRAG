@@ -5,7 +5,7 @@
 - Docker Setup: `./docker_setup.sh` (fully containerized setup)
 - Manual Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt && python -m spacy download de_core_news_sm fr_core_news_sm es_core_news_sm it_core_news_sm pt_core_news_sm nl_core_news_sm sv_core_news_sm pl_core_news_sm zh_core_web_sm ja_core_news_sm ko_core_news_sm`
 - Set up databases: `python setup_databases.py docker` (or `docker-compose up -d`)
-- Initialize databases: `python scripts/migrate_to_db.py && python scripts/migrate_add_language.py && python src/database/opensearch_setup.py`
+- Initialize databases: `python setup_databases.py docker` (includes OpenSearch setup)
 - Run all tests: `python tests/run_all_tests.py` (runs all test files)
 - Run system tests: `python tests/test_system.py`
 - Run single test: `python -c "from tests.test_system import test_retrieval; test_retrieval()"`
@@ -19,8 +19,9 @@
 - Stop databases: `docker-compose down`
 
 ## Document Processing Commands
-- Process documents with optimizations: `python scripts/migrate_to_db.py` (uses optimized batch processing)
-- Process with custom settings: `python -c "from src.document_processor import DocumentProcessor; p = DocumentProcessor(); p.process_existing_documents(batch_size=10, use_parallel=True, max_workers=4)"`
+- Upload documents with structure extraction: Use web interface Documents page (automatic processing)
+- Reprocess existing documents: Use "Reprocess with Structure Extraction" in web interface
+- Batch processing: `python -c "from src.upload_processor import UploadProcessor; p = UploadProcessor(); p.upload_files(file_list, use_parallel=True, max_workers=4)"`
 
 ## Performance Optimization Settings
 - **Batch Processing**: Documents processed in configurable batches (default: 5)

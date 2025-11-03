@@ -77,10 +77,10 @@ def initialize_databases():
         return False
 
     # Run migrations
-    if not run_command("python scripts/migrate_to_db.py", "Running database migrations"):
+    if not run_command("python scripts/migrate_to_db.py", "Running initial database migration"):
         return False
 
-    if not run_command("python scripts/migrate_add_language.py", "Adding language support"):
+    if not run_command("python scripts/migrate_database_schema.py", "Setting up complete database schema"):
         return False
 
     # Setup OpenSearch

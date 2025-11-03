@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-Migration script to add advanced document management features.
-Adds tagging, categorization, and enhanced metadata support.
-Run this after updating the models to support Phase 18 features.
+Comprehensive database schema migration script.
+
+This script applies all necessary database schema changes for the Local RAG system,
+including advanced document management, caption-aware chunking, and performance optimizations.
+Run this after setting up the database connection.
 """
 
 import os
@@ -11,9 +13,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def migrate_advanced_document_management():
+
+def migrate_database_schema():
     """
-    Add advanced document management tables and columns.
+    Apply all necessary database schema changes.
     """
     # Database connection
     conn = psycopg2.connect(
@@ -27,7 +30,17 @@ def migrate_advanced_document_management():
     cursor = conn.cursor()
 
     try:
-        # Add enhanced metadata columns to documents table
+        print("🔄 Applying database schema migrations...")
+
+        # Add language support
+        print("  📝 Adding language support...")
+        cursor.execute("""
+            ALTER TABLE documents
+            ADD COLUMN IF NOT EXISTS detected_language VARCHAR(10);
+        """)
+
+        # Add advanced document management features
+        print("  🏷️ Adding advanced document management...")
         cursor.execute("""
             ALTER TABLE documents
             ADD COLUMN IF NOT EXISTS author VARCHAR(255),
@@ -74,8 +87,33 @@ def migrate_advanced_document_management():
             );
         """)
 
-        # Create indexes for better performance
+        # Add caption-aware chunking columns
+        print("  📦 Adding caption-aware chunking support...")
         cursor.execute("""
+            ALTER TABLE document_chunks
+            ADD COLUMN IF NOT EXISTS chunk_type VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS has_captions BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS caption_text TEXT,
+            ADD COLUMN IF NOT EXISTS caption_line INTEGER,
+            ADD COLUMN IF NOT EXISTS context_lines VARCHAR(50);
+        """)
+
+        # Add performance indexes
+        print("  ⚡ Adding performance indexes...")
+        cursor.execute("""
+            -- Core indexes
+            CREATE INDEX IF NOT EXISTS idx_chunks_doc_id_index ON document_chunks(document_id, chunk_index);
+            CREATE INDEX IF NOT EXISTS idx_chunks_created_at ON document_chunks(created_at);
+            CREATE INDEX IF NOT EXISTS idx_documents_modified ON documents(last_modified);
+            CREATE INDEX IF NOT EXISTS idx_documents_language ON documents(detected_language);
+            CREATE INDEX IF NOT EXISTS idx_documents_processed ON documents(status) WHERE status = 'processed';
+
+            -- Caption-aware indexes
+            CREATE INDEX IF NOT EXISTS idx_document_chunks_chunk_type ON document_chunks(chunk_type);
+            CREATE INDEX IF NOT EXISTS idx_document_chunks_has_captions ON document_chunks(has_captions);
+            CREATE INDEX IF NOT EXISTS idx_document_chunks_caption_line ON document_chunks(caption_line);
+
+            -- Tagging and categorization indexes
             CREATE INDEX IF NOT EXISTS idx_document_tags_name ON document_tags(name);
             CREATE INDEX IF NOT EXISTS idx_document_categories_name ON document_categories(name);
             CREATE INDEX IF NOT EXISTS idx_document_categories_parent ON document_categories(parent_id);
@@ -86,10 +124,8 @@ def migrate_advanced_document_management():
         """)
 
         conn.commit()
-        print("✅ Successfully added advanced document management features")
-        print("✅ Created document_tags and document_categories tables")
-        print("✅ Added association tables and indexes")
-        print("✅ Enhanced documents table with author, reading_time, and custom_fields")
+        print("✅ Database schema migration completed successfully!")
+        print("✅ Added language support, advanced document management, caption-aware chunking, and performance indexes")
 
     except Exception as e:
         print(f"❌ Migration failed: {e}")
@@ -99,7 +135,8 @@ def migrate_advanced_document_management():
         cursor.close()
         conn.close()
 
+
 if __name__ == "__main__":
-    print("Starting advanced document management migration...")
-    migrate_advanced_document_management()
-    print("Migration completed!")
+    print("🚀 Starting comprehensive database schema migration...")
+    migrate_database_schema()
+    print("🎉 Database schema migration completed!")

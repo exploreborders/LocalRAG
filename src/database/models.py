@@ -3,7 +3,8 @@ SQLAlchemy models for the RAG system database.
 Defines tables for documents, chunks, and processing jobs.
 """
 
-from sqlalchemy import create_engine, Integer, String, Text, TIMESTAMP, ForeignKey, func, JSON, Table, Column
+from sqlalchemy import create_engine, Integer, String, Text, TIMESTAMP, ForeignKey, func, JSON, Table, Column, Boolean, Float
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Mapped, mapped_column
 from typing import Optional, List
@@ -24,19 +25,20 @@ class Document(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     filepath: Mapped[str] = mapped_column(String(500), nullable=False)
     file_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
-    content_type: Mapped[Optional[str]] = mapped_column(String(100))
     detected_language: Mapped[Optional[str]] = mapped_column(String(10))  # ISO 639-1 language code (e.g., 'en', 'de')
+    content_type: Mapped[Optional[str]] = mapped_column(String(50))  # File type/extension (e.g., 'pdf', 'txt')
+    status: Mapped[str] = mapped_column(String(20), default='uploaded')  # Processing status
     upload_date: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
     last_modified: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
-    status: Mapped[str] = mapped_column(String(50), default='processed')
-    author: Mapped[Optional[str]] = mapped_column(String(255))
-    reading_time: Mapped[Optional[int]] = mapped_column(Integer)  # estimated reading time in minutes
-    custom_fields: Mapped[Optional[dict]] = mapped_column(JSON)  # flexible metadata storage
+
+    # Content columns for structured document content
+    full_content: Mapped[Optional[str]] = mapped_column(Text)  # Complete document content
+    chapter_content: Mapped[Optional[dict]] = mapped_column(JSONB)  # Content organized by chapters/subchapters
+    toc_content: Mapped[Optional[list]] = mapped_column(JSONB)  # Table of contents structure
+    content_structure: Mapped[Optional[dict]] = mapped_column(JSONB)  # Document structure metadata
 
     chunks = relationship("DocumentChunk", back_populates="document")
-    jobs = relationship("ProcessingJob", back_populates="document")
-    tags = relationship("DocumentTag", secondary="document_tags_association", back_populates="documents")
-    categories = relationship("DocumentCategory", secondary="document_categories_association", back_populates="documents")
+    chapters = relationship("DocumentChapter", backref="parent_document")
 
 class DocumentChunk(Base):
     """
@@ -52,85 +54,41 @@ class DocumentChunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding_model: Mapped[str] = mapped_column(String(100), nullable=False)
-    chunk_size: Mapped[Optional[int]] = mapped_column(Integer)
-    overlap: Mapped[Optional[int]] = mapped_column(Integer)
-    created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
 
-    document = relationship("Document", back_populates="chunks")
+    # Chapter-aware chunk metadata for better LLM context
+    chapter_title: Mapped[Optional[str]] = mapped_column(String(255))  # Chapter/section this chunk belongs to
+    chapter_path: Mapped[Optional[str]] = mapped_column(String(500))  # Hierarchical path (e.g., "1.2.3")
+    section_type: Mapped[Optional[str]] = mapped_column(String(50))  # 'chapter', 'section', 'subsection', 'paragraph'
+    content_relevance: Mapped[Optional[float]] = mapped_column(Float)  # 0-1 score for content density
 
-class ProcessingJob(Base):
+
+    document = relationship("Document", backref="document_chunks")
+
+
+class DocumentChapter(Base):
     """
-    Processing job table.
+    Document chapters table for hierarchical retrieval.
 
-    Tracks document processing jobs including status, timing,
-    and error information.
+    Stores chapter-level content and embeddings for fast high-level retrieval.
     """
-    __tablename__ = 'processing_jobs'
+    __tablename__ = 'document_chapters'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     document_id: Mapped[int] = mapped_column(Integer, ForeignKey('documents.id'), nullable=False)
-    job_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[str] = mapped_column(String(50), default='pending')
-    started_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
-    error_message: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
+    chapter_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    chapter_path: Mapped[str] = mapped_column(String(100), nullable=False)  # Hierarchical path (e.g., "1.2")
+    content: Mapped[str] = mapped_column(Text, nullable=False)  # Full chapter content
+    embedding: Mapped[Optional[list]] = mapped_column(JSONB)  # Pre-computed chapter embedding
+    embedding_model: Mapped[Optional[str]] = mapped_column(String(100))
+    word_count: Mapped[int] = mapped_column(Integer, default=0)
+    section_type: Mapped[str] = mapped_column(String(50), default='chapter')  # 'chapter', 'section', 'subsection'
+    parent_chapter_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('document_chapters.id'))
+    level: Mapped[int] = mapped_column(Integer, default=1)  # Hierarchy level (1=chapter, 2=section, etc.)
 
-    document = relationship("Document", back_populates="jobs")
+    document = relationship("Document", backref="document_chapters")
+    parent = relationship("DocumentChapter", remote_side=[id], backref="subchapters")
 
-class DocumentTag(Base):
-    """
-    Document tag table.
 
-    Stores tags that can be assigned to documents for organization.
-    """
-    __tablename__ = 'document_tags'
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
-    color: Mapped[Optional[str]] = mapped_column(String(7))  # hex color code like #FF5733
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
-
-    documents = relationship("Document", secondary="document_tags_association", back_populates="tags")
-
-class DocumentCategory(Base):
-    """
-    Document category table.
-
-    Stores hierarchical categories for document organization.
-    """
-    __tablename__ = 'document_categories'
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    parent_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('document_categories.id'))
-    created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, default=func.current_timestamp())
-
-    documents = relationship("Document", secondary="document_categories_association", back_populates="categories")
-    parent = relationship("DocumentCategory", remote_side=[id])
-    children = relationship("DocumentCategory", back_populates="parent")
-
-# Association tables for many-to-many relationships
-# Association tables for many-to-many relationships
-class DocumentTagsAssociation(Base):
-    """
-    Association table for document-tag many-to-many relationship.
-    """
-    __tablename__ = 'document_tags_association'
-
-    document_id: Mapped[int] = mapped_column(Integer, ForeignKey('documents.id'), primary_key=True)
-    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey('document_tags.id'), primary_key=True)
-
-class DocumentCategoriesAssociation(Base):
-    """
-    Association table for document-category many-to-many relationship.
-    """
-    __tablename__ = 'document_categories_association'
-
-    document_id: Mapped[int] = mapped_column(Integer, ForeignKey('documents.id'), primary_key=True)
-    category_id: Mapped[int] = mapped_column(Integer, ForeignKey('document_categories.id'), primary_key=True)
 
 # Database connection
 import os

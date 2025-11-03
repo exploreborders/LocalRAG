@@ -6,7 +6,7 @@ Updated retrieval system using Elasticsearch for vector search and PostgreSQL fo
 import numpy as np
 from typing import List, Dict, Any, Tuple, Optional
 from elasticsearch import Elasticsearch
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from sentence_transformers import SentenceTransformer
 
 from .database.models import SessionLocal, Document, DocumentChunk
@@ -173,7 +173,7 @@ class DatabaseRetriever:
             }
         }
 
-        response = self.es.search(index="rag_vectors", body=query)
+        response = self.es.search(index="rag_vectors", body=query)  # type: ignore
         hits = response['hits']['hits']
 
         results = []
@@ -280,28 +280,18 @@ class DatabaseRetriever:
             # Cache not available, proceed with database query
             cache_available = False
 
-        # Query database for uncached documents with tags and categories
+        # Query database for uncached documents
         if uncached_doc_ids:
-            docs = self.db.query(Document).options(
-                joinedload(Document.tags),
-                joinedload(Document.categories)
-            ).filter(Document.id.in_(uncached_doc_ids)).all()
+            docs = self.db.query(Document).filter(Document.id.in_(uncached_doc_ids)).all()
             for doc in docs:
                 # Convert datetime objects to strings for JSON serialization
                 metadata = {
                     'id': doc.id,
                     'filename': doc.filename,
                     'filepath': doc.filepath,
-                    'content_type': doc.content_type,
                     'detected_language': doc.detected_language,
-                    'status': doc.status,
                     'upload_date': doc.upload_date.isoformat() if doc.upload_date else None,
                     'last_modified': doc.last_modified.isoformat() if doc.last_modified else None,
-                    'author': doc.author,
-                    'reading_time': doc.reading_time,
-                    'custom_fields': doc.custom_fields,
-                    'tags': [{'id': tag.id, 'name': tag.name, 'color': tag.color} for tag in doc.tags],
-                    'categories': [{'id': cat.id, 'name': cat.name, 'description': cat.description} for cat in doc.categories]
                 }
                 doc_map[doc.id] = metadata
 
@@ -327,12 +317,8 @@ class DatabaseRetriever:
                             'id': doc['id'],
                             'filename': doc['filename'],
                             'filepath': doc['filepath'],
-                            'status': doc['status'],
                             'detected_language': doc['detected_language'],
                             'upload_date': doc['upload_date'],
-                            'author': doc.get('author'),
-                            'reading_time': doc.get('reading_time'),
-                            'custom_fields': doc.get('custom_fields'),
                             'tags': doc.get('tags', []),
                             'categories': doc.get('categories', [])
                         }
@@ -439,7 +425,7 @@ class DatabaseRetriever:
             "size": top_k
         }
 
-        response = self.es.search(index="rag_documents", body=es_query)
+        response = self.es.search(index="rag_documents", body=es_query)  # type: ignore
         hits = response['hits']['hits']
 
         results = []

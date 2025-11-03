@@ -2,24 +2,6 @@
 
 ## Performance Optimizations
 
-### 1. LLM Response Caching (done)
-- Current Issue: Every query calls Ollama LLM, even for identical questions
-- Optimization: Implement response caching based on query + retrieved document hash
-- Impact: 10-100x speedup for repeated queries
-- Implementation: Add Redis/memory cache layer for LLM responses
-
-### 2. Embedding Batch Processing (done)
-- Current Issue: Queries embed one at a time
-- Optimization: Batch multiple queries together for GPU acceleration
-- Impact: 2-5x faster query processing during peak usage
-- Implementation: Queue system for batch embedding requests
-
-### 3. Database Query Optimization (done)
-- Current Issue: Multiple round-trips for document metadata retrieval
-- Optimization: Use SQL joins and eager loading to reduce database calls
-- Impact: 30-50% reduction in query latency
-- Implementation: Optimize DocumentChunk queries with proper indexing
-
 ### 4. Memory Management
 - Current Issue: Models loaded in memory even when idle
 - Optimization: Implement model unloading after inactivity periods
@@ -28,7 +10,7 @@
 
 ## Missing Features
 
-### 1. Conversation Memory & Context
+### 1. Conversation Memory & Context (next)
 - Missing: Multi-turn conversations with context preservation
 - Use Case: Follow-up questions that reference previous context
 - Implementation: Session-based conversation history with relevance filtering
@@ -43,7 +25,7 @@
 - Use Case: Organizing large document collections by topic/domain
 - Implementation: Metadata tagging system with faceted search
 
-### 4. Real-time Document Updates
+### 4. Real-time Document Updates (next)
 - Missing: Incremental indexing for document changes
 - Use Case: Adding new documents without full reprocessing
 - Implementation: Change detection and partial re-indexing
@@ -58,10 +40,6 @@
 - Use Case: System monitoring and optimization insights
 - Implementation: Time-series analytics, usage heatmaps, bottleneck identification
 
-### 7. Export & Backup Features
-- Missing: Data export, configuration backup, disaster recovery
-- Use Case: Data portability and system migration
-- Implementation: JSON/XML export, configuration snapshots, automated backups
 
 ## Security & Reliability Improvements
 
@@ -84,9 +62,6 @@
 
 ## Scalability Enhancements
 
-### 1. Distributed Processing
-- Missing: Multi-node document processing for large datasets
-- Implementation: Celery-based task distribution for document processing
 
 ### 2. Database Sharding
 - Missing: Horizontal scaling for massive document collections
@@ -120,7 +95,7 @@
 - Missing: Scientific formula preservation, citation parsing
 - Implementation: Specialized processors for academic content
 
-### 3. Content Type Detection
+### 3. Content Type Detection (next)
 - Missing: Automatic classification of document types
 - Implementation: ML-based content categorization
 

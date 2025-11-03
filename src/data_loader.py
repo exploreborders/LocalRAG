@@ -21,16 +21,8 @@ def load_documents(data_dir="data"):
     """
     documents = []
 
-    # Configure Docling pipeline options for better PDF processing
-    pipeline_options = PdfPipelineOptions()
-    pipeline_options.do_ocr = False  # Disable OCR for speed, enable if needed
-    pipeline_options.do_table_structure = True  # Extract tables
-
-    doc_converter = DocumentConverter(
-        format_options={
-            InputFormat.PDF: pipeline_options,
-        }
-    )
+    # Use default Docling configuration for best quality
+    doc_converter = DocumentConverter()
 
     for file in os.listdir(data_dir):
         file_path = os.path.join(data_dir, file)
@@ -52,7 +44,7 @@ def load_documents(data_dir="data"):
                     metadata={
                         "source": file_path,
                         "file_type": file.split('.')[-1],
-                        "docling_metadata": result.document.meta.export_json_dict()
+                        "docling_metadata": result.document.origin.model_dump() if hasattr(result.document, 'origin') and result.document.origin else {}
                     }
                 ))
         except Exception as e:
@@ -91,6 +83,83 @@ def split_documents(documents, chunk_size=1000, chunk_overlap=200):
     )
     chunks = text_splitter.split_documents(documents)
     return chunks
+
+
+def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap=200):
+    """
+    Load documents and split them using caption-aware chunking.
+
+    This function uses the CaptionAwareProcessor to create chunks that preserve
+    the relationship between captions and their associated content.
+
+    Args:
+        data_dir (str): Path to the directory containing documents
+        chunk_size (int): Maximum size of each chunk in characters
+        chunk_overlap (int): Number of characters to overlap between chunks
+
+    Returns:
+        list: List of Document objects with caption-aware chunking
+    """
+    from .caption_aware_processor import CaptionAwareProcessor
+
+    documents = []
+    processor = CaptionAwareProcessor(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+
+    # Use default Docling configuration for best quality
+    doc_converter = DocumentConverter()
+
+    for file in os.listdir(data_dir):
+        file_path = os.path.join(data_dir, file)
+        if not os.path.isfile(file_path):
+            continue
+
+        try:
+            if file.endswith(".txt"):
+                # Use LangChain TextLoader for simple text files
+                loader = TextLoader(file_path)
+                documents.extend(loader.load())
+            else:
+                # Use Docling for all other formats
+                result = doc_converter.convert(file_path)
+
+                # Use caption-aware chunking
+                chunks = processor.create_caption_centric_chunks(
+                    result.document,
+                    metadata={
+                        "source": file_path,
+                        "file_type": file.split('.')[-1],
+                        "docling_metadata": result.document.origin.model_dump() if hasattr(result.document, 'origin') and result.document.origin else {}
+                    }
+                )
+
+                if chunks:
+                    documents.extend(chunks)
+                else:
+                    # Fallback to regular markdown export if caption processing fails
+                    text_content = result.document.export_to_markdown()
+                    documents.append(Document(
+                        page_content=text_content,
+                        metadata={
+                            "source": file_path,
+                            "file_type": file.split('.')[-1],
+                            "chunking_method": "fallback"
+                        }
+                    ))
+
+        except Exception as e:
+            print(f"Error loading {file_path}: {e}")
+            # Fallback to basic text loading if Docling fails
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                documents.append(Document(
+                    page_content=content,
+                    metadata={"source": file_path, "fallback": True}
+                ))
+            except:
+                print(f"Failed to load {file_path} with fallback method")
+
+    return documents
 
 if __name__ == "__main__":
     docs = load_documents()
