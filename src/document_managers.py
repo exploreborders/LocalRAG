@@ -7,7 +7,7 @@ with tags and hierarchical categories.
 
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
-from .database.models import DocumentTag, DocumentCategory, Document, DocumentTagsAssociation, DocumentCategoriesAssociation
+from .database.models import DocumentTag, DocumentCategory, Document, DocumentTagAssignment, DocumentCategoryAssignment
 
 
 class TagManager:
@@ -94,7 +94,7 @@ class TagManager:
             return False
 
         # Remove associations first
-        self.db.query(DocumentTagsAssociation).filter(DocumentTagsAssociation.tag_id == tag_id).delete()
+        self.db.query(DocumentTagAssignment).filter(DocumentTagAssignment.tag_id == tag_id).delete()
 
         self.db.delete(tag)
         self.db.commit()
@@ -112,15 +112,15 @@ class TagManager:
             True if added, False if already exists or invalid IDs
         """
         # Check if association already exists
-        existing = self.db.query(DocumentTagsAssociation).filter(
-            DocumentTagsAssociation.document_id == document_id,
-            DocumentTagsAssociation.tag_id == tag_id
+        existing = self.db.query(DocumentTagAssignment).filter(
+            DocumentTagAssignment.document_id == document_id,
+            DocumentTagAssignment.tag_id == tag_id
         ).first()
 
         if existing:
             return False
 
-        association = DocumentTagsAssociation(document_id=document_id, tag_id=tag_id)
+        association = DocumentTagAssignment(document_id=document_id, tag_id=tag_id)
         self.db.add(association)
         self.db.commit()
         return True
@@ -136,9 +136,9 @@ class TagManager:
         Returns:
             True if removed, False if not found
         """
-        association = self.db.query(DocumentTagsAssociation).filter(
-            DocumentTagsAssociation.document_id == document_id,
-            DocumentTagsAssociation.tag_id == tag_id
+        association = self.db.query(DocumentTagAssignment).filter(
+            DocumentTagAssignment.document_id == document_id,
+            DocumentTagAssignment.tag_id == tag_id
         ).first()
 
         if not association:
@@ -164,8 +164,8 @@ class TagManager:
 
         result = self.db.query(
             DocumentTag,
-            func.count(DocumentTagsAssociation.document_id).label('document_count')
-        ).outerjoin(DocumentTagsAssociation).group_by(DocumentTag.id).all()
+            func.count(DocumentTagAssignment.document_id).label('document_count')
+        ).outerjoin(DocumentTagAssignment).group_by(DocumentTag.id).all()
 
         return [
             {
@@ -303,7 +303,7 @@ class CategoryManager:
             self.delete_category(child.id)
 
         # Remove associations
-        self.db.query(DocumentCategoriesAssociation).filter(DocumentCategoriesAssociation.category_id == category_id).delete()
+        self.db.query(DocumentCategoryAssignment).filter(DocumentCategoryAssignment.category_id == category_id).delete()
 
         self.db.delete(category)
         self.db.commit()
@@ -321,15 +321,15 @@ class CategoryManager:
             True if added, False if already exists or invalid IDs
         """
         # Check if association already exists
-        existing = self.db.query(DocumentCategoriesAssociation).filter(
-            DocumentCategoriesAssociation.document_id == document_id,
-            DocumentCategoriesAssociation.category_id == category_id
+        existing = self.db.query(DocumentCategoryAssignment).filter(
+            DocumentCategoryAssignment.document_id == document_id,
+            DocumentCategoryAssignment.category_id == category_id
         ).first()
 
         if existing:
             return False
 
-        association = DocumentCategoriesAssociation(document_id=document_id, category_id=category_id)
+        association = DocumentCategoryAssignment(document_id=document_id, category_id=category_id)
         self.db.add(association)
         self.db.commit()
         return True
@@ -345,9 +345,9 @@ class CategoryManager:
         Returns:
             True if removed, False if not found
         """
-        association = self.db.query(DocumentCategoriesAssociation).filter(
-            DocumentCategoriesAssociation.document_id == document_id,
-            DocumentCategoriesAssociation.category_id == category_id
+        association = self.db.query(DocumentCategoryAssignment).filter(
+            DocumentCategoryAssignment.document_id == document_id,
+            DocumentCategoryAssignment.category_id == category_id
         ).first()
 
         if not association:
@@ -373,8 +373,8 @@ class CategoryManager:
 
         result = self.db.query(
             DocumentCategory,
-            func.count(DocumentCategoriesAssociation.document_id).label('document_count')
-        ).outerjoin(DocumentCategoriesAssociation).group_by(DocumentCategory.id).all()
+            func.count(DocumentCategoryAssignment.document_id).label('document_count')
+        ).outerjoin(DocumentCategoryAssignment).group_by(DocumentCategory.id).all()
 
         return [
             {

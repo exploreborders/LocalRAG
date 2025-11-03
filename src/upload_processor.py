@@ -614,15 +614,38 @@ class UploadProcessor:
                         chapter_obj.embedding = embedding.tolist() if hasattr(embedding, 'tolist') else embedding
                         chapter_obj.embedding_model = "nomic-ai/nomic-embed-text-v1.5"
 
+                    # Flush to get chapter IDs before indexing to ES
+                    self.db.flush()
+
+                    # Save chapter embeddings to Elasticsearch
+                    self._save_chapter_embeddings_to_es(doc.id, chapter_objects, chapter_embeddings)
+
             # Update progress
             if self.progress_callback:
-                self.progress_callback(filename, 90, "Finalizing...")
+                self.progress_callback(filename, 85, "Finalizing...")
 
             # Update document status
             doc.status = 'processed'
             doc.last_modified = datetime.now()
 
             self.db.commit()
+
+            # AI enrichment (after commit so chunks are available)
+            if self.progress_callback:
+                self.progress_callback(filename, 90, "AI enrichment...")
+
+            try:
+                from .ai_enrichment import AIEnrichmentService
+                enrichment_service = AIEnrichmentService()
+                enrichment_result = enrichment_service.enrich_document(doc.id)
+
+                if enrichment_result.get('success'):
+                    print(f"AI enrichment completed for {filename}")
+                else:
+                    print(f"AI enrichment skipped: {enrichment_result.get('error', 'Unknown error')}")
+
+            except Exception as e:
+                print(f"AI enrichment failed: {e}")
 
             # Update progress
             if self.progress_callback:
@@ -675,6 +698,44 @@ class UploadProcessor:
                     print(f"Warning: Failed to index {failed} embeddings for document {document_id}")
         except Exception as e:
             print(f"Warning: Elasticsearch indexing failed for document {document_id}: {e}")
+
+    def _save_chapter_embeddings_to_es(self, document_id: int, chapters: List, embeddings):
+        """
+        Save document chapters and embeddings to Elasticsearch.
+
+        Args:
+            document_id: ID of the parent document
+            chapters: List of chapter objects
+            embeddings: List of embedding vectors
+        """
+        try:
+            actions = []
+            for i, (chapter, embedding) in enumerate(zip(chapters, embeddings)):
+                action = {
+                    "_index": "rag_vectors",
+                    "_id": f"chapter_{document_id}_{chapter.id}",
+                    "_source": {
+                        "document_id": document_id,
+                        "chapter_id": chapter.id,
+                        "chunk_id": -1,  # Special marker for chapters
+                        "content": chapter.content,
+                        "chapter_title": chapter.chapter_title,
+                        "chapter_path": chapter.chapter_path,
+                        "section_type": chapter.section_type,
+                        "embedding": embedding.tolist() if hasattr(embedding, 'tolist') else embedding,
+                        "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
+                        "content_type": "chapter"
+                    }
+                }
+                actions.append(action)
+
+            if actions:
+                from elasticsearch.helpers import bulk
+                success, failed = bulk(self.es, actions, stats_only=False, raise_on_error=False)
+                if failed:
+                    print(f"Warning: Failed to index {failed} chapter embeddings for document {document_id}")
+        except Exception as e:
+            print(f"Warning: Chapter Elasticsearch indexing failed for document {document_id}: {e}")
 
     def upload_files(self, uploaded_files: List, data_dir: str = "data",
                     use_parallel: bool = True, max_workers: int = 4) -> Dict[str, Any]:

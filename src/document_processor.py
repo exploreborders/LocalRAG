@@ -501,6 +501,9 @@ class DocumentProcessor:
 
         chunks = split_documents(documents, chunk_size=chunk_size, chunk_overlap=overlap)
 
+        # Combine all document content
+        full_content = ' '.join([doc.page_content for doc in documents])
+
         # Save or update document metadata
         if doc is None:
             content_type = file_path.suffix[1:] if file_path.suffix else 'unknown'
@@ -514,6 +517,10 @@ class DocumentProcessor:
             doc.last_modified = datetime.now()
             self.db.commit()
 
+        # Store full content
+        doc.full_content = full_content
+        self.db.commit()
+
         # Generate embeddings
         embeddings, _ = create_embeddings(chunks, model_name)
 
@@ -522,6 +529,18 @@ class DocumentProcessor:
 
         # Save embeddings to Elasticsearch
         self.save_embeddings_to_es(chunks, embeddings, model_name, doc.id)  # type: ignore
+
+        # AI enrichment (optional, only if Ollama is available)
+        try:
+            from .ai_enrichment import AIEnrichmentService
+            enrichment_service = AIEnrichmentService()
+            enrichment_result = enrichment_service.enrich_document(doc.id)
+            if enrichment_result['success']:
+                print(f"AI enrichment completed for {file_path.name}")
+            else:
+                print(f"AI enrichment skipped: {enrichment_result.get('error', 'Unknown error')}")
+        except Exception as e:
+            print(f"AI enrichment failed: {e}")
 
         # Update document last modified time
         doc.last_modified = datetime.now()
@@ -546,7 +565,41 @@ class DocumentProcessor:
                 except Exception as e:
                     print(f"Error processing {file_path}: {e}")
 
+    def process_existing_documents(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", force_reprocess: bool = True, **kwargs):
+        """
+        Process all existing documents in the database.
 
+        Args:
+            model_name (str): Name of the embedding model to use
+            force_reprocess (bool): Whether to force reprocessing of already processed documents
+            **kwargs: Additional arguments passed to process_document
+        """
+        # Get all documents
+        if force_reprocess:
+            docs = self.db.query(Document).all()
+        else:
+            docs = self.db.query(Document).filter(Document.status == 'pending').all()
+
+        if not docs:
+            print("No documents to process")
+            return
+
+        print(f"Processing {len(docs)} documents...")
+
+        for doc in docs:
+            try:
+                print(f"Processing {doc.filename}...")
+                self.process_document(doc.filepath, model_name, force_reprocess=force_reprocess, **kwargs)
+                # Update status to processed
+                doc.status = 'processed'
+                self.db.commit()
+            except Exception as e:
+                print(f"Error processing {doc.filename}: {e}")
+                # Mark as failed
+                doc.status = 'failed'
+                self.db.commit()
+
+        print("Finished processing existing documents")
 
     def get_documents(self) -> List[Dict[str, Any]]:
         """

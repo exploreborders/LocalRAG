@@ -7,7 +7,7 @@ retrieval:
   k_retrieval: 3
   embedding_model: nomic-ai/nomic-embed-text-v1.5
 generation:
-  model: mistral
+  model: llama3.2
   temperature: 0.7
   max_tokens: 500
   ollama_host: http://localhost:11434

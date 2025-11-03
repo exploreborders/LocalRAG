@@ -32,7 +32,7 @@ class AIEnrichmentService:
         if self.llm_client is None:
             try:
                 from langchain_ollama import OllamaLLM
-                self.llm_client = OllamaLLM(model="llama2")  # Use same model as RAG pipeline
+                self.llm_client = OllamaLLM(model="llama3.2:latest")  # Use available model
             except ImportError:
                 print("⚠️ Ollama LLM not available for AI enrichment")
                 self.llm_client = None
@@ -61,7 +61,7 @@ class AIEnrichmentService:
             return {'success': False, 'error': 'Document not found'}
 
         # Check if already enriched (unless force is True)
-        if not force and document.custom_fields and 'ai_enriched' in document.custom_fields:
+        if not force and (document.document_summary or document.key_topics):
             return {'success': False, 'error': 'Document already enriched'}
 
         if not self.llm_client:
@@ -193,20 +193,19 @@ class AIEnrichmentService:
             document: Document object to update
             enrichment_data: Enrichment data to apply
         """
-        # Update reading time
-        if 'reading_time' in enrichment_data:
-            document.reading_time = enrichment_data['reading_time']
+        # Update dedicated AI enrichment columns
+        document.document_summary = enrichment_data.get('summary')
+        document.key_topics = enrichment_data.get('topics', [])
+        document.reading_time_minutes = enrichment_data.get('reading_time')
 
-        # Update custom fields
-        custom_fields = document.custom_fields or {}
-        custom_fields.update({
+        # Update custom metadata for backward compatibility and additional metadata
+        custom_metadata = document.custom_metadata or {}
+        custom_metadata.update({
             'ai_enriched': True,
-            'summary': enrichment_data.get('summary'),
-            'topics': enrichment_data.get('topics', []),
             'word_count': enrichment_data.get('word_count'),
             'ai_generated_at': enrichment_data.get('generated_at')
         })
-        document.custom_fields = custom_fields
+        document.custom_metadata = custom_metadata
 
         # Create and assign tags
         for tag_name in enrichment_data.get('tags', []):
@@ -258,9 +257,7 @@ class AIEnrichmentService:
             Summary text or None if not available
         """
         document = self.db.query(Document).filter(Document.id == document_id).first()
-        if document and document.custom_fields:
-            return document.custom_fields.get('summary')
-        return None
+        return document.document_summary if document else None
 
     def get_document_topics(self, document_id: int) -> List[str]:
         """
@@ -273,9 +270,7 @@ class AIEnrichmentService:
             List of topics
         """
         document = self.db.query(Document).filter(Document.id == document_id).first()
-        if document and document.custom_fields:
-            return document.custom_fields.get('topics', [])
-        return []
+        return document.key_topics if document and document.key_topics else []
 
     def batch_enrich_documents(self, document_ids: List[int], force: bool = False) -> Dict[str, Any]:
         """
@@ -325,8 +320,8 @@ class AIEnrichmentService:
         # Get source document's tags and topics
         source_tags = [tag.name for tag in document.tags]
         source_topics = []
-        if document.custom_fields:
-            source_topics = document.custom_fields.get('topics', [])
+        if document.custom_metadata:
+            source_topics = document.custom_metadata.get('topics', [])
 
         # Find documents with overlapping tags/topics
         similar_docs = []
@@ -336,8 +331,8 @@ class AIEnrichmentService:
             score = 0
             doc_tags = [tag.name for tag in doc.tags]
             doc_topics = []
-            if doc.custom_fields:
-                doc_topics = doc.custom_fields.get('topics', [])
+            if doc.custom_metadata:
+                doc_topics = doc.custom_metadata.get('topics', [])
 
             # Calculate similarity score
             tag_overlap = len(set(source_tags) & set(doc_tags))

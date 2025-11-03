@@ -173,20 +173,34 @@ class DatabaseRetriever:
             }
         }
 
-        response = self.es.search(index="rag_vectors", body=query)  # type: ignore
+        response = self.es.search(index="rag_vectors", knn=query["knn"])  # type: ignore
         hits = response['hits']['hits']
 
         results = []
         for hit in hits:
             source = hit['_source']
-            results.append({
+            result = {
                 'document_id': source['document_id'],
                 'chunk_id': source['chunk_id'],
                 'content': source['content'],
                 'score': hit['_score'],
                 'embedding_model': source['embedding_model'],
                 'metadata': source.get('metadata', {})
-            })
+            }
+
+            # Include chapter-specific fields if present
+            if 'content_type' in source and source['content_type'] == 'chapter':
+                result.update({
+                    'content_type': 'chapter',
+                    'chapter_id': source.get('chapter_id'),
+                    'chapter_title': source.get('chapter_title'),
+                    'chapter_path': source.get('chapter_path'),
+                    'section_type': source.get('section_type')
+                })
+            else:
+                result['content_type'] = 'chunk'
+
+            results.append(result)
 
         return results
 
