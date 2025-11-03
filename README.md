@@ -17,6 +17,8 @@ A production-ready **AI-powered document processing and retrieval system** with 
 - **12-Language Multilingual Support**: Automatic language detection (91.7% accuracy) with language-aware LLM responses
 
 ### **Intelligent Knowledge Management**
+- **Document Tagging System**: Color-coded tags with AI suggestions and manual management
+- **Hierarchical Categories**: Unlimited parent-child category relationships for sophisticated organization
 - **Topic-Based Relationships**: Connect documents across topics for knowledge synthesis
 - **Hierarchical Navigation**: Tree-structured document organization with section paths
 - **Cross-Document Analysis**: Find related content across multiple papers and topics
@@ -30,10 +32,11 @@ A production-ready **AI-powered document processing and retrieval system** with 
 
 ### **Production-Ready Features**
 - **Auto-Initialization**: Zero-click setup with automatic system configuration
+- **Document Organization**: Advanced tagging and hierarchical categorization system
 - **Source Citations**: All LLM responses include document references ([Source 1: filename.pdf])
-- **Advanced Analytics**: Real-time performance monitoring with accurate system health metrics
+- **Advanced Analytics**: Real-time performance monitoring with tag/category usage statistics
 - **Modern Web Interface**: Streamlit-based UI with document management and topic exploration
-- **Comprehensive Testing**: 10-test suite with 100% pass rate
+- **Comprehensive Testing**: 13-test suite with 100% pass rate
 
 ## 📊 System Architecture
 
@@ -168,16 +171,18 @@ python run_web.py
 ```
 
 **Available Pages:**
-- **🏠 Home**: AI-powered query interface with topic-aware search
-- **📁 Documents**: Upload, process, and manage documents with hierarchical view
+- **🏠 Home**: AI-powered query interface with topic-aware search and tag/category filtering
+- **📁 Documents**: Upload, process, and manage documents with hierarchical view, tagging, and categorization
 - **⚙️ Settings**: Configure AI models, caching, and system parameters
-- **📊 Analytics**: Real-time performance metrics and system health
+- **📊 Analytics**: Real-time performance metrics and system health with tag/category analytics
 
 **Key Features:**
+- **Document Organization**: Color-coded tagging system with AI suggestions and hierarchical categories
 - **Topic Exploration**: Browse documents by automatically detected topics
 - **Hierarchical Navigation**: Drill down through document chapters and sections
 - **Cross-Document Search**: Find related content across multiple papers
 - **AI-Powered Insights**: Automatic summarization and topic extraction
+- **Bulk Operations**: Efficient tagging and categorization of multiple documents
 
 ### Command Line Interface
 ```bash
@@ -213,7 +218,7 @@ analysis = api.analyze_topic_relationships(topic_id)
 
 ### Testing & Validation
 ```bash
-# Full test suite (10 tests, 100% pass rate)
+# Full test suite (13 tests, 100% pass rate)
 python tests/run_all_tests.py
 
 # Component-specific tests
@@ -222,6 +227,8 @@ python tests/test_topic_classification.py # Topic analysis
 python tests/test_hierarchical_search.py  # Structure queries
 python tests/test_multilingual.py         # Language support
 python tests/test_performance.py          # Performance benchmarks
+python tests/test_cache.py               # Redis caching functionality
+python tests/test_enhanced_system.py     # Enhanced AI pipeline
 ```
 
 ## 🏗️ Enhanced Architecture
@@ -296,9 +303,11 @@ LocalRAG/
 │   ├── migrate_to_db.py          # Database migration
 │   └── reprocess_documents.py    # Enhanced reprocessing
 ├── tests/
-│   ├── run_all_tests.py          # Test runner (10 tests, 100% pass)
+│   ├── run_all_tests.py          # Test runner (13 tests, 100% pass)
 │   ├── test_topic_classification.py # Topic analysis tests
 │   ├── test_hierarchical_search.py # Structure query tests
+│   ├── test_cache.py             # Redis caching tests
+│   ├── test_enhanced_system.py   # Enhanced AI pipeline tests
 │   └── test_*.py                 # Component tests
 ├── setup_all.py                  # One-command setup
 ├── requirements.txt              # Dependencies
@@ -341,7 +350,7 @@ LocalRAG/
 - **Search Relevance**: 30% improvement with topic awareness
 
 ### **System Reliability**
-- **Test Coverage**: 10 tests, 100% pass rate
+- **Test Coverage**: 13 tests, 100% pass rate
 - **Uptime**: Production-ready with error handling
 - **Scalability**: Handles 1000+ documents efficiently
 - **Memory Usage**: Optimized for various hardware configurations

@@ -169,13 +169,13 @@ class TagManager:
 
         return [
             {
-                'id': tag.id,
-                'name': tag.name,
-                'color': tag.color,
-                'description': tag.description,
+                'id': cat.id,
+                'name': cat.name,
+                'description': cat.description,
+                'parent_category_id': cat.parent_category_id,
                 'document_count': count
             }
-            for tag, count in result
+            for cat, count in result
         ]
 
 
@@ -191,7 +191,7 @@ class CategoryManager:
         self.db = db
 
     def create_category(self, name: str, description: Optional[str] = None,
-                       parent_id: Optional[int] = None) -> DocumentCategory:
+                        parent_id: Optional[int] = None) -> DocumentCategory:
         """
         Create a new category.
 
@@ -203,7 +203,7 @@ class CategoryManager:
         Returns:
             Created DocumentCategory instance
         """
-        category = DocumentCategory(name=name, description=description, parent_id=parent_id)
+        category = DocumentCategory(name=name, description=description, parent_category_id=parent_id)
         self.db.add(category)
         self.db.commit()
         self.db.refresh(category)
@@ -217,16 +217,16 @@ class CategoryManager:
         """Get category by name and optional parent."""
         query = self.db.query(DocumentCategory).filter(DocumentCategory.name == name)
         if parent_id is not None:
-            query = query.filter(DocumentCategory.parent_id == parent_id)
+            query = query.filter(DocumentCategory.parent_category_id == parent_id)
         return query.first()
 
     def get_root_categories(self) -> List[DocumentCategory]:
         """Get all root categories (no parent)."""
-        return self.db.query(DocumentCategory).filter(DocumentCategory.parent_id.is_(None)).order_by(DocumentCategory.name).all()
+        return self.db.query(DocumentCategory).filter(DocumentCategory.parent_category_id.is_(None)).order_by(DocumentCategory.name).all()
 
     def get_category_children(self, parent_id: int) -> List[DocumentCategory]:
         """Get child categories of a parent category."""
-        return self.db.query(DocumentCategory).filter(DocumentCategory.parent_id == parent_id).order_by(DocumentCategory.name).all()
+        return self.db.query(DocumentCategory).filter(DocumentCategory.parent_category_id == parent_id).order_by(DocumentCategory.name).all()
 
     def get_category_tree(self, category_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """
@@ -254,7 +254,7 @@ class CategoryManager:
         return [build_tree(root) for root in roots if root]
 
     def update_category(self, category_id: int, name: Optional[str] = None,
-                       description: Optional[str] = None, parent_id: Optional[int] = None) -> Optional[DocumentCategory]:
+                        description: Optional[str] = None, parent_id: Optional[int] = None) -> Optional[DocumentCategory]:
         """
         Update category properties.
 
@@ -276,7 +276,7 @@ class CategoryManager:
         if description is not None:
             category.description = description
         if parent_id is not None:
-            category.parent_id = parent_id
+            category.parent_category_id = parent_id
 
         self.db.commit()
         self.db.refresh(category)
@@ -381,7 +381,7 @@ class CategoryManager:
                 'id': cat.id,
                 'name': cat.name,
                 'description': cat.description,
-                'parent_id': cat.parent_id,
+                'parent_category_id': cat.parent_category_id,
                 'document_count': count
             }
             for cat, count in result

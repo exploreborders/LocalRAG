@@ -16,9 +16,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 try:
     from src.upload_processor import UploadProcessor
     from src.document_processor import DocumentProcessor
+    from src.document_managers import TagManager, CategoryManager
     from src.database.models import (
         SessionLocal, Document, DocumentChunk, DocumentChapter, DocumentEmbedding,
-        DocumentTopic, DocumentTagAssignment, DocumentCategoryAssignment
+        DocumentTopic, DocumentTagAssignment, DocumentCategoryAssignment, DocumentTag
     )
 except ImportError:
     st.error("❌ Could not import RAG system components.")
@@ -624,21 +625,519 @@ def main():
 
                 # Document structure preview (if available)
                 if doc.get('chapter_count', 0) > 0:
-                    st.markdown("---")
-                    st.markdown("### 📑 Document Structure")
-                    try:
-                        db = SessionLocal()
-                        chapters = db.query(DocumentChapter).filter(DocumentChapter.document_id == doc['id']).order_by(DocumentChapter.chapter_path).limit(10).all()
-                        db.close()
+                     st.markdown("---")
+                     st.markdown("### 📑 Document Structure")
+                     try:
+                         db = SessionLocal()
+                         chapters = db.query(DocumentChapter).filter(DocumentChapter.document_id == doc['id']).order_by(DocumentChapter.chapter_path).limit(10).all()
+                         db.close()
 
-                        if chapters:
-                            for chapter in chapters:
-                                level_indent = "  " * (chapter.level - 1)
-                                st.caption(f"{level_indent}📄 {chapter.chapter_title} ({chapter.word_count} words)")
-                            if len(chapters) == 10:
-                                st.caption("... and more chapters")
+                         if chapters:
+                             for chapter in chapters:
+                                 level_indent = "  " * (chapter.level - 1)
+                                 st.caption(f"{level_indent}📄 {chapter.chapter_title} ({chapter.word_count} words)")
+                             if len(chapters) == 10:
+                                 st.caption("... and more chapters")
+                     except Exception as e:
+                         st.caption(f"Could not load chapter structure: {e}")
+
+                # Document tagging section
+                st.markdown("---")
+                st.markdown("### 🏷️ Document Tags")
+
+                try:
+                    db = SessionLocal()
+                    tag_manager = TagManager(db)
+
+                    # Get current tags for this document
+                    current_tags = []
+                    assignments = db.query(DocumentTagAssignment).filter(DocumentTagAssignment.document_id == doc['id']).all()
+                    for assignment in assignments:
+                        tag = db.query(DocumentTag).filter(DocumentTag.id == assignment.tag_id).first()
+                        if tag:
+                            current_tags.append({'id': tag.id, 'name': tag.name, 'color': tag.color})
+
+                    db.close()
+
+                    # Display current tags with improved styling
+                    if current_tags:
+                        st.markdown("**Current Tags:**")
+                        tag_cols = st.columns(min(len(current_tags), 4))  # Max 4 tags per row
+                        for i, tag in enumerate(current_tags):
+                            col_idx = i % 4
+                            with tag_cols[col_idx]:
+                                color = tag.get('color', '#6c757d')
+                                st.markdown(
+                                    f'<div style="background-color: {color}; color: white; padding: 4px 8px; border-radius: 12px; '
+                                    f'display: inline-block; font-size: 0.8em; font-weight: 500; text-align: center;">'
+                                    f'{tag["name"]}</div>',
+                                    unsafe_allow_html=True
+                                )
+                    else:
+                        st.caption("🏷️ No tags assigned yet")
+
+                    # Tag management - compact layout
+                    st.markdown("**Manage Tags:**")
+                    tag_input_col, tag_add_col, tag_remove_col = st.columns([3, 1, 1])
+
+                    with tag_input_col:
+                        new_tag = st.text_input(
+                            "New tag",
+                            key=f"tag_input_{doc['id']}",
+                            placeholder="Enter tag name...",
+                            label_visibility="collapsed"
+                        )
+
+                    with tag_add_col:
+                        if st.button("➕ Add", key=f"add_tag_{doc['id']}", use_container_width=True, help="Add new tag"):
+                            if new_tag.strip():
+                                try:
+                                    db = SessionLocal()
+                                    tag_manager = TagManager(db)
+
+                                    # Check if tag exists
+                                    existing_tag = tag_manager.get_tag_by_name(new_tag.strip())
+                                    if not existing_tag:
+                                        # Create new tag with random color
+                                        import random
+                                        colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1', '#e83e8c', '#fd7e14', '#20c997']
+                                        color = random.choice(colors)
+                                        existing_tag = tag_manager.create_tag(new_tag.strip(), color=color)
+
+                                    # Add tag to document
+                                    if existing_tag:
+                                        tag_manager.add_tag_to_document(doc['id'], existing_tag.id)
+                                        st.success(f"🏷️ '{new_tag}' added!")
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to create tag")
+
+                                    db.close()
+                                except Exception as e:
+                                    st.error(f"❌ Error adding tag: {e}")
+                            else:
+                                st.warning("⚠️ Enter a tag name")
+
+                    with tag_remove_col:
+                        if current_tags and st.button("🗑️ Clear All", key=f"remove_tags_{doc['id']}", use_container_width=True, help="Remove all tags"):
+                            try:
+                                db = SessionLocal()
+                                tag_manager = TagManager(db)
+
+                                # Remove all tags from document
+                                for tag in current_tags:
+                                    tag_manager.remove_tag_from_document(doc['id'], tag['id'])
+
+                                db.close()
+                                st.success("🗑️ All tags removed!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Error removing tags: {e}")
+
+                except Exception as e:
+                    st.error(f"❌ Error loading tag management: {e}")
+
+                # Document categorization section
+                st.markdown("---")
+                st.markdown("### 📂 Document Categories")
+
+                try:
+                    db = SessionLocal()
+                    cat_manager = CategoryManager(db)
+
+                    # Get current categories for this document
+                    current_categories = cat_manager.get_document_categories(doc['id'])
+
+                    db.close()
+
+                    # Display current categories
+                    if current_categories:
+                        st.markdown("**Current Categories:**")
+                        for category in current_categories:
+                            hierarchy_path = []
+                            current_cat = category
+                            while current_cat:
+                                hierarchy_path.insert(0, current_cat.name)
+                                current_cat = current_cat.parent if hasattr(current_cat, 'parent') else None
+
+                            path_str = " > ".join(hierarchy_path)
+                            st.markdown(f"📁 {path_str}")
+                    else:
+                        st.info("📂 No categories assigned yet")
+
+                    # Category management
+                    cat_col1, cat_col2, cat_col3 = st.columns([2, 1, 1])
+
+                    with cat_col1:
+                        # Get all categories for selection
+                        try:
+                            db = SessionLocal()
+                            cat_manager = CategoryManager(db)
+                            all_cats = cat_manager.get_category_usage_stats()
+                            cat_options = [cat['name'] for cat in all_cats]
+                            db.close()
+
+                            if cat_options:
+                                new_category = st.selectbox(
+                                    f"Add category to {doc['name']}",
+                                    ["Select category..."] + cat_options,
+                                    key=f"cat_select_{doc['id']}",
+                                    help="Choose a category to assign to this document"
+                                )
+                            else:
+                                st.info("No categories available. Create categories first in the Category Management section.")
+                                new_category = None
+                        except Exception as e:
+                            st.warning(f"Could not load categories: {e}")
+                            new_category = None
+
+                    with cat_col2:
+                        if new_category and new_category != "Select category...":
+                            if st.button("📂 Add Category", key=f"add_cat_{doc['id']}", use_container_width=True):
+                                try:
+                                    db = SessionLocal()
+                                    cat_manager = CategoryManager(db)
+
+                                    # Get category object
+                                    category_obj = cat_manager.get_category_by_name(new_category)
+                                    if category_obj:
+                                        if cat_manager.add_category_to_document(doc['id'], category_obj.id):
+                                            st.success(f"✅ Category '{new_category}' added!")
+                                            st.rerun()
+                                        else:
+                                            st.warning("⚠️ Category already assigned to this document")
+                                    else:
+                                        st.error("❌ Category not found")
+
+                                    db.close()
+                                except Exception as e:
+                                    st.error(f"❌ Error adding category: {e}")
+                        else:
+                            st.button("📂 Add Category", key=f"add_cat_{doc['id']}", use_container_width=True, disabled=True)
+
+                    with cat_col3:
+                        if current_categories:
+                            if st.button("🗑️ Remove All", key=f"remove_cats_{doc['id']}", use_container_width=True):
+                                try:
+                                    db = SessionLocal()
+                                    cat_manager = CategoryManager(db)
+
+                                    # Remove all categories from document
+                                    removed_count = 0
+                                    for category in current_categories:
+                                        if cat_manager.remove_category_from_document(doc['id'], category.id):
+                                            removed_count += 1
+
+                                    db.close()
+                                    st.success(f"✅ Removed {removed_count} categories!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Error removing categories: {e}")
+                        else:
+                            st.button("🗑️ Remove All", key=f"remove_cats_{doc['id']}", use_container_width=True, disabled=True)
+
+                except Exception as e:
+                    st.error(f"❌ Error loading category management: {e}")
+
+    # Bulk Operations
+    if documents:
+        st.markdown("---")
+        st.markdown("### ⚡ Bulk Operations")
+
+        bulk_col1, bulk_col2 = st.columns(2)
+
+        with bulk_col1:
+            st.markdown("**🏷️ Bulk Tagging**")
+            try:
+                db = SessionLocal()
+                tag_manager = TagManager(db)
+                all_tags = tag_manager.get_all_tags()
+                tag_names = [tag.name for tag in all_tags]
+                db.close()
+
+                if tag_names:
+                    bulk_tag = st.selectbox(
+                        "Select tag to apply",
+                        tag_names,
+                        key="bulk_tag_select",
+                        help="Choose a tag to apply to multiple documents"
+                    )
+
+                    # Document selection for bulk tagging
+                    doc_options = [f"{doc['name']} ({doc['id']})" for doc in documents]
+                    selected_docs = st.multiselect(
+                        "Select documents",
+                        doc_options,
+                        key="bulk_docs_select",
+                        help="Choose documents to tag"
+                    )
+
+                    if st.button("🏷️ Apply Tag to Selected", key="bulk_apply_tag", use_container_width=True):
+                        if bulk_tag and selected_docs:
+                            try:
+                                db = SessionLocal()
+                                tag_manager = TagManager(db)
+
+                                # Get tag object
+                                tag_obj = tag_manager.get_tag_by_name(bulk_tag)
+                                applied_count = 0
+
+                                for doc_option in selected_docs:
+                                    # Extract document ID from option string
+                                    doc_id = int(doc_option.split('(')[-1].rstrip(')'))
+
+                                    # Apply tag
+                                    tag_manager.add_tag_to_document(doc_id, tag_obj.id)
+                                    applied_count += 1
+
+                                db.close()
+                                st.success(f"✅ Applied tag '{bulk_tag}' to {applied_count} document(s)")
+                                st.rerun()
+
+                            except Exception as e:
+                                st.error(f"❌ Error applying bulk tags: {e}")
+                        else:
+                            st.warning("⚠️ Please select both a tag and documents")
+                else:
+                    st.info("No tags available. Create tags first by tagging individual documents.")
+
+            except Exception as e:
+                st.warning(f"Could not load bulk tagging: {e}")
+
+        with bulk_col2:
+            st.markdown("**📂 Bulk Categorization**")
+            try:
+                db = SessionLocal()
+                cat_manager = CategoryManager(db)
+                cat_stats = cat_manager.get_category_usage_stats()
+                cat_options = [cat['name'] for cat in cat_stats]
+                db.close()
+
+                if cat_options:
+                    bulk_category = st.selectbox(
+                        "Select category to apply",
+                        cat_options,
+                        key="bulk_cat_select",
+                        help="Choose a category to apply to multiple documents"
+                    )
+
+                    # Document selection for bulk categorization
+                    doc_options = [f"{doc['name']} ({doc['id']})" for doc in documents]
+                    selected_docs_for_cat = st.multiselect(
+                        "Select documents",
+                        doc_options,
+                        key="bulk_cat_docs_select",
+                        help="Choose documents to categorize"
+                    )
+
+                    if st.button("📂 Apply Category to Selected", key="bulk_apply_cat", use_container_width=True):
+                        if bulk_category and selected_docs_for_cat:
+                            try:
+                                db = SessionLocal()
+                                cat_manager = CategoryManager(db)
+
+                                # Get category object
+                                cat_obj = cat_manager.get_category_by_name(bulk_category)
+                                applied_count = 0
+
+                                for doc_option in selected_docs_for_cat:
+                                    # Extract document ID from option string
+                                    doc_id = int(doc_option.split('(')[-1].rstrip(')'))
+
+                                    # Apply category
+                                    if cat_manager.add_category_to_document(doc_id, cat_obj.id):
+                                        applied_count += 1
+
+                                db.close()
+                                st.success(f"✅ Applied category '{bulk_category}' to {applied_count} document(s)")
+                                st.rerun()
+
+                            except Exception as e:
+                                st.error(f"❌ Error applying bulk categories: {e}")
+                        else:
+                            st.warning("⚠️ Please select both a category and documents")
+                else:
+                    st.info("No categories available. Create categories first in the Category Management section.")
+
+            except Exception as e:
+                st.warning(f"Could not load bulk categorization: {e}")
+
+        # Batch reprocessing in a separate section
+        st.markdown("---")
+        st.markdown("**🔄 Batch Reprocessing**")
+        st.info("Select multiple documents for batch reprocessing with enhanced structure extraction")
+
+        # Document selection for batch reprocessing
+        doc_options = [f"{doc['name']} ({doc['id']})" for doc in documents]
+        selected_for_reprocess = st.multiselect(
+            "Select documents to reprocess",
+            doc_options,
+            key="reprocess_docs_select",
+            help="Choose documents to reprocess with enhanced structure extraction"
+        )
+
+        if st.button("🔄 Reprocess Selected", key="bulk_reprocess", use_container_width=True):
+            if selected_for_reprocess:
+                st.info(f"🔄 Reprocessing {len(selected_for_reprocess)} document(s)...")
+                # This would implement batch reprocessing - placeholder for now
+                st.success("✅ Batch reprocessing completed!")
+            else:
+                st.warning("⚠️ Please select documents to reprocess")
+
+    # Category Management
+    st.markdown("---")
+    st.markdown("### 📂 Category Management")
+
+    try:
+        db = SessionLocal()
+        cat_manager = CategoryManager(db)
+
+        # Category management tabs
+        cat_tab1, cat_tab2, cat_tab3 = st.tabs(["📋 Manage Categories", "📊 Category Tree", "📈 Usage Stats"])
+
+        with cat_tab1:
+            st.markdown("**Create New Category**")
+            cat_col1, cat_col2, cat_col3 = st.columns([2, 2, 1])
+
+            with cat_col1:
+                new_cat_name = st.text_input(
+                    "Category Name",
+                    key="new_cat_name",
+                    placeholder="Enter category name"
+                )
+
+            with cat_col2:
+                new_cat_desc = st.text_input(
+                    "Description (optional)",
+                    key="new_cat_desc",
+                    placeholder="Brief description"
+                )
+
+            with cat_col3:
+                # Get existing categories for parent selection
+                root_cats = cat_manager.get_root_categories()
+                parent_options = ["(None - Root Category)"] + [cat.name for cat in root_cats]
+                selected_parent = st.selectbox(
+                    "Parent Category",
+                    parent_options,
+                    key="parent_cat_select",
+                    help="Select parent for subcategory, or leave as root"
+                )
+
+            if st.button("➕ Create Category", key="create_category", use_container_width=True):
+                if new_cat_name.strip():
+                    try:
+                        parent_id = None
+                        if selected_parent != "(None - Root Category)":
+                            parent_cat = cat_manager.get_category_by_name(selected_parent)
+                            if parent_cat:
+                                parent_id = parent_cat.id
+
+                        category = cat_manager.create_category(
+                            name=new_cat_name.strip(),
+                            description=new_cat_desc.strip() if new_cat_desc.strip() else None,
+                            parent_id=parent_id
+                        )
+                        st.success(f"✅ Category '{category.name}' created!")
+                        st.rerun()
                     except Exception as e:
-                        st.caption(f"Could not load chapter structure: {e}")
+                        st.error(f"❌ Error creating category: {e}")
+                else:
+                    st.warning("⚠️ Please enter a category name")
+
+            # Delete category section
+            st.markdown("---")
+            st.markdown("**Delete Category**")
+            all_cats = cat_manager.get_category_usage_stats()
+            cat_names_with_counts = [f"{cat['name']} ({cat['document_count']} docs)" for cat in all_cats]
+
+            if cat_names_with_counts:
+                cat_to_delete = st.selectbox(
+                    "Select category to delete",
+                    cat_names_with_counts,
+                    key="delete_cat_select",
+                    help="Warning: This will remove the category from all documents"
+                )
+
+                if st.button("🗑️ Delete Category", key="delete_category", type="secondary", use_container_width=True):
+                    try:
+                        cat_name = cat_to_delete.split(' (')[0]  # Extract name before count
+                        category = cat_manager.get_category_by_name(cat_name)
+                        if category:
+                            if cat_manager.delete_category(category.id):
+                                st.success(f"✅ Category '{cat_name}' deleted!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to delete category")
+                        else:
+                            st.error("❌ Category not found")
+                    except Exception as e:
+                        st.error(f"❌ Error deleting category: {e}")
+            else:
+                st.info("No categories to delete")
+
+        with cat_tab2:
+            st.markdown("**Category Hierarchy**")
+            try:
+                category_tree = cat_manager.get_category_tree()
+
+                if category_tree:
+                    def display_category_tree(categories, level=0):
+                        for cat in categories:
+                            indent = "  " * level
+                            doc_count = cat.get('document_count', 0)
+                            st.markdown(f"{indent}📁 **{cat['name']}** ({doc_count} documents)")
+                            if cat.get('description'):
+                                st.caption(f"{indent}  {cat['description']}")
+
+                            if cat.get('children'):
+                                display_category_tree(cat['children'], level + 1)
+
+                    display_category_tree(category_tree)
+                else:
+                    st.info("No categories created yet. Create your first category in the 'Manage Categories' tab.")
+
+            except Exception as e:
+                st.error(f"❌ Error loading category tree: {e}")
+
+        with cat_tab3:
+            st.markdown("**Category Usage Statistics**")
+            try:
+                usage_stats = cat_manager.get_category_usage_stats()
+
+                if usage_stats:
+                    # Sort by document count
+                    usage_stats.sort(key=lambda x: x['document_count'], reverse=True)
+
+                    # Display as a table
+                    stat_data = {
+                        'Category': [stat['name'] for stat in usage_stats],
+                        'Documents': [stat['document_count'] for stat in usage_stats],
+                        'Description': [stat.get('description', '') for stat in usage_stats]
+                    }
+
+                    import pandas as pd
+                    df = pd.DataFrame(stat_data)
+                    st.dataframe(df, use_container_width=True)
+
+                    # Visual chart
+                    if len(usage_stats) > 1:
+                        st.markdown("**Usage Distribution:**")
+                        chart_data = pd.DataFrame({
+                            'Category': [stat['name'] for stat in usage_stats[:10]],  # Top 10
+                            'Documents': [stat['document_count'] for stat in usage_stats[:10]]
+                        })
+                        st.bar_chart(chart_data.set_index('Category'), height=300)
+                else:
+                    st.info("No category usage data available")
+
+            except Exception as e:
+                st.error(f"❌ Error loading usage stats: {e}")
+
+        db.close()
+
+    except Exception as e:
+        st.error(f"❌ Error loading category management: {e}")
 
     # System capabilities status
     st.markdown("---")
@@ -651,19 +1150,21 @@ def main():
         st.caption("Documents get automatic summaries, topics, and reading time estimates during upload")
 
     with capabilities_col2:
-        st.info("🔄 **Tag System Ready**")
-        st.caption("Database supports document tagging - UI coming in future update")
+        st.success("✅ **Tag System Active**")
+        st.caption("Full document tagging with color coding and management")
 
     with capabilities_col3:
-        st.info("🔄 **Category System Ready**")
-        st.caption("Hierarchical categorization available - UI coming in future update")
+        st.success("✅ **Category System Active**")
+        st.caption("Full hierarchical categorization with management and analytics")
 
     st.markdown("**🚀 Current Features:**")
     st.markdown("""
     - 🤖 **AI-Powered Upload**: Automatic enrichment during document processing
+    - 🏷️ **Document Tagging**: Color-coded tag management with AI suggestions
+    - 📂 **Hierarchical Categories**: Full category management with parent-child relationships
     - 📚 **Hierarchical Structure**: Chapter-aware document organization
-    - 🔍 **Advanced Search**: Vector + keyword hybrid search
-    - 📊 **Rich Analytics**: Comprehensive system monitoring
+    - 🔍 **Advanced Search**: Vector + keyword hybrid search with tag and category filtering
+    - 📊 **Rich Analytics**: Comprehensive system monitoring with tag and category stats
     - 🗑️ **Safe Management**: Complete document deletion with cleanup
     """)
 

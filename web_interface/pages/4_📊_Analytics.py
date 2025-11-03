@@ -419,6 +419,122 @@ def main():
         st.markdown("### 📚 Organization")
         st.info(" • ".join(org_metrics))
 
+    # Tag Analytics (detailed breakdown)
+    if metrics.get('total_tags', 0) > 0:
+        st.markdown("### 🏷️ Tag Analytics")
+
+        try:
+            from src.database.models import SessionLocal, DocumentTag, DocumentTagAssignment
+            from sqlalchemy import func
+
+            db = SessionLocal()
+
+            # Get tag usage statistics
+            tag_stats = db.query(
+                DocumentTag.name,
+                DocumentTag.color,
+                func.count(DocumentTagAssignment.document_id).label('usage_count')
+            ).join(DocumentTagAssignment).group_by(DocumentTag.id, DocumentTag.name, DocumentTag.color).order_by(
+                func.count(DocumentTagAssignment.document_id).desc()
+            ).limit(10).all()
+
+            db.close()
+
+            if tag_stats:
+                st.markdown("**Most Used Tags:**")
+                tag_cols = st.columns(min(len(tag_stats), 5))  # Max 5 tags per row
+
+                for i, (tag_name, tag_color, usage_count) in enumerate(tag_stats):
+                    col_idx = i % 5
+                    with tag_cols[col_idx]:
+                        st.markdown(
+                            f'<div style="background-color: {tag_color}; color: white; padding: 6px 12px; '
+                            f'border-radius: 15px; display: inline-block; font-size: 0.9em; font-weight: 500; '
+                            f'text-align: center; margin: 2px;">{tag_name} ({usage_count})</div>',
+                            unsafe_allow_html=True
+                        )
+
+                # Tag distribution chart
+                if len(tag_stats) > 1:
+                    st.markdown("**Tag Usage Distribution:**")
+                    chart_data = pd.DataFrame({
+                        'Tag': [stat[0] for stat in tag_stats],
+                        'Documents': [stat[2] for stat in tag_stats]
+                    })
+                    st.bar_chart(chart_data.set_index('Tag'), height=200)
+
+        except Exception as e:
+            st.warning(f"Could not load detailed tag analytics: {e}")
+
+    # Category Analytics (detailed breakdown)
+    if metrics.get('total_categories', 0) > 0:
+        st.markdown("### 📂 Category Analytics")
+
+        try:
+            from src.document_managers import CategoryManager
+            from src.database.models import SessionLocal
+
+            db = SessionLocal()
+            cat_manager = CategoryManager(db)
+
+            # Get category usage statistics
+            cat_stats = cat_manager.get_category_usage_stats()
+
+            db.close()
+
+            if cat_stats:
+                # Sort by document count
+                cat_stats.sort(key=lambda x: x['document_count'], reverse=True)
+
+                st.markdown("**Most Used Categories:**")
+                cat_cols = st.columns(min(len(cat_stats), 4))  # Max 4 categories per row
+
+                for i, cat in enumerate(cat_stats[:8]):  # Show top 8
+                    col_idx = i % 4
+                    with cat_cols[col_idx]:
+                        doc_count = cat['document_count']
+                        st.metric(
+                            cat['name'],
+                            f"{doc_count} docs",
+                            help=cat.get('description', '')
+                        )
+
+                # Category distribution chart
+                if len(cat_stats) > 1:
+                    st.markdown("**Category Usage Distribution:**")
+                    chart_data = pd.DataFrame({
+                        'Category': [stat['name'] for stat in cat_stats],
+                        'Documents': [stat['document_count'] for stat in cat_stats]
+                    })
+                    st.bar_chart(chart_data.set_index('Category'), height=250)
+
+                # Category hierarchy overview
+                st.markdown("**Category Hierarchy:**")
+                try:
+                    db = SessionLocal()
+                    cat_manager = CategoryManager(db)
+                    category_tree = cat_manager.get_category_tree()
+                    db.close()
+
+                    if category_tree:
+                        def display_tree_summary(categories, level=0):
+                            for cat in categories:
+                                indent = "  " * level
+                                doc_count = cat.get('document_count', 0)
+                                st.caption(f"{indent}📁 {cat['name']} ({doc_count} docs)")
+                                if cat.get('children'):
+                                    display_tree_summary(cat['children'], level + 1)
+
+                        display_tree_summary(category_tree)
+                    else:
+                        st.caption("No hierarchical categories")
+
+                except Exception as e:
+                    st.caption(f"Could not load hierarchy: {e}")
+
+        except Exception as e:
+            st.warning(f"Could not load detailed category analytics: {e}")
+
     # System Health Status
     st.markdown("### 🔧 System Health")
 
