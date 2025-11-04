@@ -244,9 +244,8 @@ class TagManager:
                     # Check if tag exists, create if not
                     existing_tag = self.get_tag_by_name(tag_name)
                     if not existing_tag:
-                        # Generate color for new tag
-                        color = self.color_manager.generate_color(tag_name)
-                        existing_tag = self.create_tag(tag_name, color=color)
+                        # Create tag with AI-generated unique color
+                        existing_tag = self.create_tag_with_ai_color(tag_name)
 
                     # Assign tag to document
                     if existing_tag and self.add_tag_to_document(document_id, existing_tag.id):
@@ -327,7 +326,7 @@ class TagManager:
 
     def create_tag_with_ai_color(self, name: str, description: Optional[str] = None) -> DocumentTag:
         """
-        Create a tag with AI-generated color suggestion.
+        Create a tag with AI-generated color suggestion, ensuring color uniqueness.
 
         Args:
             name: Tag name
@@ -336,8 +335,51 @@ class TagManager:
         Returns:
             Created DocumentTag instance
         """
+        # Get existing colors to avoid duplicates
+        existing_colors = set()
+        try:
+            existing_tags = self.db.query(DocumentTag).all()
+            existing_colors = {tag.color for tag in existing_tags}
+        except Exception:
+            # If we can't query existing tags, continue with basic color generation
+            pass
+
+        # Generate color and ensure uniqueness
         color = self.color_manager.generate_color(name)
+
+        # If color is already used, find an alternative
+        if color in existing_colors:
+            color = self.color_manager.get_similar_color(color, existing_colors)
+
         return self.create_tag(name, color=color, description=description)
+
+    def update_tag_color(self, tag_name: str, new_color: str) -> bool:
+        """
+        Update the color of a tag by name.
+
+        Args:
+            tag_name: Name of the tag to update
+            new_color: New hex color code
+
+        Returns:
+            True if update was successful
+        """
+        try:
+            tag = self.get_tag_by_name(tag_name)
+            if not tag:
+                return False
+
+            # Validate color format
+            if not self.color_manager.validate_hex_color(new_color):
+                return False
+
+            tag.color = new_color
+            self.db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating tag color for '{tag_name}': {e}")
+            self.db.rollback()
+            return False
 
     def get_color_palette(self) -> List[str]:
         """

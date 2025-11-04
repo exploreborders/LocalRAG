@@ -212,8 +212,8 @@ class AIEnrichmentService:
             try:
                 tag = self.tag_manager.get_tag_by_name(tag_name)
                 if not tag:
-                    # Create new tag with default color
-                    tag = self.tag_manager.create_tag(tag_name, color="#6c757d")  # Gray color
+                    # Create new tag with AI-generated unique color
+                    tag = self.tag_manager.create_tag_with_ai_color(tag_name)
 
                 # Add tag to document if not already assigned
                 if tag:

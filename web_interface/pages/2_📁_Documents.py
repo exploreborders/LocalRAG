@@ -704,11 +704,8 @@ def main():
                                     # Check if tag exists
                                     existing_tag = tag_manager.get_tag_by_name(new_tag.strip())
                                     if not existing_tag:
-                                        # Create new tag with random color
-                                        import random
-                                        colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1', '#e83e8c', '#fd7e14', '#20c997']
-                                        color = random.choice(colors)
-                                        existing_tag = tag_manager.create_tag(new_tag.strip(), color=color)
+                                        # Create new tag with AI-generated unique color
+                                        existing_tag = tag_manager.create_tag_with_ai_color(new_tag.strip())
 
                                     # Add tag to document
                                     if existing_tag:

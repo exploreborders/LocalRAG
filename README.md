@@ -27,6 +27,7 @@ A modern **Retrieval-Augmented Generation (RAG) system** for intelligent documen
 - **Hybrid Search**: BM25 (Elasticsearch) + Vector (pgvector) for optimal retrieval
 - **Redis Caching**: 172.5x speedup (3.45s → 0.02s) for LLM responses and metadata
 - **Batch Processing**: GPU-accelerated processing (2-5x faster on Apple Silicon)
+
 ### **Modern Web Interface**
 - **Streamlit-based UI**: Clean, responsive interface with multiple pages
 - **Document Management**: Upload, organize, and manage document collections

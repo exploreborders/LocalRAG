@@ -83,7 +83,7 @@ def render_tag_analytics():
                     color_continuous_scale='Blues'
                 )
                 fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key="tag_usage_distribution")
             else:
                 st.info("No active tags found.")
 
@@ -114,7 +114,7 @@ def render_tag_analytics():
                     yaxis_title="Color",
                     height=400
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key="color_distribution")
             else:
                 st.info("No color data available.")
 
@@ -194,12 +194,18 @@ def render_tag_analytics():
 
         # Check for color conflicts
         color_groups = df.groupby('color').size()
-        conflicting_colors = color_groups[color_groups > 3]
+        conflicting_colors = color_groups[color_groups >= 3]  # Changed from > 3 to >= 3 for better sensitivity
         if len(conflicting_colors) > 0:
+            conflict_details = []
+            for color, count in conflicting_colors.items():
+                tags_with_color = df[df['color'] == color]['name'].tolist()
+                conflict_details.append(f"• {color}: {count} tags ({', '.join(tags_with_color[:3])}{'...' if len(tags_with_color) > 3 else ''})")
+
             recommendations.append({
                 'type': 'visual',
-                'message': f"Some colors are used for {conflicting_colors.max()} or more tags",
-                'action': 'Consider using different colors for better visual distinction'
+                'message': f"Found {len(conflicting_colors)} colors used by 3+ tags each",
+                'details': conflict_details,
+                'action': 'Use the button below to automatically reassign colors for better visual distinction'
             })
 
         if recommendations:
@@ -209,7 +215,43 @@ def render_tag_analytics():
                 elif rec['type'] == 'refinement':
                     st.info(f"🔄 {rec['message']}\n\n*{rec['action']}*")
                 elif rec['type'] == 'visual':
-                    st.info(f"🎨 {rec['message']}\n\n*{rec['action']}*")
+                    with st.container():
+                        st.info(f"🎨 {rec['message']}\n\n*{rec['action']}*")
+                        if 'details' in rec:
+                            with st.expander("📋 View conflicting colors", expanded=False):
+                                for detail in rec['details']:
+                                    st.write(detail)
+
+                        # Add button to reassign colors
+                        if st.button("🎨 Auto-reassign conflicting colors", use_container_width=True, key="reassign_colors"):
+                            try:
+                                # Get tags with conflicting colors
+                                conflicting_color_list = list(conflicting_colors.index)
+                                tags_to_update = df[df['color'].isin(conflicting_color_list)]
+
+                                updated_count = 0
+                                for _, tag_row in tags_to_update.iterrows():
+                                    # Generate new unique color for this tag
+                                    new_color = tag_manager.color_manager.generate_color(tag_row['name'])
+                                    existing_colors = set(df[df['name'] != tag_row['name']]['color'].tolist())
+
+                                    # Ensure uniqueness
+                                    while new_color in existing_colors and len(existing_colors) < len(tag_manager.color_manager.PROFESSIONAL_PALETTE):
+                                        new_color = tag_manager.color_manager.get_similar_color(new_color, existing_colors)
+
+                                    # Update the tag color in database
+                                    if tag_manager.update_tag_color(tag_row['name'], new_color):
+                                        updated_count += 1
+
+                                if updated_count > 0:
+                                    st.success(f"✅ Successfully updated colors for {updated_count} tags!")
+                                    st.rerun()
+                                else:
+                                    st.warning("No colors were updated. Tags might already have unique colors.")
+
+                            except Exception as e:
+                                st.error(f"❌ Error reassigning colors: {e}")
+                                logger.error(f"Color reassignment error: {e}")
         else:
             st.success("✅ Your tag system looks well-organized!")
 
@@ -226,211 +268,7 @@ def render_tag_analytics():
     finally:
         if 'db' in locals():
             db.close()
-    """
-    Render comprehensive tag analytics dashboard.
-    """
-    st.header("🏷️ Tag Analytics & Insights")
 
-    try:
-        db = SessionLocal()
-        tag_manager = TagManager(db)
-
-        # Get tag statistics
-        tag_stats = tag_manager.get_tag_usage_stats()
-
-        if not tag_stats:
-            st.info("No tags found. Start tagging documents to see analytics.")
-            db.close()
-            return
-
-        # Convert to DataFrame for easier analysis
-        df = pd.DataFrame(tag_stats)
-
-        # Overview metrics
-        col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-            st.metric("Total Tags", len(df))
-
-        with col2:
-            total_usage = df['document_count'].sum()
-            st.metric("Total Tag Assignments", int(total_usage))
-
-        with col3:
-            avg_usage = df['document_count'].mean()
-            st.metric("Avg Tags per Document", f"{avg_usage:.1f}")
-
-        with col4:
-            most_used = df.loc[df['document_count'].idxmax()]
-            st.metric("Most Used Tag", most_used['name'])
-
-        st.divider()
-
-        # Tag usage visualization
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.subheader("📊 Tag Usage Distribution")
-
-            # Filter out tags with zero usage for cleaner chart
-            active_tags = df[df['document_count'] > 0].copy()
-            active_tags = active_tags.sort_values('document_count', ascending=True)
-
-            if not active_tags.empty:
-                fig = px.bar(
-                    active_tags,
-                    y='name',
-                    x='document_count',
-                    orientation='h',
-                    title="Documents per Tag",
-                    labels={'name': 'Tag', 'document_count': 'Document Count'},
-                    color='document_count',
-                    color_continuous_scale='Blues'
-                )
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No active tags found.")
-
-        with col2:
-            st.subheader("🎨 Color Distribution")
-
-            # Count tags by color
-            color_counts = df['color'].value_counts().reset_index()
-            color_counts.columns = ['color', 'count']
-
-            if not color_counts.empty:
-                # Create color swatches
-                fig = go.Figure()
-
-                for _, row in color_counts.iterrows():
-                    fig.add_trace(go.Bar(
-                        x=[row['count']],
-                        y=[row['color']],
-                        orientation='h',
-                        marker_color=row['color'],
-                        name=row['color'],
-                        showlegend=False
-                    ))
-
-                fig.update_layout(
-                    title="Tags by Color",
-                    xaxis_title="Number of Tags",
-                    yaxis_title="Color",
-                    height=400
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No color data available.")
-
-        st.divider()
-
-        # Tag insights and recommendations
-        st.subheader("💡 Tag Insights & Recommendations")
-
-        insights_col1, insights_col2 = st.columns(2)
-
-        with insights_col1:
-            st.markdown("### 📈 Popular Tags")
-            popular_tags = tag_manager.get_popular_tags(limit=5)
-
-            if popular_tags:
-                for tag in popular_tags:
-                    color = tag.get('color', '#6c757d')
-                    st.markdown(
-                        f"<div style='display: flex; align-items: center; margin: 5px 0;'>"
-                        f"<div style='background-color: {color}; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px;'></div>"
-                        f"<span><strong>{tag['name']}</strong> - {tag['document_count']} documents</span>"
-                        f"</div>",
-                        unsafe_allow_html=True
-                    )
-            else:
-                st.info("No popular tags data available.")
-
-        with insights_col2:
-            st.markdown("### 🔗 Tag Relationships")
-
-            # Show co-occurring tags for the most popular tag
-            if popular_tags:
-                top_tag = popular_tags[0]
-                related_tags = tag_manager.get_related_tags(top_tag['name'], limit=3)
-
-                if related_tags:
-                    st.markdown(f"**Tags often used with '{top_tag['name']}'**")
-                    for related in related_tags:
-                        color = related.get('color', '#6c757d')
-                        st.markdown(
-                            f"<div style='display: flex; align-items: center; margin: 5px 0;'>"
-                            f"<div style='background-color: {color}; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px;'></div>"
-                            f"<span>{related['name']} ({related['co_occurrence']} co-occurrences)</span>"
-                            f"</div>",
-                            unsafe_allow_html=True
-                        )
-                else:
-                    st.info("No relationship data available.")
-            else:
-                st.info("No relationship data available.")
-
-        st.divider()
-
-        # Tag management recommendations
-        st.subheader("🛠️ Tag Management Recommendations")
-
-        recommendations = []
-
-        # Check for unused tags
-        unused_tags = df[df['document_count'] == 0]
-        if len(unused_tags) > 0:
-            recommendations.append({
-                'type': 'cleanup',
-                'message': f"Found {len(unused_tags)} unused tags that could be removed",
-                'action': 'Review and clean up unused tags'
-            })
-
-        # Check for overused tags
-        avg_usage = df['document_count'].mean()
-        overused_tags = df[df['document_count'] > avg_usage * 3]
-        if len(overused_tags) > 0:
-            recommendations.append({
-                'type': 'refinement',
-                'message': f"Found {len(overused_tags)} tags used much more than average",
-                'action': 'Consider splitting these tags into more specific categories'
-            })
-
-        # Check for color conflicts
-        color_groups = df.groupby('color').size()
-        conflicting_colors = color_groups[color_groups > 3]
-        if len(conflicting_colors) > 0:
-            recommendations.append({
-                'type': 'visual',
-                'message': f"Some colors are used for {conflicting_colors.max()} or more tags",
-                'action': 'Consider using different colors for better visual distinction'
-            })
-
-        if recommendations:
-            for rec in recommendations:
-                if rec['type'] == 'cleanup':
-                    st.warning(f"🧹 {rec['message']}\n\n*{rec['action']}*")
-                elif rec['type'] == 'refinement':
-                    st.info(f"🔄 {rec['message']}\n\n*{rec['action']}*")
-                elif rec['type'] == 'visual':
-                    st.info(f"🎨 {rec['message']}\n\n*{rec['action']}*")
-        else:
-            st.success("✅ Your tag system looks well-organized!")
-
-        # Raw data table (collapsible)
-        with st.expander("📋 Raw Tag Data", expanded=False):
-            st.dataframe(
-                df[['name', 'color', 'document_count', 'usage_count', 'created_at']],
-                use_container_width=True
-            )
-
-    except Exception as e:
-        st.error(f"❌ Error loading tag analytics: {e}")
-        logger.error(f"Tag analytics error: {e}")
-    finally:
-        if 'db' in locals():
-            db.close()
 
 
 def render_tag_suggestions(document_id: int, document_content: str, document_title: str = ""):
