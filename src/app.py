@@ -49,7 +49,7 @@ class RAGCLI:
     def print_menu(self):
         """Print main menu"""
         print("\n📋 Available Modes:")
-        print("  1. 🔍 Retrieval Only    - Search documents without AI")
+        print("  1. 🎯 Smart Search      - Intelligent search with topic relevance boosting")
         print("  2. 🤖 Full RAG Mode     - AI-powered answers (requires Ollama)")
         print("  3. 📁 Process Documents - Batch process existing files")
         print("  4. 📊 System Status     - Show system health and metrics")
@@ -83,35 +83,36 @@ class RAGCLI:
             return False
         return True
 
-    def retrieval_mode(self):
-        """Interactive retrieval mode"""
+    def topic_aware_mode(self):
+        """Interactive smart search mode with topic relevance boosting"""
         if not self.initialize_components():
             return
 
         print("\n" + "="*50)
-        print("🔍 RETRIEVAL MODE")
+        print("🎯 SMART SEARCH MODE")
         print("="*50)
-        print("Search your documents using natural language queries")
+        print("Intelligent search that boosts results based on document topic relevance")
+        print("Documents with matching topics get higher relevance scores")
         print("Type 'quit' or 'exit' to return to main menu")
         print("Type 'help' for commands")
         print("-"*50)
 
         while True:
             try:
-                query = input("\n🔍 Query: ").strip()
+                query = input("\n🎯 Query: ").strip()
 
                 if query.lower() in ['quit', 'exit', 'q']:
                     break
                 elif query.lower() == 'help':
-                    self.show_retrieval_help()
+                    self.show_topic_aware_help()
                     continue
                 elif not query:
                     continue
 
-                print("⏳ Searching...")
+                print("⏳ Searching with topic awareness...")
                 start_time = time.time()
                 if self.retriever:
-                    results = self.retriever.retrieve(query, top_k=3)
+                    results = self.retriever.retrieve_with_topic_boost(query, top_k=3)
                 else:
                     print("❌ Retriever not initialized")
                     continue
@@ -122,6 +123,10 @@ class RAGCLI:
 
                 if results:
                     print(f"\n📊 Found {len(results)} relevant document chunks")
+                    # Show topic boost information
+                    boosted_count = sum(1 for r in results if r.get('topic_boost', 0) > 0)
+                    if boosted_count > 0:
+                        print(f"🎯 {boosted_count} results boosted by topic relevance")
 
             except KeyboardInterrupt:
                 print("\n👋 Returning to main menu...")
@@ -361,12 +366,12 @@ class RAGCLI:
 
         print("""
 MODES:
-  1. Retrieval Only    - Fast document search without AI
-  2. RAG Mode          - AI-powered answers with source citations
-  3. Process Documents - Batch process and index documents
-  4. System Status     - Health check and system metrics
-  5. Settings          - View current configuration
-  6. Help              - This help screen
+   1. Smart Search        - Intelligent search with topic relevance boosting
+   2. RAG Mode            - AI-powered answers with source citations
+   3. Process Documents   - Batch process and index documents
+   4. System Status       - Health check and system metrics
+   5. Settings            - View current configuration
+   6. Help                - This help screen
 
 FEATURES:
   🌍 Multilingual      - Automatic language detection (12 languages)
@@ -381,10 +386,11 @@ LANGUAGES SUPPORTED:
   🇨🇳 Chinese, 🇯🇵 Japanese, 🇰🇷 Korean
 
 QUICK START:
-   1. Run: python -m src.app (⚠️ MUST use module execution)
-   2. Choose mode 4 to check system status
-   3. Choose mode 3 to process documents
-   4. Choose mode 2 for AI answers (requires Ollama)
+    1. Run: python -m src.app (⚠️ MUST use module execution)
+    2. Choose mode 4 to check system status
+    3. Choose mode 3 to process documents
+    4. Choose mode 2 for AI answers (requires Ollama)
+    5. Choose mode 1 for intelligent document search!
 
 WEB INTERFACE:
   Run: streamlit run web_interface/app.py
@@ -397,37 +403,42 @@ TROUBLESHOOTING:
   • Memory issues: Use smaller models or reduce batch size
         """)
 
-    def show_retrieval_help(self):
-        """Show help for retrieval mode"""
+    def show_topic_aware_help(self):
+        """Show help for smart search mode"""
         print("""
-🔍 RETRIEVAL MODE COMMANDS:
-  • Type any question to search documents
-  • 'quit' or 'exit' - Return to main menu
-  • 'help' - Show this help
+🎯 SMART SEARCH COMMANDS:
+   • Type any question to search with intelligent topic relevance boosting
+   • 'quit' or 'exit' - Return to main menu
+   • 'help' - Show this help
+
+🎯 INTELLIGENT SEARCH:
+   • Uses AI-extracted document topics for relevance boosting
+   • Documents with matching topics get higher relevance scores
+   • Combines semantic search with topic awareness
 
 💡 TIPS:
-  • Be specific for better results
-  • Try different phrasings if no results
-  • Results show relevance scores
+   • Works best with AI-enriched documents (processed with topic extraction)
+   • Try specific topic-related queries for best results
+   • Results show topic boost indicators for enhanced relevance
         """)
 
     def show_rag_help(self):
         """Show help for RAG mode"""
         print("""
 🤖 RAG MODE COMMANDS:
-  • Type any question for AI-powered answers
-  • 'quit' or 'exit' - Return to main menu
-  • 'help' - Show this help
+   • Type any question for AI-powered answers
+   • 'quit' or 'exit' - Return to main menu
+   • 'help' - Show this help
 
 🌍 MULTILINGUAL SUPPORT:
-  • Ask questions in any supported language
-  • AI responds in the same language
-  • Language detection happens automatically
+   • Ask questions in any supported language
+   • AI responds in the same language
+   • Language detection happens automatically
 
 📚 SOURCE CITATIONS:
-  • Documents used are listed with relevance scores
-  • Multiple chunks from same document are grouped
-  • Higher scores = more relevant information
+   • Documents used are listed with relevance scores
+   • Multiple chunks from same document are grouped
+   • Higher scores = more relevant information
         """)
 
     def run(self):
@@ -444,7 +455,7 @@ TROUBLESHOOTING:
                     print("\n👋 Thank you for using Local RAG System!")
                     break
                 elif choice == "1":
-                    self.retrieval_mode()
+                    self.topic_aware_mode()
                 elif choice == "2":
                     self.rag_mode()
                 elif choice == "3":

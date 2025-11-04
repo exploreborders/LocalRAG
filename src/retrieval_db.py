@@ -258,6 +258,65 @@ class DatabaseRetriever:
 
         return enriched_results
 
+    def retrieve_with_topic_boost(self, query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None, topic_boost_weight: float = 0.3) -> List[Dict[str, Any]]:
+        """
+        Retrieve documents with topic-aware relevance boosting.
+
+        This method performs standard vector search but boosts results for documents
+        whose topics match the query, improving relevance for topic-focused queries.
+
+        Args:
+            query (str): Search query text
+            top_k (int): Number of top results to return
+            filters (dict): Optional filters for advanced search
+            topic_boost_weight (float): Weight for topic relevance boosting (0-1)
+
+        Returns:
+            list: List of search results with topic-boosted relevance scores
+        """
+        # Get standard vector search results
+        results = self.retrieve(query, top_k * 2, filters)  # Get more results for reranking
+
+        if not results:
+            return results
+
+        # Extract query keywords for topic matching
+        query_words = set(query.lower().split())
+        query_words = {word for word in query_words if len(word) > 2}  # Filter short words
+
+        # Apply topic boosting to results
+        for result in results:
+            doc = result.get('document', {})
+            topics = doc.get('key_topics', [])
+
+            if topics and query_words:
+                # Calculate topic relevance score
+                topic_relevance = 0
+                matching_topics = []
+
+                for topic in topics:
+                    topic_words = set(topic.lower().split())
+                    # Calculate overlap between query words and topic words
+                    overlap = len(query_words.intersection(topic_words))
+                    if overlap > 0:
+                        # Boost based on overlap and topic position (earlier topics are more important)
+                        boost = (overlap / len(query_words)) * (1.0 / (topics.index(topic) + 1))
+                        topic_relevance += boost
+                        matching_topics.append(topic)
+
+                if topic_relevance > 0:
+                    # Apply topic boost to the relevance score
+                    original_score = result.get('score', 0)
+                    boosted_score = original_score * (1 + topic_boost_weight * min(topic_relevance, 2.0))  # Cap boost at 2x
+
+                    result['score'] = boosted_score
+                    result['topic_boost'] = topic_relevance
+                    result['matching_topics'] = matching_topics[:3]  # Top 3 matching topics
+
+        # Re-sort by boosted scores and return top_k
+        results.sort(key=lambda x: x.get('score', 0), reverse=True)
+        return results[:top_k]
+
     def _enrich_with_batch_metadata(self, vector_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Enrich vector results with document metadata using single batch query and Redis caching.

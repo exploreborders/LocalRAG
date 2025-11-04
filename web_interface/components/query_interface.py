@@ -23,9 +23,9 @@ def render_query_input():
         )
 
     with col2:
-        mode_options = ["retrieval", "rag"] if st.session_state.get('rag_available', False) else ["retrieval"]
+        mode_options = ["topic-aware", "rag"] if st.session_state.get('rag_available', False) else ["topic-aware"]
         mode_labels = {
-            "retrieval": "📄 Retrieval Only",
+            "topic-aware": "🎯 Smart Search",
             "rag": "🤖 Full RAG"
         }
 
@@ -33,7 +33,7 @@ def render_query_input():
             "Mode",
             mode_options,
             format_func=lambda x: mode_labels.get(x, x),
-            help="Retrieval only searches documents. Full RAG generates AI answers.",
+            help="Smart Search uses intelligent topic relevance boosting. Full RAG generates AI answers with source citations.",
             key="query_mode"
         )
 

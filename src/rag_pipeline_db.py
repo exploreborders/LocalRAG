@@ -340,6 +340,10 @@ Odpowiedź:"""
         Returns:
             str: Generated answer text
         """
+        # Check if we have any relevant documents
+        if not context_docs:
+            return "I don't have any relevant information in my database to answer this question. Please try uploading relevant documents or rephrasing your query."
+
         # Detect query language
         query_lang = self.detect_query_language(query)
 

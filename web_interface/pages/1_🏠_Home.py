@@ -118,21 +118,21 @@ def _do_initialization():
         'rag_error': rag_error
     }
 
-def process_query(query, mode="retrieval", filters=None):
+def process_query(query, mode="topic-aware", filters=None):
     """Process a query and return results"""
     start_time = time.time()
 
     try:
-        if mode == "retrieval":
+        if mode == "topic-aware":
             if st.session_state.retriever is None:
                 raise Exception("Retriever not initialized")
 
-            results = st.session_state.retriever.retrieve(query, top_k=3, filters=filters or {})
+            results = st.session_state.retriever.retrieve_with_topic_boost(query, top_k=3, filters=filters or {})
             formatted_results = format_results_db(results)
 
             # Store results for display
             st.session_state.current_results = {
-                'type': 'retrieval',
+                'type': 'topic-aware',
                 'query': query,
                 'results': results,
                 'formatted': formatted_results,

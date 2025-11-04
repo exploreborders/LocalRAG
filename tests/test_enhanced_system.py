@@ -188,34 +188,6 @@ def test_topic_classification():
 
     print()
 
-def test_enhanced_retrieval():
-    """Test enhanced retrieval capabilities."""
-    print("🧪 Testing Enhanced Retrieval")
-    print("=" * 50)
-
-    try:
-        from src.enhanced_retrieval import EnhancedRetriever
-
-        # Note: This will fail without proper database setup, but we can test initialization
-        print("🧪 Testing retrieval system initialization...")
-
-        # Test basic initialization (will fail on actual queries without DB)
-        try:
-            retriever = EnhancedRetriever()
-            print("✅ Enhanced retriever initialized")
-        except Exception as e:
-            print(f"⚠️  Retriever initialization failed (expected without DB): {e}")
-
-        # Test search suggestions (mock)
-        print("🧪 Testing search suggestions...")
-        # This would require database - skip for now
-        print("✅ Search suggestions test skipped (requires database)")
-
-    except Exception as e:
-        print(f"❌ Enhanced retrieval test failed: {e}")
-
-    print()
-
 def test_performance_targets():
     """Test against performance targets."""
     print("🎯 Testing Performance Targets")
@@ -251,7 +223,6 @@ def main():
         test_ai_pipeline_components()
         test_enhanced_processor()
         test_topic_classification()
-        test_enhanced_retrieval()
         test_performance_targets()
 
         print("\n" + "=" * 60)

@@ -19,44 +19,10 @@ def render_results():
         st.info(f"⏱️ Processing time: {processing_time:.2f} seconds")
 
     # Display results based on type
-    if results.get('type') == 'retrieval':
-        render_retrieval_results(results)
+    if results.get('type') == 'topic-aware':
+        render_topic_aware_results(results)
     elif results.get('type') == 'rag':
         render_rag_results(results)
-
-def render_retrieval_results(results):
-    """Render retrieval-only results"""
-    st.markdown("**📄 Retrieved Documents:**")
-
-    # Display formatted results
-    formatted_results = results.get('formatted', '')
-    if formatted_results:
-        st.code(formatted_results, language=None)
-    else:
-        st.warning("No formatted results available")
-
-    # Display individual results with expanders
-    raw_results = results.get('results', [])
-    if raw_results:
-        st.markdown("**Document Details:**")
-        for i, result in enumerate(raw_results, 1):
-            doc = result.get('document', {})
-            distance = result.get('distance', 0)
-
-            with st.expander(f"📄 Document {i} (Distance: {distance:.4f})"):
-                page_content = doc.page_content if hasattr(doc, 'page_content') else str(doc)
-                metadata = doc.metadata if hasattr(doc, 'metadata') else {}
-
-                # Content preview
-                st.markdown("**Content:**")
-                content_preview = page_content[:500] + "..." if len(page_content) > 500 else page_content
-                st.write(content_preview)
-
-                # Metadata
-                if metadata:
-                    st.markdown("**Metadata:**")
-                    for key, value in metadata.items():
-                        st.write(f"- **{key}:** {value}")
 
 def render_rag_results(results):
     """Render RAG (generation) results"""
@@ -117,6 +83,59 @@ def render_rag_results(results):
                     content_preview = first_chunk['content'][:300] + "..." if len(first_chunk['content']) > 300 else first_chunk['content']
                     st.markdown("**Content preview:**")
                     st.write(content_preview)
+
+def render_topic_aware_results(results):
+    """Render smart search results with topic relevance indicators"""
+    st.markdown("**🎯 Smart Search Results:**")
+
+    # Display formatted results
+    formatted_results = results.get('formatted', '')
+    if formatted_results:
+        st.code(formatted_results, language=None)
+    else:
+        st.warning("No formatted results available")
+
+    # Display individual results with topic boost information
+    raw_results = results.get('results', [])
+    if raw_results:
+        st.markdown("**Document Details with Topic Relevance:**")
+        for i, result in enumerate(raw_results, 1):
+            doc = result.get('document', {})
+            score = result.get('score', 0)
+            topic_boost = result.get('topic_boost', 0)
+            matching_topics = result.get('matching_topics', [])
+
+            # Create expander title with topic boost indicator
+            boost_indicator = "🔥" if topic_boost > 0.5 else "⭐" if topic_boost > 0.2 else "📄"
+            boost_text = f" (Topic Boost: {topic_boost:.2f})" if topic_boost > 0 else ""
+
+            with st.expander(f"{boost_indicator} Document {i} (Score: {score:.4f}){boost_text}"):
+                page_content = doc.page_content if hasattr(doc, 'page_content') else str(doc)
+                metadata = doc.metadata if hasattr(doc, 'metadata') else {}
+
+                # Content preview
+                st.markdown("**Content:**")
+                content_preview = page_content[:500] + "..." if len(page_content) > 500 else page_content
+                st.write(content_preview)
+
+                # Topic relevance information
+                if topic_boost > 0:
+                    st.markdown("**🎯 Topic Relevance:**")
+                    st.progress(min(topic_boost, 1.0))  # Cap at 1.0 for progress bar
+                    st.write(f"**Boost Value:** {topic_boost:.2f}")
+
+                    if matching_topics:
+                        st.markdown("**Matching Topics:**")
+                        for topic in matching_topics:
+                            st.write(f"• {topic}")
+                else:
+                    st.info("No significant topic matches found for this document")
+
+                # Metadata
+                if metadata:
+                    st.markdown("**Metadata:**")
+                    for key, value in metadata.items():
+                        st.write(f"- **{key}:** {value}")
 
 def render_no_results():
     """Render message when no results are available"""
