@@ -30,10 +30,10 @@ def check_database_readiness():
 
     # Check if all enhanced components exist
     enhanced_files = [
-        'src/knowledge_graph.py',
-        'src/ai_enrichment.py',
-        'src/retrieval_db.py',
-        'src/rag_pipeline_db.py'
+        'src/core/knowledge_graph.py',
+        'src/ai/enrichment.py',
+        'src/core/retrieval.py',
+        'src/core/retrieval.py'  # RAG pipeline is integrated into retrieval.py
     ]
 
     print("\n📋 Checking enhanced architecture components:")
@@ -53,10 +53,10 @@ def check_database_readiness():
 
     # Check for required methods in key files
     required_methods = {
-        'src/knowledge_graph.py': ['expand_query_context', 'find_documents_by_relationships'],
-        'src/ai_enrichment.py': ['_classify_document_category'],
-        'src/retrieval_db.py': ['retrieve_with_knowledge_graph'],
-        'src/rag_pipeline_db.py': ['_build_enhanced_context']
+        'src/core/knowledge_graph.py': ['expand_query_context', 'find_documents_by_relationships'],
+        'src/ai/enrichment.py': ['_classify_document_category'],
+        'src/core/retrieval.py': ['retrieve_with_topic_boost'],
+        'src/core/retrieval.py': ['query']  # RAG pipeline method
     }
 
     print("\n📋 Checking for enhanced methods:")

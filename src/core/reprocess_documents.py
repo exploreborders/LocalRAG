@@ -6,11 +6,12 @@ Reprocess existing documents with enhanced chunking and chapter metadata.
 import sys
 from pathlib import Path
 
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+# Add parent src directory to path if running as standalone script
+if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.database.models import SessionLocal, Document
-from src.upload_processor import UploadProcessor
+from database.models import SessionLocal, Document
+from core.document_manager import UploadProcessor
 
 def reprocess_documents():
     """Reprocess existing documents with enhanced chunking."""
@@ -34,11 +35,8 @@ def reprocess_documents():
                 continue
 
             try:
-                # Calculate file hash
-                file_hash = processor.calculate_file_hash(doc.filepath)
-
                 # Reprocess the document with forced AI enrichment
-                result = processor.process_single_file(doc.filepath, doc.filename, file_hash, force_enrichment=True)
+                result = processor.process_single_file(doc.filepath, doc.filename, doc.file_hash, force_enrichment=True)
 
                 if result['success']:
                     print(f"  ✅ Successfully reprocessed: {result.get('chunks_created', 0)} chunks")

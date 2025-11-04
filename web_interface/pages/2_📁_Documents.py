@@ -9,15 +9,20 @@ import sys
 from pathlib import Path
 import time
 
-# Add src directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+# Find project root (two levels up from /web_interface/pages/)
+ROOT = Path(__file__).resolve().parents[2]
+
+SRC = ROOT / "src"
+WEB = ROOT / "web_interface"
+
+for p in (SRC, WEB):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 # Import system components
 try:
-    from src.upload_processor import UploadProcessor
-    from src.document_processor import DocumentProcessor
-    from src.document_managers import TagManager, CategoryManager
-    from src.database.models import (
+    from core.document_manager import UploadProcessor, DocumentProcessor, TagManager, CategoryManager
+    from database.models import (
         SessionLocal, Document, DocumentChunk, DocumentChapter, DocumentEmbedding,
         DocumentTopic, DocumentTagAssignment, DocumentCategoryAssignment, DocumentTag
     )
@@ -248,8 +253,8 @@ def reprocess_documents():
                 status_text.text(f"🔄 Reprocessing {doc.filename}...")
                 progress_bar.progress(int((i / len(docs)) * 100))
 
-                # Reprocess with enhanced processor and force enrichment
-                result = processor.process_single_file(doc.filepath, doc.filename, doc.file_hash, force_enrichment=True)
+                # Reprocess with enhanced processor
+                result = processor.process_single_file(doc.filepath, doc.filename, doc.file_hash)
 
                 if result['success']:
                     successful_reprocess += 1
@@ -595,42 +600,7 @@ def main():
                     with meta_col1:
                         if doc.get('document_summary'):
                             st.markdown("**📝 Summary:**")
-                            # Check if editing this document's summary
-                            edit_key = f"edit_summary_{doc['id']}"
-                            if st.session_state.get(edit_key, False):
-                                # Edit mode
-                                new_summary = st.text_area(
-                                    "Edit summary",
-                                    value=doc['document_summary'],
-                                    height=150,
-                                    key=f"summary_text_{doc['id']}",
-                                    label_visibility="collapsed"
-                                )
-                                col_save, col_cancel = st.columns([1, 1])
-                                with col_save:
-                                    if st.button("💾 Save", key=f"save_summary_{doc['id']}", width='stretch'):
-                                        try:
-                                            db = SessionLocal()
-                                            document = db.query(Document).filter(Document.id == doc['id']).first()
-                                            if document:
-                                                document.document_summary = new_summary.strip()
-                                                db.commit()
-                                                st.success("✅ Summary updated!")
-                                                st.session_state[edit_key] = False
-                                                st.rerun()
-                                            db.close()
-                                        except Exception as e:
-                                            st.error(f"❌ Error updating summary: {e}")
-                                with col_cancel:
-                                    if st.button("❌ Cancel", key=f"cancel_summary_{doc['id']}", width='stretch'):
-                                        st.session_state[edit_key] = False
-                                        st.rerun()
-                            else:
-                                # Display mode
-                                st.info(doc['document_summary'][:200] + "..." if len(doc['document_summary']) > 200 else doc['document_summary'])
-                                if st.button("✏️ Edit Summary", key=f"edit_btn_{doc['id']}", help="Edit the document summary"):
-                                    st.session_state[edit_key] = True
-                                    st.rerun()
+                            st.info(doc['document_summary'][:200] + "..." if len(doc['document_summary']) > 200 else doc['document_summary'])
 
                         if doc.get('key_topics'):
                             st.markdown("**🏷️ Key Topics:**")

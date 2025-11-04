@@ -17,15 +17,44 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Add src directory to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+# Add directories to path for imports
+# Find the src directory relative to this script's location
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Try different possible locations for the src directory
+possible_src_paths = [
+    os.path.join(current_dir, '..', '..', 'src'),  # web_interface/components/../../src
+    os.path.join(current_dir, '..', 'src'),        # web_interface/components/../src
+    os.path.join(current_dir, '..', '..', '..', 'src'),  # Extra folder case
+]
+
+src_path = None
+for path in possible_src_paths:
+    if os.path.exists(path):
+        src_path = path
+        break
+
+if src_path is None:
+    # Fallback: try to find src relative to current working directory
+    cwd_src = os.path.join(os.getcwd(), 'src')
+    if os.path.exists(cwd_src):
+        src_path = cwd_src
+
+# Set up web_interface path for components
+web_interface_path = os.path.join(current_dir, '..')
+
+if src_path:
+    sys.path.insert(0, src_path)
+if web_interface_path:
+    sys.path.insert(0, web_interface_path)
 
 def render_tag_analytics():
     """
     Render comprehensive tag analytics dashboard.
     """
     try:
-        from src.document_managers import TagManager
-        from src.database.models import SessionLocal
+        from core.document_manager import TagManager
+        from database.models import SessionLocal
 
         db = SessionLocal()
         tag_manager = TagManager(db)
@@ -258,7 +287,7 @@ def render_tag_analytics():
         # Raw data table (collapsible)
         with st.expander("📋 Raw Tag Data", expanded=False):
             st.dataframe(
-                df[['name', 'color', 'document_count', 'usage_count', 'created_at']],
+                df[['name', 'color', 'description', 'document_count', 'usage_count', 'created_at']],
                 width='stretch'
             )
 
@@ -283,8 +312,8 @@ def render_tag_suggestions(document_id: int, document_content: str, document_tit
     st.subheader("🤖 AI Tag Suggestions")
 
     try:
-        from src.document_managers import TagManager
-        from src.database.models import SessionLocal, Document, DocumentTagAssignment
+        from core.document_manager import TagManager
+        from database.models import SessionLocal, Document, DocumentTagAssignment
 
         db = SessionLocal()
         tag_manager = TagManager(db)

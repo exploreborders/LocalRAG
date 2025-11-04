@@ -11,7 +11,7 @@ from datetime import datetime
 import json
 
 from database.models import Document, DocumentChunk, SessionLocal
-from document_managers import TagManager, CategoryManager
+from core.document_manager import TagManager, CategoryManager
 
 
 class AIEnrichmentService:

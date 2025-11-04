@@ -7,14 +7,21 @@ import streamlit as st
 import time
 import os
 import sys
+from pathlib import Path
 
-# Add src directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+# Find project root (two levels up from /web_interface/pages/)
+ROOT = Path(__file__).resolve().parents[2]
+
+SRC = ROOT / "src"
+WEB = ROOT / "web_interface"
+
+for p in (SRC, WEB):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 # Import system components
 try:
-    from src.retrieval_db import DatabaseRetriever
-    from src.rag_pipeline_db import RAGPipelineDB, format_results_db, format_answer_db
+    from src.core.retrieval import DatabaseRetriever, RAGPipelineDB, format_results_db, format_answer_db
 except ImportError:
     st.error("❌ Could not import RAG system components. Please ensure you're running from the project root.")
     st.stop()

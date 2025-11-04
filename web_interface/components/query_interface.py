@@ -56,8 +56,8 @@ def render_advanced_filters() -> Dict[str, Any]:
         with col1:
             # Tag filter
             try:
-                from src.document_managers import TagManager
-                from src.database.models import SessionLocal
+                from core.document_manager import TagManager
+                from database.models import SessionLocal
                 db = SessionLocal()
                 tag_manager = TagManager(db)
                 tags = tag_manager.get_all_tags()
@@ -76,8 +76,8 @@ def render_advanced_filters() -> Dict[str, Any]:
         with col2:
             # Category filter
             try:
-                from src.document_managers import CategoryManager
-                from src.database.models import SessionLocal
+                from core.document_manager import CategoryManager
+                from database.models import SessionLocal
                 db = SessionLocal()
                 cat_manager = CategoryManager(db)
                 root_cats = cat_manager.get_root_categories()

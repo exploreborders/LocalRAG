@@ -11,8 +11,15 @@ import os
 import sys
 from pathlib import Path
 
-# Add src directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+# Find project root (two levels up from /web_interface/pages/)
+ROOT = Path(__file__).resolve().parents[2]
+
+SRC = ROOT / "src"
+WEB = ROOT / "web_interface"
+
+for p in (SRC, WEB):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 # Import utilities
 from utils.session_manager import initialize_session_state
