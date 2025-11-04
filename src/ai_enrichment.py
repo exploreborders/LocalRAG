@@ -92,14 +92,14 @@ class AIEnrichmentService:
 
     def _generate_enrichment_data(self, content: str, filename: str) -> Dict[str, Any]:
         """
-        Generate AI enrichment data for document content.
+        Generate AI enrichment data for document content with enhanced categorization.
 
         Args:
             content: Document content to analyze
             filename: Document filename
 
         Returns:
-            Dict with tags, summary, topics, etc.
+            Dict with tags, summary, topics, categories, etc.
         """
         # Truncate content if too long (keep first 2000 chars for analysis)
         analysis_content = content[:2000] if len(content) > 2000 else content
@@ -172,6 +172,9 @@ class AIEnrichmentService:
                 topics.append(topic)
         topics = topics[:4]  # Limit to 4 topics
 
+        # AI-powered category classification
+        category_data = self._classify_document_category(analysis_content, filename, tags, topics)
+
         # Estimate reading time (rough calculation: 200 words per minute)
         word_count = len(re.findall(r'\w+', content))
         reading_time = max(1, round(word_count / 200))
@@ -180,14 +183,175 @@ class AIEnrichmentService:
             'summary': summary.strip(),
             'tags': tags,
             'topics': topics,
+            'primary_category': category_data.get('primary_category'),
+            'subcategories': category_data.get('subcategories', []),
+            'category_confidence': category_data.get('confidence', 0.0),
+            'alternative_categories': category_data.get('alternatives', []),
             'reading_time': reading_time,
             'word_count': word_count,
             'generated_at': datetime.now().isoformat()
         }
 
+    def _classify_document_category(self, content: str, filename: str, tags: List[str], topics: List[str]) -> Dict[str, Any]:
+        """
+        Use AI to classify document into categories and subcategories.
+
+        Args:
+            content: Document content
+            filename: Document filename
+            tags: Generated tags
+            topics: Generated topics
+
+        Returns:
+            Dict with category classification data
+        """
+        if not self.llm_client:
+            return {
+                'primary_category': 'General',
+                'subcategories': [],
+                'confidence': 0.0,
+                'alternatives': []
+            }
+
+        # Primary category classification
+        category_prompt = f"""
+        Analyze this document and assign it to the most appropriate primary category.
+        Choose from: Academic, Technical, Business, Scientific, Educational, Legal, Medical, Creative, Reference, General
+
+        Document: {filename}
+        Content preview: {content[:500]}
+        Tags: {', '.join(tags)}
+        Topics: {', '.join(topics)}
+
+        Return only the category name (one word):
+        """
+
+        primary_category = self._call_llm(category_prompt, max_tokens=20).strip()
+
+        # Validate category
+        valid_categories = ['Academic', 'Technical', 'Business', 'Scientific', 'Educational',
+                          'Legal', 'Medical', 'Creative', 'Reference', 'General']
+        if primary_category not in valid_categories:
+            primary_category = 'General'
+
+        # Generate subcategories
+        subcategory_prompt = f"""
+        For the category "{primary_category}", suggest 1-2 relevant subcategories for this document.
+        Consider the tags and topics provided.
+
+        Document: {filename}
+        Tags: {', '.join(tags)}
+        Topics: {', '.join(topics)}
+
+        IMPORTANT: Return ONLY clean subcategory names separated by commas.
+        Do NOT include explanations, prefixes, or quotes.
+        Examples: "Machine Learning, Deep Learning" or "Computer Vision" or "Natural Language Processing, Neural Networks"
+        """
+
+        subcategory_response = self._call_llm(subcategory_prompt, max_tokens=50).strip()
+        subcategories = [s.strip() for s in subcategory_response.split(',') if s.strip()]
+
+        # Clean subcategory names - extract actual category names
+        cleaned_subcategories = []
+        for subcat in subcategories[:2]:  # Limit to 2
+            # Remove common AI prefixes and clean up
+            cleaned = self._clean_category_name(subcat)
+            if cleaned and len(cleaned) > 1:  # Avoid single characters
+                cleaned_subcategories.append(cleaned)
+
+        subcategories = cleaned_subcategories
+
+        # Alternative categories with confidence
+        alternatives_prompt = f"""
+        Suggest 2 alternative categories for this document (besides {primary_category}).
+        Include confidence scores (0.0-1.0) in format: Category:Score
+
+        Document: {filename}
+        Tags: {', '.join(tags)}
+        Topics: {', '.join(topics)}
+
+        Return format: Category1:0.8, Category2:0.6
+        """
+
+        alternatives_response = self._call_llm(alternatives_prompt, max_tokens=40).strip()
+        alternatives = []
+        for alt in alternatives_response.split(','):
+            if ':' in alt:
+                cat, score = alt.split(':', 1)
+                try:
+                    score_val = float(score.strip())
+                    cleaned_cat = self._clean_category_name(cat.strip())
+                    if cleaned_cat:
+                        alternatives.append({'category': cleaned_cat, 'confidence': score_val})
+                except ValueError:
+                    continue
+
+        return {
+            'primary_category': primary_category,
+            'subcategories': subcategories,
+            'confidence': 0.8,  # Default high confidence for AI classification
+            'alternatives': alternatives[:2]  # Limit to 2 alternatives
+        }
+
+    def _clean_category_name(self, raw_name: str) -> str:
+        """
+        Clean AI-generated category names to extract actual category names.
+
+        Args:
+            raw_name: Raw category name from AI
+
+        Returns:
+            Cleaned category name
+        """
+        import re
+
+        cleaned = raw_name.strip()
+
+        # Remove common AI prefixes and verbose phrases
+        prefixes_to_remove = [
+            r'I suggest the following relevant subcategories for the .*? category:\s*',
+            r'I would suggest the following relevant subcategories for the .*? category:\s*',
+            r'For the .*? category, I suggest:\s*',
+            r'Based on the .*?(?:provided|document|tags|topics).*?:\s*',
+            r'Two relevant subcategories for .*? could be:\s*',
+            r'Relevant subcategories?:\s*',
+            r'Suggested subcategories?:\s*',
+            r'Subcategories?:\s*',
+            r'Suggested:\s*',
+            r'^\s*[-•*]\s*',  # Bullet points
+            r'^\s*\d+\.\s*',  # Numbered lists
+        ]
+
+        # Remove prefixes
+        for prefix in prefixes_to_remove:
+            cleaned = re.sub(prefix, '', cleaned, flags=re.IGNORECASE)
+
+        # Split on common separators and take the first meaningful part
+        parts = re.split(r'[,;]|\sand\s|\sor\s|\scould be\s', cleaned)
+        if parts:
+            # Take the first non-empty part
+            cleaned = parts[0].strip()
+
+        # Remove quotes and extra punctuation
+        cleaned = re.sub(r'^["\']|["\']$', '', cleaned)  # Remove surrounding quotes
+        cleaned = re.sub(r'[^\w\s\-&]', '', cleaned)  # Keep letters, numbers, spaces, hyphens, ampersands
+        cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize whitespace
+        cleaned = cleaned.strip()
+
+        # Skip if it's too short or contains unwanted words
+        skip_words = ['the', 'and', 'or', 'for', 'with', 'from', 'this', 'that', 'these', 'those']
+        if len(cleaned.split()) <= 1 or any(word in cleaned.lower() for word in skip_words):
+            return ""
+
+        # Capitalize properly (title case for category names)
+        if cleaned:
+            cleaned = cleaned.title()
+
+        return cleaned
+
     def _apply_enrichment(self, document: Document, enrichment_data: Dict[str, Any]):
         """
-        Apply enrichment data to document.
+        Apply enrichment data to document with enhanced category support.
 
         Args:
             document: Document object to update
@@ -203,7 +367,9 @@ class AIEnrichmentService:
         custom_metadata.update({
             'ai_enriched': True,
             'word_count': enrichment_data.get('word_count'),
-            'ai_generated_at': enrichment_data.get('generated_at')
+            'ai_generated_at': enrichment_data.get('generated_at'),
+            'ai_category_confidence': enrichment_data.get('category_confidence', 0.0),
+            'ai_alternative_categories': enrichment_data.get('alternative_categories', [])
         })
         document.custom_metadata = custom_metadata
 
@@ -221,6 +387,39 @@ class AIEnrichmentService:
             except Exception as e:
                 print(f"Warning: Failed to add tag '{tag_name}': {e}")
                 continue
+
+        # Create and assign AI-suggested categories
+        primary_category = enrichment_data.get('primary_category')
+        if primary_category:
+            try:
+                # Check if primary category exists
+                category = self.category_manager.get_category_by_name(primary_category)
+                if not category:
+                    # Create new category
+                    category = self.category_manager.create_category(
+                        name=primary_category,
+                        description=f"AI-classified {primary_category.lower()} category"
+                    )
+
+                # Add category to document if not already assigned
+                if category:
+                    self.category_manager.add_category_to_document(document.id, category.id)
+
+                    # Create subcategories if provided
+                    parent_id = category.id
+                    for subcategory_name in enrichment_data.get('subcategories', []):
+                        subcat = self.category_manager.get_category_by_name(subcategory_name, parent_id)
+                        if not subcat:
+                            subcat = self.category_manager.create_category(
+                                name=subcategory_name,
+                                description=f"AI-generated subcategory of {primary_category}",
+                                parent_id=parent_id
+                            )
+                        if subcat:
+                            self.category_manager.add_category_to_document(document.id, subcat.id)
+
+            except Exception as e:
+                print(f"Warning: Failed to add AI categories: {e}")
 
         self.db.commit()
 

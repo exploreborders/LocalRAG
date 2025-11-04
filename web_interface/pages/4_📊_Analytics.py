@@ -436,15 +436,15 @@ def main():
                 func.count(DocumentTagAssignment.document_id).label('usage_count')
             ).join(DocumentTagAssignment).group_by(DocumentTag.id, DocumentTag.name, DocumentTag.color).order_by(
                 func.count(DocumentTagAssignment.document_id).desc()
-            ).limit(10).all()
+            ).all()  # Get all tags for cloud
 
             db.close()
 
             if tag_stats:
                 st.markdown("**Most Used Tags:**")
-                tag_cols = st.columns(min(len(tag_stats), 5))  # Max 5 tags per row
+                tag_cols = st.columns(min(len(tag_stats[:10]), 5))  # Max 5 tags per row, top 10
 
-                for i, (tag_name, tag_color, usage_count) in enumerate(tag_stats):
+                for i, (tag_name, tag_color, usage_count) in enumerate(tag_stats[:10]):
                     col_idx = i % 5
                     with tag_cols[col_idx]:
                         st.markdown(
@@ -458,10 +458,59 @@ def main():
                 if len(tag_stats) > 1:
                     st.markdown("**Tag Usage Distribution:**")
                     chart_data = pd.DataFrame({
-                        'Tag': [stat[0] for stat in tag_stats],
-                        'Documents': [stat[2] for stat in tag_stats]
+                        'Tag': [stat[0] for stat in tag_stats[:15]],  # Top 15 for chart
+                        'Documents': [stat[2] for stat in tag_stats[:15]]
                     })
                     st.bar_chart(chart_data.set_index('Tag'), height=200)
+
+                # Tag Cloud Visualization
+                if len(tag_stats) > 2:
+                    st.markdown("**☁️ Tag Cloud:**")
+                    try:
+                        # Create word cloud data
+                        from wordcloud import WordCloud
+                        import matplotlib.pyplot as plt
+                        from io import BytesIO
+                        import base64
+
+                        # Prepare word frequencies
+                        word_freq = {stat[0]: stat[2] for stat in tag_stats}
+
+                        # Generate word cloud
+                        wc = WordCloud(
+                            width=800,
+                            height=400,
+                            background_color='white',
+                            colormap='viridis',
+                            max_words=50,
+                            prefer_horizontal=0.7
+                        ).generate_from_frequencies(word_freq)
+
+                        # Convert to image
+                        fig, ax = plt.subplots(figsize=(10, 5))
+                        ax.imshow(wc, interpolation='bilinear')
+                        ax.axis('off')
+                        ax.set_title('Tag Usage Cloud', fontsize=16, fontweight='bold')
+
+                        # Save to buffer
+                        buf = BytesIO()
+                        fig.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+                        buf.seek(0)
+                        image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+                        buf.close()
+                        plt.close(fig)
+
+                        # Display
+                        st.markdown(
+                            f'<div style="text-align: center;"><img src="data:image/png;base64,{image_base64}" '
+                            'style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"></div>',
+                            unsafe_allow_html=True
+                        )
+
+                    except ImportError:
+                        st.info("📦 Install wordcloud for tag cloud visualization: `pip install wordcloud matplotlib`")
+                    except Exception as e:
+                        st.warning(f"Could not generate tag cloud: {e}")
 
         except Exception as e:
             st.warning(f"Could not load detailed tag analytics: {e}")
@@ -534,6 +583,305 @@ def main():
 
         except Exception as e:
             st.warning(f"Could not load detailed category analytics: {e}")
+
+    # Knowledge Graph Visualization
+    st.markdown("### 🕸️ Knowledge Graph Analytics")
+
+    try:
+        from src.knowledge_graph import KnowledgeGraph
+        from src.database.models import SessionLocal
+        import networkx as nx
+
+        db = SessionLocal()
+        kg = KnowledgeGraph(db)
+
+        # Get graph statistics
+        graph_stats = kg.get_graph_statistics()
+
+        # Build relationships for visualization
+        kg.build_relationships_from_cooccurrence(min_occurrences=2)
+        kg.infer_tag_category_relationships()
+
+        # Get top relationships for visualization
+        relationships_data = []
+        for tag, relations in kg._relationship_cache.items():
+            for rel in relations[:3]:  # Top 3 relationships per tag
+                relationships_data.append({
+                    'source': tag,
+                    'target': rel['related_tag'],
+                    'type': rel['type'],
+                    'strength': rel['strength'],
+                    'evidence': rel['evidence_count']
+                })
+
+        db.close()
+
+        # Knowledge Graph Metrics
+        kg_col1, kg_col2, kg_col3, kg_col4 = st.columns(4)
+
+        with kg_col1:
+            total_tags = graph_stats['tags']['total']
+            st.metric("🏷️ Total Tags", total_tags)
+
+        with kg_col2:
+            tags_with_rels = graph_stats['tags']['with_relationships']
+            st.metric("🔗 Tags with Relationships", tags_with_rels)
+
+        with kg_col3:
+            total_cats = graph_stats['categories']['total']
+            st.metric("📂 Categories", total_cats)
+
+        with kg_col4:
+            total_relationships = len(relationships_data)
+            st.metric("⚡ Relationships", total_relationships)
+
+        # Knowledge Graph Network Visualization
+        if relationships_data:
+            st.markdown("**Knowledge Graph Network:**")
+
+            # Create network data for visualization
+            import plotly.graph_objects as go
+
+            # Build network
+            G = nx.Graph()
+
+            # Add nodes and edges
+            for rel in relationships_data:
+                G.add_node(rel['source'], node_type='tag')
+                G.add_node(rel['target'], node_type='tag')
+                G.add_edge(rel['source'], rel['target'],
+                          weight=rel['strength'],
+                          relationship_type=rel['type'])
+
+            # Calculate advanced graph metrics
+            if len(G.nodes()) > 1:
+                # Centrality measures
+                degree_centrality = nx.degree_centrality(G)
+                betweenness_centrality = nx.betweenness_centrality(G, weight='weight')
+                closeness_centrality = nx.closeness_centrality(G)
+
+                # Community detection (greedy modularity)
+                try:
+                    from networkx.algorithms.community import greedy_modularity_communities
+                    communities = list(greedy_modularity_communities(G, weight='weight'))
+                    community_map = {}
+                    for i, comm in enumerate(communities):
+                        for node in comm:
+                            community_map[node] = i
+                except:
+                    community_map = {node: 0 for node in G.nodes()}
+
+                # Calculate node positions
+                pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
+
+                # Create edge traces
+                edge_x = []
+                edge_y = []
+                edge_weights = []
+                for edge in G.edges(data=True):
+                    x0, y0 = pos[edge[0]]
+                    x1, y1 = pos[edge[1]]
+                    edge_x.extend([x0, x1, None])
+                    edge_y.extend([y0, y1, None])
+                    edge_weights.append(edge[2].get('weight', 1))
+
+                # Normalize edge weights for visualization
+                if edge_weights:
+                    max_weight = max(edge_weights)
+                    min_weight = min(edge_weights)
+                    if max_weight > min_weight:
+                        edge_widths = [1 + 3 * (w - min_weight) / (max_weight - min_weight) for w in edge_weights]
+                    else:
+                        edge_widths = [2] * len(edge_weights)
+                else:
+                    edge_widths = [2] * len(G.edges())
+
+                edge_trace = go.Scatter(
+                    x=edge_x, y=edge_y,
+                    line=dict(width=edge_widths, color='#888'),
+                    hoverinfo='none',
+                    mode='lines')
+
+                # Create node traces with advanced coloring
+                node_x = []
+                node_y = []
+                node_text = []
+                node_color = []
+                node_size = []
+                node_hover_text = []
+
+                # Color palette for communities
+                colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
+
+                for node in G.nodes():
+                    x, y = pos[node]
+                    node_x.append(x)
+                    node_y.append(y)
+                    node_text.append(node)
+
+                    # Node size based on degree centrality
+                    degree_cent = degree_centrality.get(node, 0)
+                    node_size.append(max(15, min(40, 15 + degree_cent * 50)))
+
+                    # Color based on community
+                    comm_id = community_map.get(node, 0)
+                    node_color.append(colors[comm_id % len(colors)])
+
+                    # Hover text with centrality measures
+                    hover_text = f"{node}<br>"
+                    hover_text += f"Degree Centrality: {degree_centrality.get(node, 0):.3f}<br>"
+                    hover_text += f"Betweenness: {betweenness_centrality.get(node, 0):.3f}<br>"
+                    hover_text += f"Closeness: {closeness_centrality.get(node, 0):.3f}<br>"
+                    hover_text += f"Community: {comm_id}"
+                    node_hover_text.append(hover_text)
+
+                node_trace = go.Scatter(
+                    x=node_x, y=node_y,
+                    mode='markers+text',
+                    hoverinfo='text',
+                    text=node_text,
+                    hovertext=node_hover_text,
+                    textposition="top center",
+                    marker=dict(
+                        showscale=False,
+                        color=node_color,
+                        size=node_size,
+                        line_width=2,
+                        line_color='white'
+                    )
+                )
+
+                # Create figure
+                fig = go.Figure(data=[edge_trace, node_trace],
+                              layout=go.Layout(
+                                  showlegend=False,
+                                  hovermode='closest',
+                                  margin=dict(b=0,l=0,r=0,t=0),
+                                  xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                  yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                  height=500,
+                                  title="Knowledge Graph Network (with Centrality & Communities)"
+                               ))
+
+                st.plotly_chart(fig, width='stretch')
+
+                # Advanced Analytics Section
+                st.markdown("**📊 Advanced Graph Analytics:**")
+
+                analytics_col1, analytics_col2, analytics_col3 = st.columns(3)
+
+                with analytics_col1:
+                    st.markdown("**🏆 Top Central Tags:**")
+                    # Sort by degree centrality
+                    top_central = sorted(degree_centrality.items(), key=lambda x: x[1], reverse=True)[:5]
+                    for tag, centrality in top_central:
+                        st.write(f"• {tag}: {centrality:.3f}")
+
+                with analytics_col2:
+                    st.markdown("**🌉 Bridge Tags:**")
+                    # Sort by betweenness centrality
+                    top_between = sorted(betweenness_centrality.items(), key=lambda x: x[1], reverse=True)[:5]
+                    for tag, centrality in top_between:
+                        st.write(f"• {tag}: {centrality:.3f}")
+
+                with analytics_col3:
+                    st.markdown("**👥 Communities:**")
+                    st.write(f"• {len(set(community_map.values()))} communities detected")
+                    for comm_id in sorted(set(community_map.values())):
+                        comm_size = sum(1 for node in community_map if community_map[node] == comm_id)
+                        st.write(f"• Community {comm_id}: {comm_size} tags")
+
+            else:
+                # Fallback for small graphs
+                pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
+
+                # Create edge traces
+                edge_x = []
+                edge_y = []
+                for edge in G.edges():
+                    x0, y0 = pos[edge[0]]
+                    x1, y1 = pos[edge[1]]
+                    edge_x.extend([x0, x1, None])
+                    edge_y.extend([y0, y1, None])
+
+                edge_trace = go.Scatter(
+                    x=edge_x, y=edge_y,
+                    line=dict(width=0.5, color='#888'),
+                    hoverinfo='none',
+                    mode='lines')
+
+                # Create node traces
+                node_x = []
+                node_y = []
+                node_text = []
+                node_color = []
+                node_size = []
+
+                for node in G.nodes():
+                    x, y = pos[node]
+                    node_x.append(x)
+                    node_y.append(y)
+                    node_text.append(node)
+
+                    # Node size based on degree
+                    degree = G.degree(node)
+                    node_size.append(max(10, min(30, degree * 3)))
+
+                    # Color based on node type (could be extended)
+                    node_color.append('#1f77b4')  # Blue for tags
+
+                node_trace = go.Scatter(
+                    x=node_x, y=node_y,
+                    mode='markers+text',
+                    hoverinfo='text',
+                    text=node_text,
+                    textposition="top center",
+                    marker=dict(
+                        showscale=False,
+                        color=node_color,
+                        size=node_size,
+                        line_width=2,
+                        line_color='white'
+                    )
+                )
+
+                # Create figure
+                fig = go.Figure(data=[edge_trace, node_trace],
+                              layout=go.Layout(
+                                  showlegend=False,
+                                  hovermode='closest',
+                                  margin=dict(b=0,l=0,r=0,t=0),
+                                  xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                  yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                  height=400
+                              ))
+
+                st.plotly_chart(fig, width='stretch')
+
+                # Relationship Details
+                st.markdown("**Top Relationships:**")
+                rel_df = pd.DataFrame(relationships_data[:10])  # Show top 10
+                if not rel_df.empty:
+                    st.dataframe(rel_df[['source', 'target', 'type', 'strength', 'evidence']],
+                            width='stretch',
+                            column_config={
+                                'strength': st.column_config.NumberColumn(
+                                    'Strength',
+                                    format="%.2f"
+                                ),
+                                'evidence': st.column_config.NumberColumn(
+                                    'Evidence Count'
+                                )
+                             })
+
+        else:
+            # No relationships to visualize
+            st.info("📊 No tag relationships found. Add more documents with tags to see the knowledge graph visualization.")
+
+    except ImportError:
+        st.warning("⚠️ NetworkX not available for knowledge graph visualization")
+    except Exception as e:
+        st.warning(f"Could not load knowledge graph analytics: {e}")
 
     # System Health Status
     st.markdown("### 🔧 System Health")
@@ -724,25 +1072,129 @@ def main():
             • {metrics.get('docs_with_reading_time', 0)} with reading time
             """)
 
-    # Recent Queries Table
-    st.markdown("### 📋 Recent Queries")
+    # Recent Queries Table with Feedback
+    st.markdown("### 📋 Recent Queries & Feedback")
 
     history = st.session_state.get('query_history', [])
     if history:
         # Show last 10 queries
         recent_queries = history[-10:]
 
-        # Create a table
+        # Create a table with feedback options
         table_data = []
-        for item in reversed(recent_queries):  # Most recent first
+        for i, item in enumerate(reversed(recent_queries)):  # Most recent first
+            query_id = f"query_{len(history) - i - 1}"  # Unique ID for each query
+
+            # Get existing feedback if any
+            feedback_key = f"feedback_{query_id}"
+            existing_feedback = st.session_state.get(feedback_key, {})
+
             table_data.append({
                 'Time': item.get('timestamp', datetime.now()).strftime('%H:%M:%S'),
                 'Mode': item.get('mode', 'unknown').title(),
                 'Query': item.get('query', '')[:50] + ('...' if len(item.get('query', '')) > 50 else ''),
-                'Response Time': f"{item.get('processing_time', 0):.2f}s"
+                'Response Time': f"{item.get('processing_time', 0):.2f}s",
+                'Feedback': existing_feedback.get('rating', 'Not rated')
             })
 
-        st.dataframe(table_data, use_container_width=True)
+        st.dataframe(table_data, width='stretch')
+
+        # Feedback Collection Section
+        st.markdown("**💬 Provide Feedback on Recent Queries:**")
+
+        # Allow feedback on last 5 queries
+        feedback_queries = history[-5:]
+        if feedback_queries:
+            tabs = st.tabs([f"Query {i+1}" for i in range(len(feedback_queries))])
+
+            for i, (tab, item) in enumerate(zip(tabs, reversed(feedback_queries))):
+                with tab:
+                    query_id = f"query_{len(history) - i - 1}"
+                    feedback_key = f"feedback_{query_id}"
+
+                    st.markdown(f"**Query:** {item.get('query', '')}")
+                    st.markdown(f"**Mode:** {item.get('mode', 'unknown').title()}")
+                    st.markdown(f"**Response Time:** {item.get('processing_time', 0):.2f}s")
+
+                    # Get existing feedback
+                    existing = st.session_state.get(feedback_key, {})
+
+                    # Rating
+                    rating = st.slider(
+                        "Rate this response (1-5):",
+                        min_value=1,
+                        max_value=5,
+                        value=existing.get('rating', 3),
+                        key=f"rating_{query_id}"
+                    )
+
+                    # Comments
+                    comments = st.text_area(
+                        "Comments (optional):",
+                        value=existing.get('comments', ''),
+                        height=60,
+                        key=f"comments_{query_id}"
+                    )
+
+                    # Save feedback
+                    if st.button("💾 Save Feedback", key=f"save_{query_id}"):
+                        st.session_state[feedback_key] = {
+                            'rating': rating,
+                            'comments': comments,
+                            'timestamp': datetime.now(),
+                            'query': item.get('query', ''),
+                            'mode': item.get('mode', ''),
+                            'response_time': item.get('processing_time', 0)
+                        }
+                        st.success("✅ Feedback saved!")
+
+                        # Update the table data with new rating
+                        st.rerun()
+
+        # Feedback Analytics
+        st.markdown("**📊 Feedback Summary:**")
+        feedback_stats = []
+        for item in history:
+            query_id = f"query_{history.index(item)}"
+            feedback_key = f"feedback_{query_id}"
+            feedback = st.session_state.get(feedback_key, {})
+            if feedback.get('rating'):
+                feedback_stats.append({
+                    'rating': feedback['rating'],
+                    'mode': item.get('mode', 'unknown'),
+                    'response_time': item.get('processing_time', 0)
+                })
+
+        if feedback_stats:
+            feedback_df = pd.DataFrame(feedback_stats)
+
+            feedback_col1, feedback_col2, feedback_col3 = st.columns(3)
+
+            with feedback_col1:
+                avg_rating = feedback_df['rating'].mean()
+                st.metric("Average Rating", f"{avg_rating:.1f}/5")
+
+            with feedback_col2:
+                total_feedback = len(feedback_stats)
+                st.metric("Total Feedback", total_feedback)
+
+            with feedback_col3:
+                # Rating distribution
+                rating_counts = feedback_df['rating'].value_counts().sort_index()
+                most_common = rating_counts.idxmax()
+                st.metric("Most Common Rating", f"{most_common}/5")
+
+            # Rating distribution chart
+            st.markdown("**Rating Distribution:**")
+            rating_chart_data = pd.DataFrame({
+                'Rating': rating_counts.index,
+                'Count': rating_counts.values
+            }).set_index('Rating')
+            st.bar_chart(rating_chart_data, height=150)
+
+        else:
+            st.info("📝 No feedback provided yet. Rate some queries above!")
+
     else:
         st.info("📭 No queries recorded yet")
 
@@ -753,7 +1205,7 @@ def main():
     export_col1, export_col2, export_col3 = st.columns(3)
 
     with export_col1:
-        if st.button("📊 Export Query History", use_container_width=True):
+        if st.button("📊 Export Query History", width='stretch'):
             history = st.session_state.get('query_history', [])
             if history:
                 # Convert to DataFrame for export
@@ -778,7 +1230,7 @@ def main():
                 st.info("📭 No query history to export")
 
     with export_col2:
-        if st.button("📈 Export System Metrics", use_container_width=True):
+        if st.button("📈 Export System Metrics", width='stretch'):
             # Create comprehensive metrics export
             export_data = {
                 'export_timestamp': datetime.now().isoformat(),
@@ -831,7 +1283,7 @@ def main():
             )
 
     with export_col3:
-        if st.button("📋 Generate Report", use_container_width=True):
+        if st.button("📋 Generate Report", width='stretch'):
             # Generate a human-readable report
             report_lines = [
                 "# Local RAG System Analytics Report",

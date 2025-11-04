@@ -431,7 +431,7 @@ def main():
 
     with col1:
         if settings_changed:
-            if st.button("💾 Save Settings", type="primary", use_container_width=True):
+            if st.button("💾 Save Settings", type="primary", width='stretch'):
                 if save_settings_to_file(settings):
                     update_settings(settings)
                     st.success("✅ Settings saved successfully!")
@@ -450,14 +450,14 @@ def main():
                 else:
                     st.error("❌ Failed to save settings")
         else:
-            st.button("💾 Save Settings", type="secondary", use_container_width=True, disabled=True)
+            st.button("💾 Save Settings", type="secondary", width='stretch', disabled=True)
 
     with col2:
-        if st.button("🔄 Reset to Defaults", type="secondary", use_container_width=True):
+        if st.button("🔄 Reset to Defaults", type="secondary", width='stretch'):
             reset_settings()
 
     with col3:
-        if st.button("📊 Export Settings", type="secondary", use_container_width=True):
+        if st.button("📊 Export Settings", type="secondary", width='stretch'):
             st.download_button(
                 label="Download",
                 data=str(settings).replace("'", '"'),

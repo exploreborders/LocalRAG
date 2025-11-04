@@ -148,7 +148,7 @@ def render_submit_button(query, mode):
     if st.button(
         "🔎 Search",
         type="primary",
-        use_container_width=True,
+        width='stretch',
         disabled=disabled
     ):
         if not query.strip():

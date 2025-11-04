@@ -158,8 +158,15 @@ class TagManager:
 
     def get_document_tags(self, document_id: int) -> List[DocumentTag]:
         """Get all tags for a document."""
-        document = self.db.query(Document).filter(Document.id == document_id).first()
-        return document.tags if document else []
+        from sqlalchemy.orm import joinedload
+
+        # Get assignments with tags loaded
+        assignments = self.db.query(DocumentTagAssignment).options(
+            joinedload(DocumentTagAssignment.tag)
+        ).filter(DocumentTagAssignment.document_id == document_id).all()
+
+        # Return the actual tag objects
+        return [assignment.tag for assignment in assignments if assignment.tag]
 
     def get_tag_usage_stats(self) -> List[Dict[str, Any]]:
         """
@@ -297,9 +304,10 @@ class TagManager:
             from sqlalchemy import func
 
             # Get document IDs that have this tag
-            doc_ids_with_tag = self.db.query(DocumentTagAssignment.document_id).filter(
+            from sqlalchemy import select
+            doc_ids_with_tag = select(DocumentTagAssignment.document_id).where(
                 DocumentTagAssignment.tag_id == tag.id
-            ).subquery()
+            ).scalar_subquery()
 
             # Find other tags on those documents
             related_tags = self.db.query(
@@ -568,6 +576,28 @@ class CategoryManager:
 
         return [build_tree(root) for root in roots if root]
 
+    def get_category_hierarchy_path(self, category_id: int) -> List[str]:
+        """
+        Get the full hierarchy path for a category.
+
+        Args:
+            category_id: Category ID
+
+        Returns:
+            List of category names from root to the given category
+        """
+        path = []
+        current_id = category_id
+
+        while current_id:
+            category = self.get_category_by_id(current_id)
+            if not category:
+                break
+            path.insert(0, category.name)
+            current_id = category.parent_category_id
+
+        return path
+
     def update_category(self, category_id: int, name: Optional[str] = None,
                         description: Optional[str] = None, parent_id: Optional[int] = None) -> Optional[DocumentCategory]:
         """
@@ -674,8 +704,15 @@ class CategoryManager:
 
     def get_document_categories(self, document_id: int) -> List[DocumentCategory]:
         """Get all categories for a document."""
-        document = self.db.query(Document).filter(Document.id == document_id).first()
-        return document.categories if document else []
+        from sqlalchemy.orm import joinedload
+
+        # Get assignments with categories loaded
+        assignments = self.db.query(DocumentCategoryAssignment).options(
+            joinedload(DocumentCategoryAssignment.category)
+        ).filter(DocumentCategoryAssignment.document_id == document_id).all()
+
+        # Return the actual category objects
+        return [assignment.category for assignment in assignments if assignment.category]
 
     def get_category_usage_stats(self) -> List[Dict[str, Any]]:
         """

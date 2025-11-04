@@ -83,7 +83,7 @@ def render_tag_analytics():
                     color_continuous_scale='Blues'
                 )
                 fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True, key="tag_usage_distribution")
+                st.plotly_chart(fig, width='stretch', key="tag_usage_distribution")
             else:
                 st.info("No active tags found.")
 
@@ -114,7 +114,7 @@ def render_tag_analytics():
                     yaxis_title="Color",
                     height=400
                 )
-                st.plotly_chart(fig, use_container_width=True, key="color_distribution")
+                st.plotly_chart(fig, width='stretch', key="color_distribution")
             else:
                 st.info("No color data available.")
 
@@ -223,7 +223,7 @@ def render_tag_analytics():
                                     st.write(detail)
 
                         # Add button to reassign colors
-                        if st.button("🎨 Auto-reassign conflicting colors", use_container_width=True, key="reassign_colors"):
+                        if st.button("🎨 Auto-reassign conflicting colors", width='stretch', key="reassign_colors"):
                             try:
                                 # Get tags with conflicting colors
                                 conflicting_color_list = list(conflicting_colors.index)
@@ -259,7 +259,7 @@ def render_tag_analytics():
         with st.expander("📋 Raw Tag Data", expanded=False):
             st.dataframe(
                 df[['name', 'color', 'document_count', 'usage_count', 'created_at']],
-                use_container_width=True
+                width='stretch'
             )
 
     except Exception as e:
@@ -348,7 +348,7 @@ def render_tag_suggestions(document_id: int, document_content: str, document_tit
                             if st.button(
                                 "➕ Add",
                                 key=f"add_suggestion_{document_id}_{i}",
-                                use_container_width=True,
+                                width='stretch',
                                 help=f"Add '{tag_name}' to document"
                             ):
                                 # Create tag if it doesn't exist
@@ -366,7 +366,7 @@ def render_tag_suggestions(document_id: int, document_content: str, document_tit
                         if st.button(
                             "👁️ Preview",
                             key=f"preview_suggestion_{document_id}_{i}",
-                            use_container_width=True,
+                            width='stretch',
                             help=f"See documents with '{tag_name}' tag"
                         ):
                             # Show existing documents with this tag
@@ -392,7 +392,7 @@ def render_tag_suggestions(document_id: int, document_content: str, document_tit
                 st.markdown("### ⚡ Quick Auto-Assign")
                 st.markdown("Automatically assign high-confidence tags to this document:")
 
-                if st.button("🚀 Auto-assign high confidence tags", use_container_width=True):
+                if st.button("🚀 Auto-assign high confidence tags", width='stretch'):
                     assigned = tag_manager.auto_assign_tags(document_id, min_confidence=0.8)
                     if assigned:
                         st.success(f"✅ Auto-assigned {len(assigned)} tags: {', '.join(assigned)}")

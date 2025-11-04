@@ -308,9 +308,9 @@ def clear_all_documents():
 
         col1, col2 = st.columns([1, 1])
         with col1:
-            confirm_clear = st.button("🗑️ YES, DELETE ALL DOCUMENTS", type="primary", use_container_width=True)
+            confirm_clear = st.button("🗑️ YES, DELETE ALL DOCUMENTS", type="primary", width='stretch')
         with col2:
-            cancel_clear = st.button("❌ Cancel", use_container_width=True)
+            cancel_clear = st.button("❌ Cancel", width='stretch')
 
         if cancel_clear:
             st.session_state.show_clear_dialog = False
@@ -440,7 +440,7 @@ def show_clear_documents_dialog():
         st.session_state.show_clear_dialog = False
 
     # Trigger dialog from button
-    if st.button("🗑️ Clear Documents", type="secondary", use_container_width=True):
+    if st.button("🗑️ Clear Documents", type="secondary", width='stretch'):
         st.session_state.show_clear_dialog = True
         st.rerun()
 
@@ -514,7 +514,7 @@ def main():
             with col3:
                 st.write(file.type if file.type else "Unknown")
 
-        if st.button("🚀 Process & Upload Files", type="primary", use_container_width=True):
+        if st.button("🚀 Process & Upload Files", type="primary", width='stretch'):
             process_uploaded_files(uploaded_files)
 
     st.markdown("---")
@@ -533,7 +533,7 @@ def main():
         col1, col2, col3 = st.columns([1, 1, 1])
 
         with col1:
-            if st.button("🔄 Reprocess with Structure Extraction", type="secondary", use_container_width=True):
+            if st.button("🔄 Reprocess with Structure Extraction", type="secondary", width='stretch'):
                 reprocess_documents()
 
         with col2:
@@ -695,7 +695,7 @@ def main():
                         )
 
                     with tag_add_col:
-                        if st.button("➕ Add", key=f"add_tag_{doc['id']}", use_container_width=True, help="Add new tag"):
+                        if st.button("➕ Add", key=f"add_tag_{doc['id']}", width='stretch', help="Add new tag"):
                             if new_tag.strip():
                                 try:
                                     db = SessionLocal()
@@ -722,7 +722,7 @@ def main():
                                 st.warning("⚠️ Enter a tag name")
 
                     with tag_remove_col:
-                        if current_tags and st.button("🗑️ Clear All", key=f"remove_tags_{doc['id']}", use_container_width=True, help="Remove all tags"):
+                        if current_tags and st.button("🗑️ Clear All", key=f"remove_tags_{doc['id']}", width='stretch', help="Remove all tags"):
                             try:
                                 db = SessionLocal()
                                 tag_manager = TagManager(db)
@@ -751,22 +751,18 @@ def main():
                     # Get current categories for this document
                     current_categories = cat_manager.get_document_categories(doc['id'])
 
-                    db.close()
-
                     # Display current categories
                     if current_categories:
                         st.markdown("**Current Categories:**")
                         for category in current_categories:
-                            hierarchy_path = []
-                            current_cat = category
-                            while current_cat:
-                                hierarchy_path.insert(0, current_cat.name)
-                                current_cat = current_cat.parent if hasattr(current_cat, 'parent') else None
-
+                            # Build hierarchy path using category manager
+                            hierarchy_path = cat_manager.get_category_hierarchy_path(category.id)
                             path_str = " > ".join(hierarchy_path)
                             st.markdown(f"📁 {path_str}")
                     else:
                         st.info("📂 No categories assigned yet")
+
+                    db.close()
 
                     # Category management
                     cat_col1, cat_col2, cat_col3 = st.columns([2, 1, 1])
@@ -796,7 +792,7 @@ def main():
 
                     with cat_col2:
                         if new_category and new_category != "Select category...":
-                            if st.button("📂 Add Category", key=f"add_cat_{doc['id']}", use_container_width=True):
+                            if st.button("📂 Add Category", key=f"add_cat_{doc['id']}", width='stretch'):
                                 try:
                                     db = SessionLocal()
                                     cat_manager = CategoryManager(db)
@@ -816,11 +812,11 @@ def main():
                                 except Exception as e:
                                     st.error(f"❌ Error adding category: {e}")
                         else:
-                            st.button("📂 Add Category", key=f"add_cat_{doc['id']}", use_container_width=True, disabled=True)
+                            st.button("📂 Add Category", key=f"add_cat_{doc['id']}", width='stretch', disabled=True)
 
                     with cat_col3:
                         if current_categories:
-                            if st.button("🗑️ Remove All", key=f"remove_cats_{doc['id']}", use_container_width=True):
+                            if st.button("🗑️ Remove All", key=f"remove_cats_{doc['id']}", width='stretch'):
                                 try:
                                     db = SessionLocal()
                                     cat_manager = CategoryManager(db)
@@ -837,7 +833,7 @@ def main():
                                 except Exception as e:
                                     st.error(f"❌ Error removing categories: {e}")
                         else:
-                            st.button("🗑️ Remove All", key=f"remove_cats_{doc['id']}", use_container_width=True, disabled=True)
+                            st.button("🗑️ Remove All", key=f"remove_cats_{doc['id']}", width='stretch', disabled=True)
 
                 except Exception as e:
                     st.error(f"❌ Error loading category management: {e}")
@@ -875,7 +871,7 @@ def main():
                         help="Choose documents to tag"
                     )
 
-                    if st.button("🏷️ Apply Tag to Selected", key="bulk_apply_tag", use_container_width=True):
+                    if st.button("🏷️ Apply Tag to Selected", key="bulk_apply_tag", width='stretch'):
                         if bulk_tag and selected_docs:
                             try:
                                 db = SessionLocal()
@@ -933,7 +929,7 @@ def main():
                         help="Choose documents to categorize"
                     )
 
-                    if st.button("📂 Apply Category to Selected", key="bulk_apply_cat", use_container_width=True):
+                    if st.button("📂 Apply Category to Selected", key="bulk_apply_cat", width='stretch'):
                         if bulk_category and selected_docs_for_cat:
                             try:
                                 db = SessionLocal()
@@ -979,7 +975,7 @@ def main():
             help="Choose documents to reprocess with enhanced structure extraction"
         )
 
-        if st.button("🔄 Reprocess Selected", key="bulk_reprocess", use_container_width=True):
+        if st.button("🔄 Reprocess Selected", key="bulk_reprocess", width='stretch'):
             if selected_for_reprocess:
                 st.info(f"🔄 Reprocessing {len(selected_for_reprocess)} document(s)...")
                 # This would implement batch reprocessing - placeholder for now
@@ -1027,7 +1023,7 @@ def main():
                     help="Select parent for subcategory, or leave as root"
                 )
 
-            if st.button("➕ Create Category", key="create_category", use_container_width=True):
+            if st.button("➕ Create Category", key="create_category", width='stretch'):
                 if new_cat_name.strip():
                     try:
                         parent_id = None
@@ -1062,7 +1058,7 @@ def main():
                     help="Warning: This will remove the category from all documents"
                 )
 
-                if st.button("🗑️ Delete Category", key="delete_category", type="secondary", use_container_width=True):
+                if st.button("🗑️ Delete Category", key="delete_category", type="secondary", width='stretch'):
                     try:
                         cat_name = cat_to_delete.split(' (')[0]  # Extract name before count
                         category = cat_manager.get_category_by_name(cat_name)
@@ -1121,7 +1117,7 @@ def main():
 
                     import pandas as pd
                     df = pd.DataFrame(stat_data)
-                    st.dataframe(df, use_container_width=True)
+                    st.dataframe(df, width='stretch')
 
                     # Visual chart
                     if len(usage_stats) > 1:

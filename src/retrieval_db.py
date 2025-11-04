@@ -11,6 +11,7 @@ from sentence_transformers import SentenceTransformer
 
 from .database.models import SessionLocal, Document, DocumentChunk
 from .embeddings import get_embedding_model
+from .knowledge_graph import KnowledgeGraph
 
 class DatabaseRetriever:
     """
@@ -20,7 +21,7 @@ class DatabaseRetriever:
 
     def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", use_batch_processing: bool = False):
         """
-        Initialize the retriever with specified embedding model.
+        Initialize the retriever with specified embedding model and knowledge graph.
 
         Args:
             model_name (str): Name of the sentence-transformers model to use
@@ -44,9 +45,8 @@ class DatabaseRetriever:
                         # Create task in existing loop
                         asyncio.create_task(self.batch_service.start_processing())
                     else:
-                        # This will be a problem - we can't start async processing in sync context
-                        # Let's defer this to when it's actually needed
-                        pass
+                        # We can start it in a new loop
+                        asyncio.run(self.batch_service.start_processing())
                 except RuntimeError:
                     # No event loop, defer to when needed
                     pass
@@ -64,9 +64,96 @@ class DatabaseRetriever:
         )
         self.db: Session = SessionLocal()
 
+        # Initialize knowledge graph for enhanced retrieval
+        self.knowledge_graph = KnowledgeGraph(self.db)
+
     def __del__(self):
         """Clean up database connections."""
         self.db.close()
+
+    def retrieve_with_knowledge_graph(self, query: str, tags: List[str] = None,
+                                     categories: List[str] = None, limit: int = 10,
+                                     include_related: bool = True) -> List[Dict[str, Any]]:
+        """
+        Enhanced retrieval using knowledge graph for contextual expansion.
+
+        Args:
+            query: Search query text
+            tags: Optional tag filters
+            categories: Optional category filters
+            limit: Maximum results to return
+            include_related: Whether to include related documents
+
+        Returns:
+            List of retrieved documents with context
+        """
+        # Expand context using knowledge graph
+        if tags or categories:
+            context_expansion = self.knowledge_graph.expand_query_context(
+                tags or [], categories or [], context_depth=2
+            )
+
+            # Combine original and expanded tags/categories
+            expanded_tags = (tags or []) + context_expansion.get('expanded_tags', [])
+            expanded_categories = (categories or []) + context_expansion.get('expanded_categories', [])
+
+            # Find documents using relationships
+            related_docs = self.knowledge_graph.find_documents_by_relationships(
+                expanded_tags, expanded_categories, include_related
+            )
+
+            # Get embeddings for semantic search
+            query_embedding = self.embed_query(query)
+
+            # Score documents by relevance
+            scored_results = []
+            for doc_info in related_docs:
+                doc = doc_info['document']
+
+                # Get document chunks for semantic similarity
+                chunks = self.db.query(DocumentChunk).filter(
+                    DocumentChunk.document_id == doc.id
+                ).limit(3).all()  # Use first few chunks
+
+                if chunks:
+                    # Calculate semantic similarity
+                    chunk_texts = [chunk.content for chunk in chunks]
+                    chunk_embeddings = self.model.encode(chunk_texts)
+
+                    # Average similarity across chunks
+                    similarities = []
+                    for chunk_emb in chunk_embeddings:
+                        similarity = np.dot(query_embedding, chunk_emb) / (
+                            np.linalg.norm(query_embedding) * np.linalg.norm(chunk_emb)
+                        )
+                        similarities.append(similarity)
+
+                    semantic_score = np.mean(similarities)
+                else:
+                    semantic_score = 0.0
+
+                # Combine semantic score with relationship relevance
+                relationship_score = doc_info.get('relevance_score', 0.5)
+                final_score = 0.7 * semantic_score + 0.3 * relationship_score
+
+                scored_results.append({
+                    'document': doc,
+                    'score': final_score,
+                    'semantic_score': semantic_score,
+                    'relationship_score': relationship_score,
+                    'match_type': doc_info.get('match_type', 'unknown'),
+                    'tags': doc_info.get('tags', []),
+                    'categories': doc_info.get('categories', []),
+                    'context_expansion': context_expansion
+                })
+
+            # Sort by final score and return top results
+            scored_results.sort(key=lambda x: x['score'], reverse=True)
+            return scored_results[:limit]
+
+        else:
+            # Fallback to standard retrieval if no tags/categories provided
+            return self.retrieve_documents(query, limit=limit)
 
     def embed_query(self, query: str) -> np.ndarray:
         """

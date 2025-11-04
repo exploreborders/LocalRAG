@@ -15,6 +15,8 @@ elasticsearch==8.11.0
 langdetect==1.0.9
 spacy==3.8.0
 redis==5.0.1
+networkx==3.2.1
+plotly==5.18.0
 de-core-news-sm
 fr-core-news-sm
 es-core-news-sm

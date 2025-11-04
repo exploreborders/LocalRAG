@@ -12,6 +12,8 @@ import hashlib
 import logging
 
 from .retrieval_db import DatabaseRetriever
+from .knowledge_graph import KnowledgeGraph
+from .database.models import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -364,16 +366,8 @@ Odpowiedź:"""
                 self.cache.set(cache_key, cached_response)
                 return cached_response['answer']
 
-        # Combine context from retrieved documents with source information
-        context_parts = []
-        for i, doc in enumerate(context_docs, 1):
-            doc_info = doc.get('document', {})
-            filename = doc_info.get('filename', f'Document {i}')
-            content = doc['content']
-            source_ref = f"[Source {i}: {filename}]"
-            context_parts.append(f"{source_ref}\n{content}")
-
-        context = "\n\n".join(context_parts)
+        # Build enhanced context using knowledge graph relationships
+        context = self._build_enhanced_context(query, context_docs)
 
         # Get appropriate prompt template for the detected language
         prompt_template = self.prompt_templates.get(query_lang, self.default_template)
@@ -399,6 +393,80 @@ Odpowiedź:"""
             return answer
         except Exception as e:
             return f"Error generating answer: {e}"
+
+    def _build_enhanced_context(self, query: str, context_docs: List[Dict[str, Any]]) -> str:
+        """
+        Build enhanced context using knowledge graph relationships.
+
+        Args:
+            query: Original query
+            context_docs: Retrieved document information
+
+        Returns:
+            Enhanced context string with relationships
+        """
+        context_parts = []
+
+        # Initialize knowledge graph for context expansion
+        kg = KnowledgeGraph(SessionLocal())
+
+        # Collect all tags and categories from retrieved documents
+        all_tags = set()
+        all_categories = set()
+
+        for i, doc in enumerate(context_docs, 1):
+            # Handle different document formats
+            if isinstance(doc.get('document'), dict):
+                doc_info = doc['document']
+                filename = doc_info.get('filename', f'Document {i}')
+                content = doc.get('content', '')
+            else:
+                # Handle Document model objects
+                doc_obj = doc.get('document')
+                filename = getattr(doc_obj, 'filename', f'Document {i}')
+                content = doc.get('content', '')
+
+                # Extract tags and categories from document object
+                if hasattr(doc_obj, 'tags'):
+                    doc_tags = [tag.name for tag in doc_obj.tags]
+                    all_tags.update(doc_tags)
+                if hasattr(doc_obj, 'categories'):
+                    doc_cats = [cat.name for cat in doc_obj.categories]
+                    all_categories.update(doc_cats)
+
+            source_ref = f"[Source {i}: {filename}]"
+
+            # Add relationship context if available
+            relationship_info = ""
+            if 'tags' in doc and doc['tags']:
+                relationship_info += f"Tags: {', '.join(doc['tags'])}"
+            if 'categories' in doc and doc['categories']:
+                if relationship_info:
+                    relationship_info += " | "
+                relationship_info += f"Categories: {', '.join(doc['categories'])}"
+            if 'match_type' in doc:
+                if relationship_info:
+                    relationship_info += " | "
+                relationship_info += f"Match: {doc['match_type']}"
+
+            if relationship_info:
+                context_parts.append(f"{source_ref} ({relationship_info})\n{content}")
+            else:
+                context_parts.append(f"{source_ref}\n{content}")
+
+        # Add knowledge graph context expansion
+        if all_tags or all_categories:
+            try:
+                expansion = kg.expand_query_context(
+                    list(all_tags), list(all_categories), context_depth=1
+                )
+
+                if expansion.get('total_expansions', 0) > 0:
+                    context_parts.append(f"\n[Knowledge Graph Context]\nRelated Tags: {', '.join(expansion.get('expanded_tags', []))}\nRelated Categories: {', '.join(expansion.get('expanded_categories', []))}\nTag-Category Relationships: {', '.join(expansion.get('tag_related_categories', []))}")
+            except Exception as e:
+                logger.warning(f"Failed to expand context with knowledge graph: {e}")
+
+        return "\n\n".join(context_parts)
 
     def query(self, question: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
