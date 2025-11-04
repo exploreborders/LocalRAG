@@ -248,8 +248,8 @@ def reprocess_documents():
                 status_text.text(f"🔄 Reprocessing {doc.filename}...")
                 progress_bar.progress(int((i / len(docs)) * 100))
 
-                # Reprocess with enhanced processor
-                result = processor.process_single_file(doc.filepath, doc.filename, doc.file_hash)
+                # Reprocess with enhanced processor and force enrichment
+                result = processor.process_single_file(doc.filepath, doc.filename, doc.file_hash, force_enrichment=True)
 
                 if result['success']:
                     successful_reprocess += 1
@@ -595,7 +595,42 @@ def main():
                     with meta_col1:
                         if doc.get('document_summary'):
                             st.markdown("**📝 Summary:**")
-                            st.info(doc['document_summary'][:200] + "..." if len(doc['document_summary']) > 200 else doc['document_summary'])
+                            # Check if editing this document's summary
+                            edit_key = f"edit_summary_{doc['id']}"
+                            if st.session_state.get(edit_key, False):
+                                # Edit mode
+                                new_summary = st.text_area(
+                                    "Edit summary",
+                                    value=doc['document_summary'],
+                                    height=150,
+                                    key=f"summary_text_{doc['id']}",
+                                    label_visibility="collapsed"
+                                )
+                                col_save, col_cancel = st.columns([1, 1])
+                                with col_save:
+                                    if st.button("💾 Save", key=f"save_summary_{doc['id']}", width='stretch'):
+                                        try:
+                                            db = SessionLocal()
+                                            document = db.query(Document).filter(Document.id == doc['id']).first()
+                                            if document:
+                                                document.document_summary = new_summary.strip()
+                                                db.commit()
+                                                st.success("✅ Summary updated!")
+                                                st.session_state[edit_key] = False
+                                                st.rerun()
+                                            db.close()
+                                        except Exception as e:
+                                            st.error(f"❌ Error updating summary: {e}")
+                                with col_cancel:
+                                    if st.button("❌ Cancel", key=f"cancel_summary_{doc['id']}", width='stretch'):
+                                        st.session_state[edit_key] = False
+                                        st.rerun()
+                            else:
+                                # Display mode
+                                st.info(doc['document_summary'][:200] + "..." if len(doc['document_summary']) > 200 else doc['document_summary'])
+                                if st.button("✏️ Edit Summary", key=f"edit_btn_{doc['id']}", help="Edit the document summary"):
+                                    st.session_state[edit_key] = True
+                                    st.rerun()
 
                         if doc.get('key_topics'):
                             st.markdown("**🏷️ Key Topics:**")

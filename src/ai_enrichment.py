@@ -10,8 +10,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import json
 
-from .database.models import Document, DocumentChunk, SessionLocal
-from .document_managers import TagManager, CategoryManager
+from database.models import Document, DocumentChunk, SessionLocal
+from document_managers import TagManager, CategoryManager
 
 
 class AIEnrichmentService:
@@ -115,6 +115,16 @@ class AIEnrichmentService:
         """
 
         summary = self._call_llm(summary_prompt, max_tokens=150)
+
+        # Clean up the summary response - remove introductory text
+        summary_lower = summary.lower()
+        if (summary_lower.startswith("here is a summary") or
+            summary_lower.startswith("here is a concise summary") or
+            summary_lower.startswith("summary:")):
+            # Find the first colon and take everything after it
+            colon_index = summary.find(":")
+            if colon_index != -1:
+                summary = summary[colon_index + 1:].strip()
 
         # Generate tags
         tags_prompt = f"""

@@ -30,10 +30,10 @@ from sqlalchemy.orm import Session
 from langdetect import detect, LangDetectException
 import spacy
 
-from .database.models import Document, DocumentChunk, DocumentChapter, SessionLocal
-from .data_loader import split_documents
-from .embeddings import get_embedding_model, create_embeddings
-from .database.opensearch_setup import get_elasticsearch_client
+from database.models import Document, DocumentChunk, DocumentChapter, SessionLocal
+from data_loader import split_documents
+from embeddings import get_embedding_model, create_embeddings
+from database.opensearch_setup import get_elasticsearch_client
 
 class UploadProcessor:
     """
@@ -418,7 +418,7 @@ class UploadProcessor:
 
         return has_letters and number_ratio < 0.5
 
-    def process_single_file(self, file_path: str, filename: str, file_hash: str) -> Dict[str, Any]:
+    def process_single_file(self, file_path: str, filename: str, file_hash: str, force_enrichment: bool = False) -> Dict[str, Any]:
         """
         Process a single file with full structure extraction and chapter creation.
 
@@ -426,6 +426,7 @@ class UploadProcessor:
             file_path: Path to the file
             filename: Original filename
             file_hash: MD5 hash of the file
+            force_enrichment: Whether to force re-enrichment of already enriched documents
 
         Returns:
             Dictionary with processing results and metadata
@@ -637,7 +638,7 @@ class UploadProcessor:
             try:
                 from .ai_enrichment import AIEnrichmentService
                 enrichment_service = AIEnrichmentService()
-                enrichment_result = enrichment_service.enrich_document(doc.id)
+                enrichment_result = enrichment_service.enrich_document(doc.id, force=force_enrichment)
 
                 if enrichment_result.get('success'):
                     print(f"AI enrichment completed for {filename}")

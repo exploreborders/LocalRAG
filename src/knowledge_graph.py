@@ -12,7 +12,7 @@ from sqlalchemy import and_, or_, func
 from collections import defaultdict, deque
 import logging
 
-from .database.models import (
+from database.models import (
     DocumentTag, DocumentCategory, Document,
     DocumentTagAssignment, DocumentCategoryAssignment,
     SessionLocal
@@ -205,9 +205,12 @@ class KnowledgeGraph:
                     queue.append((parent_cat.name, current_depth + 1))
 
             # Get child categories
-            children = self.db.query(DocumentCategory).filter(
-                DocumentCategory.parent_category_id == parent.id if parent else None
-            ).all()
+            if parent:
+                children = self.db.query(DocumentCategory).filter(
+                    DocumentCategory.parent_category_id == parent.id
+                ).all()
+            else:
+                children = []
 
             for child in children:
                 if child.name not in visited:

@@ -7,9 +7,9 @@ with tags and hierarchical categories, including AI-powered suggestions.
 
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
-from .database.models import DocumentTag, DocumentCategory, Document, DocumentTagAssignment, DocumentCategoryAssignment
-from .ai_tag_suggester import AITagSuggester
-from .tag_colors import TagColorManager
+from database.models import DocumentTag, DocumentCategory, Document, DocumentTagAssignment, DocumentCategoryAssignment
+from ai_tag_suggester import AITagSuggester
+from tag_colors import TagColorManager
 import logging
 
 logger = logging.getLogger(__name__)

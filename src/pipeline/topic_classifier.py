@@ -22,7 +22,7 @@ class TopicClassifier:
     """
 
     def __init__(self,
-                 model_name: str = "phi3.5:3.8b",
+                 model_name: str = "phi3.5:latest",
                  base_url: str = "http://localhost:11434"):
         """
         Initialize the topic classifier.

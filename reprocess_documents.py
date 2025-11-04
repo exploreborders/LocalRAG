@@ -37,8 +37,8 @@ def reprocess_documents():
                 # Calculate file hash
                 file_hash = processor.calculate_file_hash(doc.filepath)
 
-                # Reprocess the document
-                result = processor.process_single_file(doc.filepath, doc.filename, file_hash)
+                # Reprocess the document with forced AI enrichment
+                result = processor.process_single_file(doc.filepath, doc.filename, file_hash, force_enrichment=True)
 
                 if result['success']:
                     print(f"  ✅ Successfully reprocessed: {result.get('chunks_created', 0)} chunks")

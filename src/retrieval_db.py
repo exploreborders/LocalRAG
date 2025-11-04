@@ -9,9 +9,9 @@ from elasticsearch import Elasticsearch
 from sqlalchemy.orm import Session
 from sentence_transformers import SentenceTransformer
 
-from .database.models import SessionLocal, Document, DocumentChunk
-from .embeddings import get_embedding_model
-from .knowledge_graph import KnowledgeGraph
+from database.models import SessionLocal, Document, DocumentChunk
+from embeddings import get_embedding_model
+from knowledge_graph import KnowledgeGraph
 
 class DatabaseRetriever:
     """

@@ -15,10 +15,10 @@ from typing import Dict, Any, Optional, List
 from pathlib import Path
 import time
 
-from .vision_fallback import VisionFallbackProcessor
-from .structure_extractor import StructureExtractor
-from .hierarchical_chunker import HierarchicalChunker
-from .relevance_scorer import RelevanceScorer
+from pipeline.vision_fallback import VisionFallbackProcessor
+from pipeline.structure_extractor import StructureExtractor
+from pipeline.hierarchical_chunker import HierarchicalChunker
+from pipeline.relevance_scorer import RelevanceScorer
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +30,8 @@ class EnhancedDocumentProcessor:
     """
 
     def __init__(self,
-                 vision_model: str = "qwen2.5vl:7b",
-                 structure_model: str = "phi3.5:3.8b",
+                 vision_model: str = "qwen2.5vl:latest",
+                 structure_model: str = "llama3.2:latest",
                  ollama_base_url: str = "http://localhost:11434"):
         """
         Initialize the enhanced processor.

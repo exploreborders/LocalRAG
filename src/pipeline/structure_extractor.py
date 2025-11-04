@@ -10,6 +10,7 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 import re
 import requests
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class StructureExtractor:
     enhanced retrieval and organization.
     """
 
-    def __init__(self, model_name: str = "phi3.5:3.8b", base_url: str = "http://localhost:11434"):
+    def __init__(self, model_name: str = "phi3.5:latest", base_url: str = "http://localhost:11434"):
         """
         Initialize the structure extractor.
 
@@ -108,49 +109,32 @@ class StructureExtractor:
             text_sample = text
 
         prompt = f"""
-        Analyze the following document and extract its hierarchical structure.
+        Extract the EXACT table of contents from this document. Do not analyze or create new structure.
 
         Document: {filename}
-        Content Sample:
+        Content:
         {text_sample}
 
-        Instructions:
-        1. Identify the document's hierarchical structure (chapters, sections, subsections)
-        2. Assign proper hierarchical levels and numbering (1, 1.1, 1.1.1, etc.)
-        3. Extract chapter titles and section headings
-        4. Identify the main topics and themes
-        5. Determine the document type and purpose
-        6. Assess content complexity and technical level
+        TASK: Find the table of contents section and extract each entry exactly as written.
 
-        Return your analysis as a JSON object with this exact structure:
+        For each line in the table of contents that looks like:
+        | number | title |  or  number | title
+
+        Extract the number and title exactly, maintaining the hierarchy (1, 1.1, 2, 2.1, etc.).
+
+        Return ONLY valid JSON:
         {{
             "hierarchy": [
-                {{
-                    "level": 1,
-                    "path": "1",
-                    "title": "Chapter Title",
-                    "content_preview": "First few sentences...",
-                    "word_count": 150,
-                    "type": "chapter"
-                }},
-                {{
-                    "level": 2,
-                    "path": "1.1",
-                    "title": "Section Title",
-                    "content_preview": "Section content preview...",
-                    "word_count": 75,
-                    "type": "section"
-                }}
+                {{"level": 1, "path": "1", "title": "EXACT TITLE FROM TABLE", "content_preview": "", "word_count": 0, "type": "chapter"}},
+                {{"level": 2, "path": "1.1", "title": "EXACT SUBTITLE FROM TABLE", "content_preview": "", "word_count": 0, "type": "section"}}
             ],
-            "document_type": "research_paper|manual|report|article|book",
-            "primary_topic": "Main subject area",
-            "secondary_topics": ["topic1", "topic2"],
-            "technical_level": "beginner|intermediate|advanced|expert",
-            "content_quality": 0.85,
+            "document_type": "article",
+            "primary_topic": "General",
+            "secondary_topics": [],
+            "technical_level": "intermediate",
+            "content_quality": 0.8,
             "structure_confidence": 0.9
         }}
-
-        Be precise and base your analysis only on the provided content.
         """
 
         return prompt
@@ -158,34 +142,168 @@ class StructureExtractor:
     def _parse_structure_response(self, response_text: str) -> Dict[str, Any]:
         """Parse the JSON response from the structure analysis."""
         try:
-            import json
-
             # Extract JSON from response
             json_start = response_text.find('{')
             json_end = response_text.rfind('}') + 1
 
-            if json_start >= 0 and json_end > json_start:
-                json_str = response_text[json_start:json_end]
-                parsed = json.loads(json_str)
+            if json_start >= 0:
+                # Find the first complete JSON object by counting braces
+                json_str = response_text[json_start:]
+                brace_count = 0
+                end_pos = 0
 
-                # Validate required fields
-                if 'hierarchy' not in parsed:
-                    parsed['hierarchy'] = []
+                for i, char in enumerate(json_str):
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            end_pos = i + 1
+                            break
 
-                if 'document_type' not in parsed:
-                    parsed['document_type'] = 'unknown'
+                if end_pos > 0:
+                    json_str = json_str[:end_pos]
 
-                if 'primary_topic' not in parsed:
-                    parsed['primary_topic'] = 'general'
+                    # Clean JSON by removing JavaScript-style comments
+                    import re
+                    # Remove // comments
+                    json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
+                    # Remove /* */ comments
+                    json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
 
-                return parsed
-            else:
-                logger.warning("No JSON found in structure response")
-                return self._create_default_structure()
+                    parsed = json.loads(json_str)
+
+                    # Validate required fields
+                    if 'hierarchy' not in parsed:
+                        parsed['hierarchy'] = []
+
+                    if 'document_type' not in parsed:
+                        parsed['document_type'] = 'unknown'
+
+                    if 'primary_topic' not in parsed:
+                        parsed['primary_topic'] = 'general'
+
+                    # Filter out non-chapter entries from hierarchy
+                    filtered_hierarchy = []
+                    for item in parsed['hierarchy']:
+                        title = item.get('title', '').strip()
+                        if title and not self._is_non_chapter_text(title):
+                            filtered_hierarchy.append(item)
+
+                    parsed['hierarchy'] = filtered_hierarchy
+
+                    return parsed
+
+            # If we get here, no valid JSON was found
+            logger.warning("No complete JSON object found in structure response")
+            return self._create_default_structure()
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse structure JSON: {e}")
             return self._create_default_structure()
+
+    def _extract_table_of_contents(self, text: str) -> List[Dict[str, Any]]:
+        """Extract table of contents from document text."""
+        lines = text.split('\n')
+        hierarchy = []
+
+        # Look for table of contents section
+        toc_start = -1
+        for i, line in enumerate(lines):
+            line_lower = line.lower().strip()
+            if ('inhaltsverzeichnis' in line_lower or  # German
+                'table of contents' in line_lower or
+                'contents' in line_lower):
+                toc_start = i
+                break
+
+        if toc_start == -1:
+            return []
+
+        # Parse markdown table format
+        # Look for table rows starting from toc_start
+        for i in range(toc_start, min(toc_start + 50, len(lines))):
+            line = lines[i].strip()
+
+            # Skip table separators (|---| or |-----|)
+            if re.match(r'^\s*\|[\s\-\|]+\|\s*$', line):
+                continue
+
+            # Look for table rows with | number | title |
+            match = re.match(r'^\s*\|\s*([\d\.]+)\s*\|\s*(.+?)\s*\|.*\|?\s*$', line)
+            if match:
+                path = match.group(1).strip()
+                title = match.group(2).strip()
+
+                # Skip if it's not a proper chapter/section number
+                if not re.match(r'^\d+(\.\d+)*$', path):
+                    continue
+
+                # Filter out non-chapter text
+                if self._is_non_chapter_text(title):
+                    continue
+
+                # Determine level based on dots in path
+                level = path.count('.') + 1
+
+                hierarchy.append({
+                    'level': level,
+                    'path': path,
+                    'title': title,
+                    'content_preview': '',
+                    'word_count': 0,
+                    'type': 'chapter' if level == 1 else 'section'
+                })
+
+        return hierarchy
+
+    def _is_non_chapter_text(self, line: str) -> bool:
+        """Check if a line contains text that shouldn't be considered a chapter heading."""
+        # Common non-chapter patterns (case insensitive, with optional content after colon)
+        non_chapter_patterns = [
+            r'^wobei:?.*',  # "Wobei:" - German "whereas" or "where"
+            r'^note:?.*',   # "Note:"
+            r'^see also:?.*',  # "See also:"
+            r'^example:?.*',   # "Example:"
+            r'^figure:?.*',    # "Figure:"
+            r'^table:?.*',     # "Table:"
+            r'^source:?.*',    # "Source:"
+            r'^references?:?.*',  # "Reference(s):"
+            r'^abstract:?.*',  # "Abstract:"
+            r'^summary:?.*',   # "Summary:"
+            r'^introduction:?.*',  # "Introduction:" (too generic)
+            r'^conclusion:?.*',   # "Conclusion:"
+            r'^acknowledgments?:?.*',  # "Acknowledgment(s):"
+            r'^appendix:?.*',   # "Appendix:"
+            r'^glossary:?.*',   # "Glossary:"
+            r'^index:?.*',      # "Index:"
+            r'^contents?:?.*',  # "Content(s):"
+            r'^table of contents?:?.*',  # "Table of contents:"
+            r'^in this (chapter|section|part):?.*',  # "In this chapter/section/part:"
+            r'^the following:?.*',  # "The following:"
+            r'^overview:?.*',   # "Overview:"
+            r'^background:?.*', # "Background:"
+            r'^related work:?.*',  # "Related work:"
+            r'^methodology:?.*',  # "Methodology:"
+            r'^results:?.*',     # "Results:"
+            r'^discussion:?.*',  # "Discussion:"
+            r'^future work:?.*', # "Future work:"
+        ]
+
+        line_lower = line.lower().strip()
+        for pattern in non_chapter_patterns:
+            if re.match(pattern, line_lower):
+                return True
+
+        # Also exclude very short lines (likely not chapter headings)
+        if len(line.strip()) < 5:
+            return True
+
+        # Exclude lines that are just numbers or symbols
+        if re.match(r'^[\d\s\.\-\(\)]+$', line.strip()):
+            return True
+
+        return False
 
     def _create_default_structure(self) -> Dict[str, Any]:
         """Create a default structure when parsing fails."""
@@ -203,21 +321,101 @@ class StructureExtractor:
         """Fallback structure extraction using heuristics."""
         logger.info("Using fallback structure extraction")
 
-        # Simple heuristic-based structure detection
+        # First priority: extract table of contents if it exists
+        toc_hierarchy = self._extract_table_of_contents(text)
+        if toc_hierarchy:
+            logger.info(f"Successfully extracted {len(toc_hierarchy)} items from table of contents")
+            return {
+                'hierarchy': toc_hierarchy,
+                'document_type': self._guess_document_type(text, filename),
+                'primary_topic': 'general',
+                'secondary_topics': [],
+                'technical_level': 'intermediate',
+                'content_quality': 0.8,
+                'structure_confidence': 0.9
+            }
+
+        # Second priority: try LLM analysis if available
+        if self.is_available():
+            logger.info("No table of contents found, trying LLM analysis")
+            try:
+                # Use LLM for analysis but with a much simpler prompt
+                prompt = f"""
+                Analyze this document and identify its main sections.
+
+                Document: {filename}
+                Content: {text[:2000]}
+
+                Return a simple JSON list of section titles:
+                {{"sections": ["Section 1", "Section 2", "Subsection 1.1"]}}
+                """
+
+                payload = {
+                    "model": self.model_name,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.2, "num_predict": 500}
+                }
+
+                import requests
+                response = requests.post(self.api_url, json=payload, timeout=30)
+
+                if response.status_code == 200:
+                    result = response.json()
+                    response_text = result.get('response', '')
+
+                    # Simple JSON extraction
+                    json_start = response_text.find('{')
+                    json_end = response_text.rfind('}') + 1
+
+                    if json_start >= 0 and json_end > json_start:
+                        json_str = response_text[json_start:json_end]
+                        import json
+                        parsed = json.loads(json_str)
+
+                        if 'sections' in parsed:
+                            hierarchy = []
+                            for i, title in enumerate(parsed['sections'], 1):
+                                hierarchy.append({
+                                    'level': 1,
+                                    'path': str(i),
+                                    'title': title,
+                                    'content_preview': '',
+                                    'word_count': 0,
+                                    'type': 'chapter'
+                                })
+
+                            logger.info(f"LLM extracted {len(hierarchy)} sections")
+                            return {
+                                'hierarchy': hierarchy,
+                                'document_type': self._guess_document_type(text, filename),
+                                'primary_topic': 'general',
+                                'secondary_topics': [],
+                                'technical_level': 'intermediate',
+                                'content_quality': 0.5,
+                                'structure_confidence': 0.6
+                            }
+
+            except Exception as e:
+                logger.warning(f"LLM analysis failed: {e}")
+
+        # Final fallback: simple heuristic-based structure detection
+        logger.info("Using heuristic structure extraction")
         lines = text.split('\n')
         hierarchy = []
 
         current_chapter = 0
         current_section = 0
 
-        for line in lines[:50]:  # Analyze first 50 lines
+        for line in lines[:100]:  # Analyze first 100 lines
             line = line.strip()
             if not line:
                 continue
 
-            # Look for chapter-like patterns
-            if re.match(r'^(chapter|Chapter|CHAPTER)\s+\d+', line) or \
-               re.match(r'^\d+\.?\s+[A-Z]', line):
+            # Look for chapter-like patterns (with filtering)
+            if (re.match(r'^(chapter|Chapter|CHAPTER)\s+\d+', line) or \
+                re.match(r'^\d+\.?\s+[A-Z]', line)) and \
+                not self._is_non_chapter_text(line):
                 current_chapter += 1
                 hierarchy.append({
                     'level': 1,
@@ -229,9 +427,10 @@ class StructureExtractor:
                 })
                 current_section = 0
 
-            # Look for section-like patterns
+            # Look for section-like patterns (more selective)
             elif re.match(r'^\d+\.\d+', line) or \
-                 re.match(r'^[A-Z][^.!?]*$', line) and len(line) < 80:
+                  (re.match(r'^[A-Z][^.!?]*$', line) and len(line) < 80 and
+                   not self._is_non_chapter_text(line)):
                 current_section += 1
                 hierarchy.append({
                     'level': 2,

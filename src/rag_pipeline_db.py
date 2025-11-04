@@ -11,9 +11,9 @@ import os
 import hashlib
 import logging
 
-from .retrieval_db import DatabaseRetriever
-from .knowledge_graph import KnowledgeGraph
-from .database.models import SessionLocal
+from retrieval_db import DatabaseRetriever
+from knowledge_graph import KnowledgeGraph
+from database.models import SessionLocal
 
 logger = logging.getLogger(__name__)
 
