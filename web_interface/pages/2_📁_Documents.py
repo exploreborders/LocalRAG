@@ -21,6 +21,7 @@ try:
         SessionLocal, Document, DocumentChunk, DocumentChapter, DocumentEmbedding,
         DocumentTopic, DocumentTagAssignment, DocumentCategoryAssignment, DocumentTag
     )
+    from components.tag_analytics import render_tag_suggestions
 except ImportError:
     st.error("❌ Could not import RAG system components.")
     st.stop()
@@ -676,6 +677,11 @@ def main():
                     else:
                         st.caption("🏷️ No tags assigned yet")
 
+                    # AI Tag Suggestions
+                    if doc.get('full_content') and len(doc['full_content'].strip()) > 100:
+                        with st.expander("🤖 AI Tag Suggestions", expanded=False):
+                            render_tag_suggestions(doc['id'], doc['full_content'], doc['filename'])
+
                     # Tag management - compact layout
                     st.markdown("**Manage Tags:**")
                     tag_input_col, tag_add_col, tag_remove_col = st.columns([3, 1, 1])
@@ -1167,6 +1173,11 @@ def main():
     - 📊 **Rich Analytics**: Comprehensive system monitoring with tag and category stats
     - 🗑️ **Safe Management**: Complete document deletion with cleanup
     """)
+
+    # Tag Analytics Section
+    st.markdown("---")
+    from components.tag_analytics import render_tag_analytics
+    render_tag_analytics()
 
     # Enhanced processing status
     st.markdown("---")

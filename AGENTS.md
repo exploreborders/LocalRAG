@@ -1,89 +1,19 @@
 # AGENTS.md
 
 ## Build/Lint/Test Commands
-- Quick Setup: `python setup_all.py` (automated setup of everything)
-- Docker Setup: `./docker_setup.sh` (fully containerized setup)
-- Manual Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt && python -m spacy download de_core_news_sm fr_core_news_sm es_core_news_sm it_core_news_sm pt_core_news_sm nl_core_news_sm sv_core_news_sm pl_core_news_sm zh_core_web_sm ja_core_news_sm ko_core_news_sm`
-- Set up databases: `python setup_databases.py docker` (or `docker-compose up -d`)
-- Initialize databases: `python setup_databases.py docker` (includes OpenSearch setup)
-- Run all tests: `python tests/run_all_tests.py` (runs all test files)
-- Run system tests: `python tests/test_system.py`
+- Quick Setup: `python setup_all.py`
+- Docker Setup: `./docker_setup.sh`
+- Manual Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt`
+- Run all tests: `python tests/run_all_tests.py`
 - Run single test: `python -c "from tests.test_system import test_retrieval; test_retrieval()"`
-- Performance tests: `python tests/test_performance.py`
-- Cache tests: `python tests/test_cache.py` (test Redis caching functionality)
-- Cache performance: `python tests/test_cache_performance.py` (measure cache speedup)
-- Run web interface: `python run_web.py` (or `streamlit run web_interface/app.py`)
-- Run CLI app: `python -m src.app` (⚠️ **MUST** be run as module - `python src/app.py` will not work)
-- Process data: `python -m src.embeddings`
-- Reprocess documents (for language detection): Click "🔄 Reprocess Documents" in web interface (uses batch processing, parallelization, and memory management)
-- Stop databases: `docker-compose down`
-
-## Document Processing Commands
-- Upload documents with structure extraction: Use web interface Documents page (automatic processing)
-- Reprocess existing documents: Use "Reprocess with Structure Extraction" in web interface
-- Batch processing: `python -c "from src.upload_processor import UploadProcessor; p = UploadProcessor(); p.upload_files(file_list, use_parallel=True, max_workers=4)"`
-
-## Performance Optimization Settings
-- **Batch Processing**: Documents processed in configurable batches (default: 5)
-- **Parallel Processing**: Multi-worker processing for large document sets (default: 4 workers, SQLAlchemy-safe)
-- **Memory Management**: Automatic memory monitoring with configurable limits (default: 500MB)
-- **Pipeline Optimization**: Using default docling options (OCR/table processing enabled due to v2.60.0 backend bug)
-- **Converter Reuse**: Single DocumentConverter instance reused across operations
-- **Smart Routing**: Separate optimized paths for text files vs. complex documents
-- **Serialization Safety**: Workers use only serializable data to avoid SQLAlchemy pickling issues
-- **Database Optimization**: 30-50% query latency reduction through aggregated queries and metadata caching
-- **Index Utilization**: Strategic database indexes improve JOIN performance and query execution
-- **Cache Integration**: Redis caching for both LLM responses and document metadata lookups
-- **Embedding Batch Processing**: GPU-accelerated batch processing for 2-5x faster query handling (Apple Silicon Metal support included) - 17.6 queries/second achieved
-- **Advanced Document Management**: Tagging, categorization, and faceted search system for organizing large document collections
-
-## Redis Cache Management
-- **Cache Status**: View cache metrics in Analytics dashboard (total keys, memory usage, hit rate)
-- **Cache Settings**: Configure cache TTL and enable/disable in Settings page
-- **Clear Cache**: Use "🗑️ Clear Cache" button in Settings to manually clear all cached responses
-- **Cache Performance**: 172.5x speedup demonstrated for repeated queries (3.45s → 0.02s)
-- **Redis Monitoring**: `docker-compose exec redis redis-cli` for direct Redis access
-- **Cache Keys**: Pattern `llm:*` for LLM response cache entries, `doc_meta:*` for document metadata
-
-## Database Query Optimization
-- **Query Performance**: 30-50% reduction in query latency through optimized database operations
-- **Aggregated Queries**: Single queries replace multiple round-trips (N+1 query elimination)
-- **Metadata Caching**: Document metadata cached in Redis for fast lookups
-- **Index Optimization**: Strategic database indexes for improved JOIN performance
-- **Batch Operations**: Efficient batch processing for document listing and metadata retrieval
-- **Analytics Optimization**: Single aggregated queries for system metrics and statistics
-
-## Multilingual Support
-- **Language Detection**: Automatic language detection using `langdetect` for 12 supported languages
-- **Text Preprocessing**: Language-specific spaCy models for proper tokenization and sentence segmentation
-- **LLM Responses**: Language-aware prompt templates ensure responses in the user's query language
-- **Source Citations**: LLM answers include references to source documents ([Source 1: filename.pdf])
-- **Supported Languages**: English, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Polish, Chinese, Japanese, Korean
-
-## Environment Configuration
-- **Local Development**: Use `.env` with localhost settings (currently active)
-- **Docker Deployment**: Environment variables are set automatically in docker-compose.yml
-- **Database Switching**: Comment/uncomment sections in `.env` based on deployment method
+- Run web interface: `streamlit run web_interface/app.py`
+- Run CLI app: `python -m src.app`
 
 ## Code Style Guidelines
-- **Imports**: Group stdlib/third-party/local, sort alphabetically, use relative imports
-- **Formatting**: 4 spaces, 88 char limit, double quotes, docstrings for public APIs
-- **Naming**: snake_case functions/vars, PascalCase classes, UPPER_SNAKE_CASE constants
-- **Types**: Type hints on parameters/returns when beneficial for clarity
-- **Error Handling**: try/except with specific exceptions, validate inputs, context managers
-- **Best Practices**: PEP 8, descriptive names, single responsibility, unit tests, no global state
-
-## Document Processing
-- **Unified Loading**: Docling integration for high-quality document parsing (PDF, DOCX, PPTX, XLSX)
-- **Quality Processing**: Uses Docling for all document types including reprocessing for better text extraction
-- **Fallback Support**: PyPDF2 fallback for PDFs if Docling fails
-- **Text Files**: Direct loading for simple .txt files
-
-## Model Requirements
-- **Default model: nomic-ai/nomic-embed-text-v1.5**: Primary multilingual embedding model for all operations (requires einops)
-- **Language Support**: 12 languages with automatic detection and processing
-- **spaCy Models**: 11 language-specific models for text preprocessing (de, fr, es, it, pt, nl, sv, pl, zh, ja, ko)
-- **Smart Caching**: Document hash comparison prevents reprocessing
-- **Batch Processing**: Efficient document processing with single model
-- **Database Optimization**: Query performance improved by 30-50% through aggregated operations
-- **Metadata Caching**: Redis caching for document metadata lookups reduces database load
+- **Imports**: Group stdlib/third-party/local imports alphabetically, use relative imports for local modules
+- **Formatting**: 4 spaces indentation, 88 char line limit, double quotes for strings
+- **Naming**: snake_case for functions/variables, PascalCase for classes, UPPER_SNAKE_CASE for constants
+- **Types**: Use type hints on parameters/returns when beneficial for clarity
+- **Error Handling**: try/except with specific exceptions, validate inputs, use context managers
+- **Documentation**: Docstrings for public APIs and classes, use logging for debugging
+- **Best Practices**: PEP 8 compliance, descriptive names, single responsibility principle, no global state

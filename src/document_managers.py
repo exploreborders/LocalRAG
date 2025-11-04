@@ -2,23 +2,31 @@
 Document management classes for tagging and categorization.
 
 Provides TagManager and CategoryManager classes for organizing documents
-with tags and hierarchical categories.
+with tags and hierarchical categories, including AI-powered suggestions.
 """
 
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from .database.models import DocumentTag, DocumentCategory, Document, DocumentTagAssignment, DocumentCategoryAssignment
+from .ai_tag_suggester import AITagSuggester
+from .tag_colors import TagColorManager
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TagManager:
     """
     Manager class for document tags.
 
-    Handles CRUD operations for tags and tag-document associations.
+    Handles CRUD operations for tags and tag-document associations,
+    with AI-powered suggestions and intelligent color management.
     """
 
     def __init__(self, db: Session):
         self.db = db
+        self.ai_suggester = AITagSuggester()
+        self.color_manager = TagColorManager()
 
     def create_tag(self, name: str, color: Optional[str] = None, description: Optional[str] = None) -> DocumentTag:
         """
@@ -169,14 +177,279 @@ class TagManager:
 
         return [
             {
-                'id': cat.id,
-                'name': cat.name,
-                'description': cat.description,
-                'parent_category_id': cat.parent_category_id,
-                'document_count': count
+                'id': tag.id,
+                'name': tag.name,
+                'color': tag.color,
+                'description': tag.description,
+                'usage_count': tag.usage_count,
+                'document_count': count,
+                'created_at': tag.created_at
             }
-            for cat, count in result
+            for tag, count in result
         ]
+
+    def suggest_tags_for_document(self, document_id: int, max_suggestions: int = 5) -> List[Dict[str, Any]]:
+        """
+        Generate AI-powered tag suggestions for a document.
+
+        Args:
+            document_id: Document ID to generate suggestions for
+            max_suggestions: Maximum number of suggestions to return
+
+        Returns:
+            List of tag suggestions with confidence scores
+        """
+        try:
+            # Get document content
+            document = self.db.query(Document).filter(Document.id == document_id).first()
+            if not document or not document.full_content:
+                return []
+
+            # Get existing tags for this document
+            existing_tags = [tag.name for tag in self.get_document_tags(document_id)]
+
+            # Generate AI suggestions
+            suggestions = self.ai_suggester.suggest_tags(
+                document.full_content,
+                document.filename,
+                existing_tags,
+                max_suggestions
+            )
+
+            return suggestions
+
+        except Exception as e:
+            logger.error(f"Error generating tag suggestions for document {document_id}: {e}")
+            return []
+
+    def auto_assign_tags(self, document_id: int, min_confidence: float = 0.7) -> List[str]:
+        """
+        Automatically assign high-confidence AI-suggested tags to a document.
+
+        Args:
+            document_id: Document ID to auto-tag
+            min_confidence: Minimum confidence threshold for auto-assignment
+
+        Returns:
+            List of auto-assigned tag names
+        """
+        try:
+            suggestions = self.suggest_tags_for_document(document_id, max_suggestions=10)
+            assigned_tags = []
+
+            for suggestion in suggestions:
+                if suggestion['confidence'] >= min_confidence:
+                    tag_name = suggestion['tag']
+
+                    # Check if tag exists, create if not
+                    existing_tag = self.get_tag_by_name(tag_name)
+                    if not existing_tag:
+                        # Generate color for new tag
+                        color = self.color_manager.generate_color(tag_name)
+                        existing_tag = self.create_tag(tag_name, color=color)
+
+                    # Assign tag to document
+                    if existing_tag and self.add_tag_to_document(document_id, existing_tag.id):
+                        assigned_tags.append(tag_name)
+
+            return assigned_tags
+
+        except Exception as e:
+            logger.error(f"Error auto-assigning tags to document {document_id}: {e}")
+            return []
+
+    def get_popular_tags(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get most popular tags by usage count.
+
+        Args:
+            limit: Maximum number of tags to return
+
+        Returns:
+            List of popular tags with usage statistics
+        """
+        try:
+            stats = self.get_tag_usage_stats()
+            # Sort by document count descending
+            popular = sorted(stats, key=lambda x: x['document_count'], reverse=True)
+            return popular[:limit]
+        except Exception as e:
+            logger.error(f"Error getting popular tags: {e}")
+            return []
+
+    def get_related_tags(self, tag_name: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Find tags that are often used together with the given tag.
+
+        Args:
+            tag_name: Base tag name
+            limit: Maximum number of related tags to return
+
+        Returns:
+            List of related tags with co-occurrence statistics
+        """
+        try:
+            # Get documents that have this tag
+            tag = self.get_tag_by_name(tag_name)
+            if not tag:
+                return []
+
+            # Find other tags used on the same documents
+            from sqlalchemy import func
+
+            # Get document IDs that have this tag
+            doc_ids_with_tag = self.db.query(DocumentTagAssignment.document_id).filter(
+                DocumentTagAssignment.tag_id == tag.id
+            ).subquery()
+
+            # Find other tags on those documents
+            related_tags = self.db.query(
+                DocumentTag,
+                func.count(DocumentTagAssignment.document_id).label('co_occurrence')
+            ).join(DocumentTagAssignment).filter(
+                DocumentTagAssignment.document_id.in_(doc_ids_with_tag),
+                DocumentTag.id != tag.id
+            ).group_by(DocumentTag.id).order_by(func.count(DocumentTagAssignment.document_id).desc()).limit(limit).all()
+
+            return [
+                {
+                    'id': tag.id,
+                    'name': tag.name,
+                    'color': tag.color,
+                    'co_occurrence': count
+                }
+                for tag, count in related_tags
+            ]
+
+        except Exception as e:
+            logger.error(f"Error getting related tags for {tag_name}: {e}")
+            return []
+
+    def create_tag_with_ai_color(self, name: str, description: Optional[str] = None) -> DocumentTag:
+        """
+        Create a tag with AI-generated color suggestion.
+
+        Args:
+            name: Tag name
+            description: Optional description
+
+        Returns:
+            Created DocumentTag instance
+        """
+        color = self.color_manager.generate_color(name)
+        return self.create_tag(name, color=color, description=description)
+
+    def get_color_palette(self) -> List[str]:
+        """
+        Get available color palette for tag creation.
+
+        Returns:
+            List of hex color codes
+        """
+        return self.color_manager.get_color_palette()
+
+    def validate_tag_name(self, name: str) -> Dict[str, Any]:
+        """
+        Validate tag name and provide suggestions if invalid.
+
+        Args:
+            name: Tag name to validate
+
+        Returns:
+            Dict with validation result and suggestions
+        """
+        result = {
+            'valid': True,
+            'errors': [],
+            'suggestions': []
+        }
+
+        # Check length
+        if len(name.strip()) < 2:
+            result['valid'] = False
+            result['errors'].append("Tag name must be at least 2 characters long")
+
+        if len(name.strip()) > 50:
+            result['valid'] = False
+            result['errors'].append("Tag name must be less than 50 characters long")
+
+        # Check for existing tag
+        if self.get_tag_by_name(name.strip()):
+            result['valid'] = False
+            result['errors'].append("Tag name already exists")
+
+        # Check for special characters (allow basic punctuation)
+        if not name.replace(' ', '').replace('-', '').replace('_', '').isalnum():
+            result['valid'] = False
+            result['errors'].append("Tag name can only contain letters, numbers, spaces, hyphens, and underscores")
+
+        # Generate suggestions if invalid
+        if not result['valid']:
+            # Simple suggestions: capitalize, trim, etc.
+            suggestions = []
+            clean_name = name.strip()
+            if clean_name:
+                suggestions.append(clean_name.title())
+                suggestions.append(clean_name.lower())
+                if len(clean_name) > 50:
+                    suggestions.append(clean_name[:47] + "...")
+
+            result['suggestions'] = suggestions[:3]  # Max 3 suggestions
+
+        return result
+
+    def bulk_tag_operation(self, document_ids: List[int], tag_names: List[str],
+                          operation: str = 'add') -> Dict[str, Any]:
+        """
+        Perform bulk tag operations on multiple documents.
+
+        Args:
+            document_ids: List of document IDs
+            tag_names: List of tag names
+            operation: 'add' or 'remove'
+
+        Returns:
+            Dict with operation results
+        """
+        results = {
+            'success': True,
+            'total_operations': 0,
+            'successful_operations': 0,
+            'errors': []
+        }
+
+        try:
+            for doc_id in document_ids:
+                for tag_name in tag_names:
+                    results['total_operations'] += 1
+
+                    try:
+                        # Get or create tag
+                        tag = self.get_tag_by_name(tag_name)
+                        if not tag and operation == 'add':
+                            tag = self.create_tag_with_ai_color(tag_name)
+
+                        if tag:
+                            if operation == 'add':
+                                success = self.add_tag_to_document(doc_id, tag.id)
+                            elif operation == 'remove':
+                                success = self.remove_tag_from_document(doc_id, tag.id)
+                            else:
+                                success = False
+
+                            if success:
+                                results['successful_operations'] += 1
+                        else:
+                            results['errors'].append(f"Could not find or create tag: {tag_name}")
+
+                    except Exception as e:
+                        results['errors'].append(f"Error with document {doc_id}, tag {tag_name}: {str(e)}")
+
+        except Exception as e:
+            results['success'] = False
+            results['errors'].append(f"Bulk operation failed: {str(e)}")
+
+        return results
 
 
 class CategoryManager:

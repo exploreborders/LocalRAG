@@ -1,237 +1,145 @@
 # Local RAG System - Web Interface
 
-A modern multipage web interface for the Local RAG system, featuring database-backed document storage and Elasticsearch vector search, built with Streamlit.
+A modern Streamlit-based web interface for the Local RAG document intelligence system.
 
 ## Features
 
-- **🏠 Home Page**: Interactive query interface with dual mode support
-- **📁 Documents Page**: File upload and document library management with multilingual support
-- **⚙️ Settings Page**: Comprehensive configuration options
-- **📊 Analytics Page**: Performance monitoring and usage statistics
-- **Multilingual Support**: Automatic language detection for English, German, French, and Spanish documents
-- **Query History**: Track and revisit previous queries across sessions
-- **Responsive Design**: Works on desktop and mobile devices
-- **Real-time Feedback**: Loading indicators and status updates
+- **🏠 Home**: Query interface for AI-powered document Q&A
+- **📁 Documents**: Upload and manage document collections
+- **⚙️ Settings**: Configure AI models, caching, and system parameters
+- **📊 Analytics**: Performance monitoring and usage statistics
+- **Multilingual Support**: 12+ languages with automatic detection
+- **Real-time Processing**: Live status updates and progress indicators
 
 ## Quick Start
 
-1. **Activate the virtual environment:**
-   ```bash
-   source rag_env/bin/activate
-   ```
+1. **Setup the system:**
+    ```bash
+    python setup_all.py
+    ```
 
-2. **Launch the web interface:**
-   ```bash
-   streamlit run web_interface/app.py
-   ```
+2. **Start the web interface:**
+    ```bash
+    python run_web.py
+    ```
 
 3. **Open your browser** to `http://localhost:8501`
 
-4. **Navigate using the sidebar** to explore different features
+## Pages
 
-## Page Overview
+### 🏠 Home
+- **Query Interface**: Ask questions about your documents in natural language
+- **AI-Powered Responses**: Get contextual answers with source citations
+- **Query History**: Track and revisit previous searches
 
-### 🏠 Home - Main Query Interface
-- **Natural Language Queries**: Ask questions in plain English
-- **Dual Mode Support**: Retrieval-only or AI-powered RAG responses
-- **System Initialization**: One-click setup for the RAG system
-- **Results Display**: Formatted answers with source attribution
+### 📁 Documents
+- **File Upload**: Support for PDF, DOCX, XLSX, PPTX, TXT files
+- **Document Library**: Browse and manage uploaded documents
+- **Batch Processing**: Efficient processing of multiple documents
+- **Tagging System**: Organize documents with custom tags
 
-### 📁 Documents - File Management
-- **Multi-Format Upload**: Support for PDF, DOCX, XLSX, PPTX, TXT files
-- **Document Library**: Browse and manage your knowledge base
-- **Automatic Processing**: Documents are automatically chunked and embedded on upload
-- **Database Storage**: All documents and chunks stored in PostgreSQL
+### ⚙️ Settings
+- **AI Configuration**: Set Ollama model parameters and embedding options
+- **Cache Settings**: Configure Redis caching behavior
+- **System Preferences**: Customize interface and processing options
 
-### ⚙️ Settings - Configuration
-- **AI Generation Settings**: Configure temperature, max tokens, and Ollama models
-- **Interface Preferences**: Theme selection and display options
-
-### 📊 Analytics - Performance Dashboard
-- **Usage Metrics**: Query counts, response times, and trends
-- **System Health**: Monitor component status, resource usage, and database performance
-- **Cache Performance**: Real-time Redis cache metrics (hit rate, memory usage, uptime)
-- **Performance Charts**: Visualize query patterns and response times
-- **Database Optimization**: Monitor query performance and optimization impact
-- **Data Export**: Download query history and metrics as CSV/JSON
+### 📊 Analytics
+- **Performance Metrics**: Query response times and system statistics
+- **Cache Monitoring**: Redis cache hit rates and memory usage
+- **Usage Analytics**: Document processing and query patterns
 
 ## Usage Guide
 
 ### Getting Started
-1. **Visit the Home page** and initialize the system
-2. **Go to Documents page** and upload your files
-3. **Reprocess documents** to create embeddings and vector index
-4. **Return to Home** and start asking questions!
+1. **Upload documents** using the Documents page
+2. **Ask questions** on the Home page about your documents
+3. **Monitor performance** via the Analytics page
+4. **Configure settings** in the Settings page
 
-### Query Modes
+### Document Processing
+- **Supported Formats**: PDF, DOCX, XLSX, PPTX, TXT
+- **Automatic Processing**: Documents are parsed, chunked, and embedded on upload
+- **Batch Operations**: Process multiple documents efficiently
+- **Progress Tracking**: Real-time status updates during processing
 
-#### Retrieval Mode
-- Searches your document library using semantic similarity
-- Returns relevant text chunks ranked by relevance
-- Fast and works without external AI services
-
-#### RAG Mode
-- Combines retrieval with AI generation for comprehensive answers
-- Requires Ollama to be running locally
-- Provides context-aware responses with citations
-
-### Theme Switching
-
-The interface supports light and dark themes:
-
-1. **Go to Settings page** (⚙️ Settings)
-2. **Select theme** from the dropdown (Light or Dark)
-3. **Save settings** - you'll see a notification about app restart
-4. **Restart the application** to apply the theme change
-
-Theme changes require a full application restart because they modify the Streamlit configuration file.
-
-### Document Management
-
-#### Supported Formats
-- **📄 Text files**: .txt (plain text)
-- **📕 PDFs**: .pdf (Portable Document Format)
-- **📝 Word documents**: .docx (Microsoft Word)
-- **📊 Spreadsheets**: .xlsx (Microsoft Excel)
-- **📈 Presentations**: .pptx (Microsoft PowerPoint)
-
-#### Processing Pipeline
-1. **Upload**: Files are processed temporarily (not permanently stored)
-2. **Parsing**: Advanced text extraction using Docling with layout awareness
-3. **Chunking**: Documents split into manageable pieces with overlap
-4. **Embedding**: Text converted to vector representations using nomic-embed-text-v1.5
-5. **Storage**: Chunks stored in PostgreSQL, vectors indexed in Elasticsearch
+### Query Interface
+- **Natural Language**: Ask questions in plain English
+- **Source Citations**: All answers include document references
+- **Context Awareness**: Responses consider document content and relationships
 
 ## Configuration
 
-### Settings Categories
+### AI Settings
+- **LLM Model**: Select from installed Ollama models
+- **Temperature**: Control response randomness (0.0-1.0)
+- **Max Tokens**: Set maximum response length
+- **Embedding Model**: Choose embedding model for document processing
 
-#### Retrieval Settings
-```yaml
-retrieval:
-  chunk_size: 1000        # Size of text chunks
-  chunk_overlap: 200      # Overlap between chunks
-  k_retrieval: 3          # Number of results to retrieve
-  embedding_model: "all-MiniLM-L6-v2"  # Available sentence transformer model
-```
+### System Settings
+- **Cache Configuration**: Enable/disable Redis caching
+- **Batch Processing**: Configure parallel processing options
+- **Database Settings**: Connection parameters for PostgreSQL/Elasticsearch
 
-**Note:** Both LLM Model and Embedding Model dropdowns automatically detect and show only available models.
-
-#### Generation Settings
-```yaml
-generation:
-  model: "llama2"         # Ollama model name (from installed models only)
-  temperature: 0.7        # Response randomness (0.0-1.0)
-  max_tokens: 500         # Maximum response length
-  ollama_host: "http://localhost:11434"  # Ollama server URL
-```
-
-**Note:** The LLM Model dropdown automatically detects and shows only your installed Ollama models.
-
-#### Interface Settings
-```yaml
-interface:
-  theme: "light"          # UI theme ("light" or "dark")
-  max_results_display: 5  # Results per page
-```
+### Interface Settings
+- **Theme**: Light or dark mode
+- **Display Options**: Customize result presentation
 
 ## System Requirements
 
-### Core Requirements
-- ✅ Python 3.8+ with virtual environment
-- ✅ All dependencies from `requirements.txt`
-- ✅ Document files in supported formats
-
-### RAG Mode Requirements
-- ✅ Ollama installed and running
-- ✅ AI model downloaded (e.g., `ollama pull llama2`)
-- ✅ Sufficient RAM for model loading
+- **Python 3.8+** with virtual environment
+- **Ollama** installed and running locally
+- **AI Models**: llama3.2:3b and nomic-embed-text-v1.5
+- **Web Browser**: Modern browser for Streamlit interface
+- **RAM**: 16GB+ recommended for AI processing
 
 ## Troubleshooting
 
 ### Common Issues
 
-**"Could not import RAG system components"**
+**Import Errors**
 - Ensure you're running from the project root directory
-- Check that all dependencies are installed
+- Check that virtual environment is activated
+- Verify all dependencies are installed
 
-**"RAG mode unavailable"**
-- Install Ollama: https://ollama.ai
-- Start server: `ollama serve`
-- Pull model: `ollama pull llama2`
+**AI Model Issues**
+- Install Ollama from https://ollama.ai
+- Pull required models: `ollama pull llama3.2:3b`
+- Ensure Ollama service is running
 
-**"No documents found"**
-- Upload files using the Documents page
-- Ensure files are in supported formats
-- Reprocess documents after uploading
+**Document Processing**
+- Check file formats are supported (PDF, DOCX, XLSX, PPTX, TXT)
+- Verify files are not corrupted or password-protected
+- Monitor processing status in the interface
 
-**Slow performance**
-- Reduce `k_retrieval` value
-- Use smaller chunk sizes
-- Try a lighter embedding model
-
-**Theme not changing**
-- Theme changes require app restart
-- After changing theme in Settings, restart the application
-- Check that `.streamlit/config.toml` exists in the project root
-
-**Model dropdown shows wrong models**
-- LLM dropdown automatically detects installed Ollama models
-- Embedding dropdown automatically detects available sentence-transformers models
-- If Ollama is not running, only "llama2" will be shown as default
-- If sentence-transformers models are not cached, only "all-MiniLM-L6-v2" will be shown
-- Install additional models with `ollama pull <model_name>` or they will auto-download when first used
-
-### Performance Optimization
-
-- **For Speed**: Use smaller chunks and lower k-values
-- **For Accuracy**: Increase k-value and use larger chunks
-- **For Memory**: Choose efficient embedding models
-- **For Quality**: Use higher-quality models like `all-mpnet-base-v2`
+**Performance Issues**
+- Reduce chunk overlap for faster processing
+- Use smaller batch sizes for memory constraints
+- Enable Redis caching for better performance
 
 ## Development
 
 ### Project Structure
 ```
 web_interface/
-├── app.py                    # Landing page
-├── pages/
+├── app.py                    # Main application entry point
+├── pages/                    # Streamlit pages (numbered for sidebar order)
 │   ├── 1_🏠_Home.py         # Query interface
-│   ├── 2_📁_Documents.py    # File management
+│   ├── 2_📁_Documents.py    # Document management
 │   ├── 3_⚙️_Settings.py     # Configuration
-│   └── 4_📊_Analytics.py    # Performance dashboard
-├── components/
-│   ├── query_interface.py   # Query components
-│   └── results_display.py   # Results rendering
-├── utils/
-│   └── session_manager.py   # Session management
-└── config/
-    └── default_settings.yaml # Default configuration
+│   └── 4_📊_Analytics.py    # Performance monitoring
+├── components/               # Reusable UI components
+│   ├── query_interface.py    # Query input components
+│   └── results_display.py    # Results rendering
+└── utils/
+    └── session_manager.py    # Session state management
 ```
 
-### Adding New Features
-
-1. **Create page files** in `pages/` directory (numbered for order)
-2. **Add components** in `components/` for reusable UI elements
-3. **Update session state** in `utils/session_manager.py`
-4. **Test across all pages** for consistency
-
-### Session State Management
-
-The app uses Streamlit's session state to maintain:
-- System initialization status
-- Query history and results
-- User preferences and settings
-- Component availability flags
-
-## Contributing
-
-1. Follow the existing code structure and naming conventions
-2. Add comprehensive error handling and user feedback
-3. Test features across all pages and modes
-4. Update documentation for new functionality
-5. Ensure responsive design works on mobile devices
+### Adding Features
+1. Create new page files in `pages/` (use numbering for sidebar order)
+2. Add reusable components in `components/`
+3. Update session state management as needed
+4. Test across all pages for consistency
 
 ## License
 
-This project is part of the Local RAG System. See main project README for licensing information.
+Part of the Local RAG System. See main project README for licensing information.
