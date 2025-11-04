@@ -20,3 +20,4 @@
 - **Documentation**: Docstrings for public APIs/classes, inline comments for complex logic
 - **Best Practices**: PEP 8 compliance, descriptive names, single responsibility, no global state
 - **Logging**: Use `logger = logging.getLogger(__name__)` for module-level logging
+- **File Structure**: src/ for core modules, tests/ for unit tests, web_interface/ for Streamlit UI

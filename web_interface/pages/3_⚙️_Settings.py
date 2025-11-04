@@ -20,7 +20,7 @@ for p in (SRC, WEB):
         sys.path.insert(0, str(p))
 
 # Import utilities
-from utils.session_manager import load_settings, update_settings
+from web_interface.utils.session_manager import load_settings, update_settings, initialize_session_state
 
 # Page configuration
 st.set_page_config(

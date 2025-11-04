@@ -22,7 +22,7 @@ for p in (SRC, WEB):
         sys.path.insert(0, str(p))
 
 # Import utilities
-from utils.session_manager import initialize_session_state
+from web_interface.utils.session_manager import initialize_session_state
 
 # Page configuration
 st.set_page_config(
@@ -275,9 +275,8 @@ def initialize_system_if_needed():
     if not st.session_state.get('system_initialized', False):
         try:
             # Import system components
-            from src.retrieval_db import DatabaseRetriever
-            from src.rag_pipeline_db import RAGPipelineDB
-            from utils.session_manager import load_settings
+            from src.core.retrieval import DatabaseRetriever, RAGPipelineDB
+            from web_interface.utils.session_manager import load_settings
 
             # Get configured models from settings
             settings = load_settings()

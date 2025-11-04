@@ -26,10 +26,14 @@ except ImportError:
     st.error("❌ Could not import RAG system components. Please ensure you're running from the project root.")
     st.stop()
 
-# Import web interface components
-from utils.session_manager import initialize_session_state, add_query_to_history
-from components.query_interface import render_query_input, render_submit_button
-from components.results_display import render_results
+# Import web interface components (after path setup)
+try:
+    from web_interface.utils.session_manager import load_settings, update_settings, initialize_session_state
+    from components.query_interface import render_query_input, render_submit_button
+    from components.results_display import render_results
+except ImportError as e:
+    st.error(f"❌ Could not import web interface components: {e}")
+    st.stop()
 
 # Page configuration
 st.set_page_config(
@@ -97,7 +101,7 @@ def _do_initialization():
     logging.getLogger("torch").setLevel(logging.WARNING)
 
     # Get configured models from settings
-    from utils.session_manager import load_settings
+    from web_interface.utils.session_manager import load_settings
     settings = load_settings()
     embedding_model = settings.get('retrieval', {}).get('embedding_model', 'nomic-ai/nomic-embed-text-v1.5')
     llm_model = settings.get('generation', {}).get('model', 'llama2')
