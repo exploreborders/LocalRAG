@@ -401,22 +401,21 @@ def main():
         with col2:
             # Cache status and controls
             try:
-                if hasattr(st.session_state, 'rag_pipeline') and st.session_state.rag_pipeline:
-                    cache_stats = st.session_state.rag_pipeline.get_cache_stats()
-                    if cache_stats.get('cache_enabled', False):
-                        st.metric("Cached Responses", cache_stats.get('total_keys', 0))
-                        st.metric("Memory Used", cache_stats.get('memory_used', 'unknown'))
-                        st.metric("Hit Rate", f"{cache_stats.get('hit_rate', 0):.1%}")
+                if hasattr(st.session_state, 'rag_pipeline') and st.session_state.rag_pipeline and st.session_state.rag_pipeline.cache:
+                    cache_stats = st.session_state.rag_pipeline.cache.get_stats()
+                    st.metric("Cached Responses", cache_stats.get('total_keys', 0))
+                    st.metric("Memory Used", cache_stats.get('memory_used', 'unknown'))
+                    st.metric("Hit Rate", f"{cache_stats.get('hit_rate', 0):.1%}")
 
-                        # Clear cache button
-                        if st.button("🗑️ Clear Cache", type="secondary"):
-                            cleared = st.session_state.rag_pipeline.cache.clear_pattern("llm:*")
-                            st.success(f"✅ Cleared {cleared} cached responses")
-                            st.rerun()
-                    else:
-                        st.info("ℹ️ Cache is disabled or not configured")
+                    # Clear cache button
+                    if st.button("🗑️ Clear Cache", type="secondary"):
+                        cleared = st.session_state.rag_pipeline.cache.clear_pattern("llm:*")
+                        st.success(f"✅ Cleared {cleared} cached responses")
+                        st.rerun()
                 else:
-                    st.info("ℹ️ RAG pipeline not initialized")
+                    st.info("ℹ️ Cache is disabled or not configured")
+            except Exception as e:
+                st.error(f"❌ Cache status error: {e}")
             except Exception as e:
                 st.error(f"❌ Cache status error: {e}")
 

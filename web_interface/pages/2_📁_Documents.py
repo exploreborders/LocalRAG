@@ -164,8 +164,8 @@ def process_uploaded_files(uploaded_files):
         status_text.text(f"Processing {filename}: {message}")
         progress_bar.progress(int(progress))
 
-    # Initialize upload processor with progress callback
-    processor = UploadProcessor(progress_callback=progress_callback)
+    # Initialize upload processor
+    processor = UploadProcessor()
 
     try:
         status_text.text("Starting upload process...")
@@ -230,8 +230,8 @@ def reprocess_documents():
             status_text.text(f"Reprocessing {filename}: {message}")
             progress_bar.progress(int(progress))
 
-        # Use UploadProcessor for reprocessing with progress tracking
-        processor = UploadProcessor(progress_callback=progress_callback)
+        # Use UploadProcessor for reprocessing
+        processor = UploadProcessor()
 
         status_text.text("🔄 Starting reprocessing with enhanced structure extraction...")
 
