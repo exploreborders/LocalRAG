@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci_base:
+    uses: exploreborders/ci_templates/.github/workflows/ci-base.yml@main
+    with:
+      python_version: '3.11'
+      run_tests: 'true'
+      run_security: 'true'
+      run_coverage: 'true'
+      run_docs: 'true'
+
+  codeql:
+    uses: exploreborders/ci_templates/.github/workflows/codeql-analysis.yml@main
+    needs: ci_base
