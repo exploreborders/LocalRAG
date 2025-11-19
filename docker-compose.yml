@@ -57,8 +57,8 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=rag_system
-      - POSTGRES_USER=rag_user
-      - POSTGRES_PASSWORD=rag_password
+      - POSTGRES_USER=christianhein
+      - POSTGRES_PASSWORD=
       - OPENSEARCH_HOST=elasticsearch
       - OPENSEARCH_PORT=9200
       - OPENSEARCH_USER=elastic

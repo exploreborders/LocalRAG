@@ -6,6 +6,7 @@ Run with: python tests/run_tests.py
 
 import sys
 import os
+import importlib.util
 from pathlib import Path
 
 def run_tests():
@@ -68,5 +69,4 @@ def run_tests():
         return 0
 
 if __name__ == "__main__":
-    import importlib.util
     sys.exit(run_tests())

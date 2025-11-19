@@ -195,7 +195,7 @@ CREATE INDEX IF NOT EXISTS idx_category_assignments_cat ON document_category_ass
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON processing_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_document_id ON processing_jobs(document_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_type ON processing_jobs(job_type);
-CREATE INDEX IF NOT EXISTS idx_jobs_recent ON processing_jobs(created_at) WHERE created_at > NOW() - INTERVAL '7 days';
+-- Note: Removed time-based index as it requires IMMUTABLE functions
 CREATE INDEX IF NOT EXISTS idx_embeddings_chunk_id ON document_embeddings(chunk_id);
 CREATE INDEX IF NOT EXISTS idx_embeddings_model ON document_embeddings(embedding_model);
 
@@ -204,5 +204,5 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON document_embeddings USING iv
 
 -- Partial indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_documents_processed ON documents(status) WHERE status = 'processed';
-CREATE INDEX IF NOT EXISTS idx_documents_uploaded_recent ON documents(upload_date) WHERE upload_date > NOW() - INTERVAL '30 days';
+-- Note: Removed time-based partial indexes as they require IMMUTABLE functions
 CREATE INDEX IF NOT EXISTS idx_jobs_running ON processing_jobs(status) WHERE status = 'running';

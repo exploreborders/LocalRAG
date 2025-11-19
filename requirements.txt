@@ -17,7 +17,4 @@ spacy==3.8.0
 redis==5.0.1
 networkx==3.2.1
 plotly==5.18.0
-de-core-news-sm
-fr-core-news-sm
-es-core-news-sm
-it-core-news-sm
+pgvector==0.4.1

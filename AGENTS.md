@@ -1,23 +1,20 @@
 # AGENTS.md
 
-## Build/Lint/Test Commands
+**Build/Lint/Test**
 - Quick Setup: `python setup_all.py`
 - Docker Setup: `./docker_setup.sh && docker-compose up -d`
 - Manual Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt`
-- Run all tests: `python tests/run_tests.py`
-- Run single test: `python -c "import sys; sys.path.insert(0, 'src'); from tests.test_file import test_function; test_function()"`
+- Run all tests: `pytest -q`
+- Run single test: `pytest tests/<module>.py::<TestClass|function> -q`
 - Run web interface: `python run_web.py`
-- Run CLI app: `python -m src.interfaces.cli`
+- Run CLI: `python -m src.interfaces.cli`
 - Build Docker: `docker build -t local-rag .`
 - Reprocess documents: `python -m src.core.reprocess_documents`
 
-## Code Style Guidelines
-- **Imports**: Group stdlib/third-party/local alphabetically, relative imports for local modules
-- **Formatting**: 4 spaces indentation, double quotes for strings, no trailing whitespace
-- **Naming**: snake_case for functions/variables, PascalCase for classes, UPPER_SNAKE_CASE for constants
-- **Types**: Type hints on parameters/returns, Optional for nullable types
-- **Error Handling**: try/except with specific exceptions, validate inputs early, use context managers
-- **Documentation**: Docstrings for public APIs/classes, inline comments for complex logic
-- **Best Practices**: PEP 8 compliance, descriptive names, single responsibility, no global state
-- **Logging**: Use `logger = logging.getLogger(__name__)` for module-level logging
-- **File Structure**: src/ for core modules, tests/ for unit tests, web_interface/ for Streamlit UI
+**Code Style**
+- Imports: stdlib/third-party/local alphabetically; absolute imports; relative for locals
+- Formatting: 4 spaces; 100 chars; double quotes; no trailing spaces
+- Naming: snake_case for funcs/vars/methods; PascalCase for classes; UPPER_SNAKE for constants
+- Types: type hints on all params/returns; Optional/Union as needed
+- Errors: specific exceptions; input validation; context managers
+- Docs/Logging: docstrings for public APIs; Google/NumPy; `logger = logging.getLogger(__name__)`

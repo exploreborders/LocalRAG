@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 # Database connections
 def get_postgres_connection():
     """
@@ -29,8 +30,9 @@ def get_postgres_connection():
         port=os.getenv("POSTGRES_PORT", 5432),
         dbname=os.getenv("POSTGRES_DB", "rag_system"),
         user=os.getenv("POSTGRES_USER", "christianhein"),
-        password=os.getenv("POSTGRES_PASSWORD", "")
+        password=os.getenv("POSTGRES_PASSWORD", ""),
     )
+
 
 def get_elasticsearch_client():
     """
@@ -40,10 +42,20 @@ def get_elasticsearch_client():
         Elasticsearch: Configured Elasticsearch client instance
     """
     return Elasticsearch(
-        hosts=[{"host": os.getenv("OPENSEARCH_HOST", "localhost"), "port": int(os.getenv("OPENSEARCH_PORT", 9200)), "scheme": "http"}],
-        basic_auth=(os.getenv("OPENSEARCH_USER", "elastic"), os.getenv("OPENSEARCH_PASSWORD", "changeme")),
-        verify_certs=False
+        hosts=[
+            {
+                "host": os.getenv("OPENSEARCH_HOST", "localhost"),
+                "port": int(os.getenv("OPENSEARCH_PORT", 9200)),
+                "scheme": "http",
+            }
+        ],
+        basic_auth=(
+            os.getenv("OPENSEARCH_USER", "elastic"),
+            os.getenv("OPENSEARCH_PASSWORD", "changeme"),
+        ),
+        verify_certs=False,
     )
+
 
 def calculate_file_hash(filepath):
     """
@@ -60,6 +72,7 @@ def calculate_file_hash(filepath):
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
 
 def migrate_documents_to_postgres():
     """
@@ -78,28 +91,41 @@ def migrate_documents_to_postgres():
     documents = []
 
     for file_path in data_dir.glob("*"):
-        if file_path.is_file() and file_path.suffix.lower() in ['.txt', '.pdf', '.docx', '.pptx', '.xlsx']:
+        if file_path.is_file() and file_path.suffix.lower() in [
+            ".txt",
+            ".pdf",
+            ".docx",
+            ".pptx",
+            ".xlsx",
+        ]:
             file_hash = calculate_file_hash(file_path)
-            documents.append((
-                file_path.name,
-                str(file_path),
-                file_hash,
-                file_path.suffix[1:],  # content_type
-                datetime.now(),
-                datetime.now(),
-                'pending'  # Start as pending, will be processed later
-            ))
+            documents.append(
+                (
+                    file_path.name,
+                    str(file_path),
+                    file_hash,
+                    file_path.suffix[1:],  # content_type
+                    datetime.now(),
+                    datetime.now(),
+                    "pending",  # Start as pending, will be processed later
+                )
+            )
 
     if documents:
-        execute_values(cursor, """
+        execute_values(
+            cursor,
+            """
             INSERT INTO documents (filename, filepath, file_hash, content_type, upload_date, last_modified, status)
             VALUES %s ON CONFLICT (file_hash) DO NOTHING
-        """, documents)
+        """,
+            documents,
+        )
 
     conn.commit()
     cursor.close()
     conn.close()
     print(f"Migrated {len(documents)} documents (marked as pending)")
+
 
 def migrate_chunks_to_postgres():
     """
@@ -113,15 +139,16 @@ def migrate_chunks_to_postgres():
     import os
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.join(script_dir, '..')
+    project_dir = os.path.join(script_dir, "..")
 
     try:
         # Run the document processor
         cmd = [
-            'python', '-c',
-            'from src.document_processor import DocumentProcessor; '
-            'p = DocumentProcessor(); '
-            'p.process_existing_documents()'
+            "python",
+            "-c",
+            "from src.core.document_manager import DocumentProcessor; "
+            "p = DocumentProcessor(); "
+            "p.process_existing_documents()",
         ]
 
         result = subprocess.run(
@@ -129,7 +156,7 @@ def migrate_chunks_to_postgres():
             cwd=project_dir,
             capture_output=True,
             text=True,
-            env={**os.environ, 'PYTHONPATH': os.path.join(project_dir, 'src')}
+            env={**os.environ, "PYTHONPATH": os.path.join(project_dir, "src")},
         )
 
         if result.returncode == 0:
@@ -143,6 +170,7 @@ def migrate_chunks_to_postgres():
     except Exception as e:
         print(f"Error during document processing: {e}")
         raise
+
 
 def migrate_embeddings_to_opensearch():
     """
@@ -168,11 +196,11 @@ def migrate_embeddings_to_opensearch():
             print(f"Skipping {model_name}, missing files")
             continue
 
-        with open(embeddings_path, 'rb') as f:
+        with open(embeddings_path, "rb") as f:
             embeddings = pickle.load(f)
-        with open(documents_path, 'rb') as f:
+        with open(documents_path, "rb") as f:
             documents = pickle.load(f)
-        with open(chunks_path, 'rb') as f:
+        with open(chunks_path, "rb") as f:
             chunks = pickle.load(f)
 
         # Bulk index to OpenSearch
@@ -184,19 +212,23 @@ def migrate_embeddings_to_opensearch():
                 "_source": {
                     "document_id": i // 100,  # Placeholder logic
                     "chunk_id": i,
-                    "content": chunk.page_content if hasattr(chunk, 'page_content') else str(chunk),
+                    "content": chunk.page_content
+                    if hasattr(chunk, "page_content")
+                    else str(chunk),
                     "embedding": embedding.tolist(),
                     "embedding_model": model_name,
-                    "metadata": chunk.metadata if hasattr(chunk, 'metadata') else {}
-                }
+                    "metadata": chunk.metadata if hasattr(chunk, "metadata") else {},
+                },
             }
             actions.append(action)
 
         # Bulk insert
         if actions:
             from elasticsearch.helpers import bulk
+
             bulk(client, actions)
             print(f"Migrated {len(actions)} vectors for {model_name}")
+
 
 if __name__ == "__main__":
     print("Starting database migration...")

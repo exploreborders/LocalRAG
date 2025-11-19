@@ -7,6 +7,7 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOption
 from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 import os
 
+
 def load_documents(data_dir="data"):
     """
     Load documents from the specified directory using Docling.
@@ -39,50 +40,79 @@ def load_documents(data_dir="data"):
                 result = doc_converter.convert(file_path)
                 # Extract text content from Docling document
                 text_content = result.document.export_to_markdown()
-                documents.append(Document(
-                    page_content=text_content,
-                    metadata={
-                        "source": file_path,
-                        "file_type": file.split('.')[-1],
-                        "docling_metadata": result.document.origin.model_dump() if hasattr(result.document, 'origin') and result.document.origin else {}
-                    }
-                ))
+                documents.append(
+                    Document(
+                        page_content=text_content,
+                        metadata={
+                            "source": file_path,
+                            "file_type": file.split(".")[-1],
+                            "docling_metadata": result.document.origin.model_dump()
+                            if hasattr(result.document, "origin")
+                            and result.document.origin
+                            else {},
+                        },
+                    )
+                )
         except Exception as e:
             print(f"Error loading {file_path}: {e}")
             # Fallback to basic text loading if Docling fails
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                documents.append(Document(
-                    page_content=content,
-                    metadata={"source": file_path, "fallback": True}
-                ))
+                documents.append(
+                    Document(
+                        page_content=content,
+                        metadata={"source": file_path, "fallback": True},
+                    )
+                )
             except:
                 print(f"Failed to load {file_path} with fallback method")
 
     return documents
 
+
 # Individual load functions removed - now using Docling for unified document processing
 
-def split_documents(documents, chunk_size=1000, chunk_overlap=200):
+
+def split_documents(file_paths, chunk_size=1000, chunk_overlap=200):
     """
-    Split documents into smaller chunks for better retrieval performance.
+    Load and split documents into smaller chunks for better retrieval performance.
 
     Args:
-        documents (list): List of Document objects to split
+        file_paths (list): List of file paths to load and split
         chunk_size (int): Maximum size of each chunk in characters
         chunk_overlap (int): Number of characters to overlap between chunks
 
     Returns:
-        list: List of Document objects representing text chunks
+        str: The content of the first document (for backward compatibility)
     """
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        length_function=len,
-    )
-    chunks = text_splitter.split_documents(documents)
-    return chunks
+    if not file_paths:
+        return ""
+
+    # Load the first document
+    file_path = file_paths[0]
+
+    try:
+        # Handle .txt files directly
+        if file_path.lower().endswith(".txt"):
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        else:
+            # Use Docling for other document formats
+            doc_converter = DocumentConverter()
+            result = doc_converter.convert(file_path)
+            content = result.document.export_to_markdown()
+    except Exception as e:
+        print(f"Failed to load {file_path}: {e}")
+        # Fallback to basic text loading
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception as e2:
+            print(f"Failed to load {file_path} with fallback: {e2}")
+            return ""
+
+    return content
 
 
 def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap=200):
@@ -103,7 +133,9 @@ def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap
     from .caption_aware_processor import CaptionAwareProcessor
 
     documents = []
-    processor = CaptionAwareProcessor(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    processor = CaptionAwareProcessor(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    )
 
     # Use default Docling configuration for best quality
     doc_converter = DocumentConverter()
@@ -127,9 +159,11 @@ def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap
                     result.document,
                     metadata={
                         "source": file_path,
-                        "file_type": file.split('.')[-1],
-                        "docling_metadata": result.document.origin.model_dump() if hasattr(result.document, 'origin') and result.document.origin else {}
-                    }
+                        "file_type": file.split(".")[-1],
+                        "docling_metadata": result.document.origin.model_dump()
+                        if hasattr(result.document, "origin") and result.document.origin
+                        else {},
+                    },
                 )
 
                 if chunks:
@@ -137,29 +171,34 @@ def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap
                 else:
                     # Fallback to regular markdown export if caption processing fails
                     text_content = result.document.export_to_markdown()
-                    documents.append(Document(
-                        page_content=text_content,
-                        metadata={
-                            "source": file_path,
-                            "file_type": file.split('.')[-1],
-                            "chunking_method": "fallback"
-                        }
-                    ))
+                    documents.append(
+                        Document(
+                            page_content=text_content,
+                            metadata={
+                                "source": file_path,
+                                "file_type": file.split(".")[-1],
+                                "chunking_method": "fallback",
+                            },
+                        )
+                    )
 
         except Exception as e:
             print(f"Error loading {file_path}: {e}")
             # Fallback to basic text loading if Docling fails
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                documents.append(Document(
-                    page_content=content,
-                    metadata={"source": file_path, "fallback": True}
-                ))
+                documents.append(
+                    Document(
+                        page_content=content,
+                        metadata={"source": file_path, "fallback": True},
+                    )
+                )
             except:
                 print(f"Failed to load {file_path} with fallback method")
 
     return documents
+
 
 if __name__ == "__main__":
     docs = load_documents()
@@ -167,4 +206,4 @@ if __name__ == "__main__":
     chunks = split_documents(docs)
     print(f"Split into {len(chunks)} chunks")
     for i, chunk in enumerate(chunks[:3]):  # Show first 3 chunks
-        print(f"Chunk {i+1}: {chunk.page_content[:200]}...")
+        print(f"Chunk {i + 1}: {chunk.page_content[:200]}...")

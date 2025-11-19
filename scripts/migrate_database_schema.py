@@ -24,7 +24,7 @@ def migrate_database_schema():
         port=os.getenv("POSTGRES_PORT", 5432),
         dbname=os.getenv("POSTGRES_DB", "rag_system"),
         user=os.getenv("POSTGRES_USER", "christianhein"),
-        password=os.getenv("POSTGRES_PASSWORD", "")
+        password=os.getenv("POSTGRES_PASSWORD", ""),
     )
 
     cursor = conn.cursor()
@@ -116,7 +116,7 @@ def migrate_database_schema():
             -- Tagging and categorization indexes
             CREATE INDEX IF NOT EXISTS idx_document_tags_name ON document_tags(name);
             CREATE INDEX IF NOT EXISTS idx_document_categories_name ON document_categories(name);
-            CREATE INDEX IF NOT EXISTS idx_document_categories_parent ON document_categories(parent_id);
+            CREATE INDEX IF NOT EXISTS idx_document_categories_parent ON document_categories(parent_category_id);
             CREATE INDEX IF NOT EXISTS idx_document_tags_assoc_doc ON document_tags_association(document_id);
             CREATE INDEX IF NOT EXISTS idx_document_tags_assoc_tag ON document_tags_association(tag_id);
             CREATE INDEX IF NOT EXISTS idx_document_categories_assoc_doc ON document_categories_association(document_id);
@@ -125,7 +125,9 @@ def migrate_database_schema():
 
         conn.commit()
         print("✅ Database schema migration completed successfully!")
-        print("✅ Added language support, advanced document management, caption-aware chunking, and performance indexes")
+        print(
+            "✅ Added language support, advanced document management, caption-aware chunking, and performance indexes"
+        )
 
     except Exception as e:
         print(f"❌ Migration failed: {e}")
