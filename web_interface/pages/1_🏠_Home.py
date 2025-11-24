@@ -189,14 +189,20 @@ def process_query(query, mode="topic-aware", filters=None):
             )
             formatted_answer = format_answer_db(result["answer"])
 
-            # Store results for display
-            st.session_state.current_results = {
-                "type": "rag",
-                "query": query,
-                "result": result,
-                "formatted": formatted_answer,
-                "filters": filters,
-            }
+        # Store results for display
+        st.session_state.current_results = {
+            "type": "rag",
+            "query": query,
+            "result": result,
+            "formatted": formatted_answer,
+            "filters": filters,
+            "processing_info": {
+                "ocr_used": getattr(st.session_state, "last_upload_ocr_used", False),
+                "is_scanned": getattr(
+                    st.session_state, "last_upload_is_scanned", False
+                ),
+            },
+        }
 
         # Add to query history
         processing_time = time.time() - start_time

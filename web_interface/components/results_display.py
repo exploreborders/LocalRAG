@@ -58,6 +58,18 @@ def render_rag_results(results):
     else:
         st.warning("No formatted answer available")
 
+    # Show processing information
+    processing_info = results.get("processing_info", {})
+    if processing_info.get("ocr_used") or processing_info.get("is_scanned"):
+        if processing_info.get("ocr_used"):
+            st.info(
+                "🤖 **OCR Processing Used**: This document was processed using Optical Character Recognition for scanned content."
+            )
+        elif processing_info.get("is_scanned"):
+            st.info(
+                "📄 **Scanned Document Detected**: This appears to be a scanned PDF with image-based content."
+            )
+
     # Show summary statistics
     sources = result_data.get("sources", [])
     if sources:

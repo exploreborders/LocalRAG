@@ -718,7 +718,10 @@ def main():
 
         # Get top relationships for visualization
         relationships_data = []
+        tags_with_relationships = set()
         for tag, relations in kg._relationship_cache.items():
+            if relations:  # Only count tags that have relationships
+                tags_with_relationships.add(tag)
             for rel in relations[:3]:  # Top 3 relationships per tag
                 relationships_data.append(
                     {
@@ -729,6 +732,15 @@ def main():
                         "evidence": rel["evidence_count"],
                     }
                 )
+
+        # Update statistics with current relationship data
+        graph_stats["tags"]["with_relationships"] = len(tags_with_relationships)
+        graph_stats["relationships"] = {
+            "total": len(relationships_data),
+            "tag_relationships_cached": len(kg._relationship_cache)
+            if kg._relationship_cache
+            else 0,
+        }
 
         db.close()
 
