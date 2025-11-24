@@ -7,6 +7,8 @@ Main entry point for the multipage Streamlit application
 import streamlit as st
 import warnings
 import logging
+import sys
+from pathlib import Path
 
 # Suppress common warnings that are usually harmless
 warnings.filterwarnings("ignore", message=".*torch.classes.*")
@@ -21,16 +23,82 @@ logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
 logging.getLogger("torch").setLevel(logging.WARNING)
 logging.getLogger("huggingface").setLevel(logging.WARNING)
 
+# Add src to path for imports
+ROOT = Path(__file__).resolve().parent.parent
+SRC = ROOT / "src"
+WEB = ROOT / "web_interface"
+
+# Add all necessary paths
+for path in [ROOT, SRC, WEB]:
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
+# Also ensure PYTHONPATH is set
+import os
+
+current_pythonpath = os.environ.get("PYTHONPATH", "")
+paths_to_add = [str(ROOT), str(SRC), str(WEB)]
+for path in paths_to_add:
+    if path not in current_pythonpath:
+        if current_pythonpath:
+            current_pythonpath = f"{path}:{current_pythonpath}"
+        else:
+            current_pythonpath = path
+os.environ["PYTHONPATH"] = current_pythonpath
+
+
+def check_system_setup():
+    """Check if the RAG system is properly set up."""
+    issues = []
+
+    # Check if we're in virtual environment
+    in_venv = hasattr(sys, "real_prefix") or (
+        hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+    )
+    if not in_venv:
+        issues.append("Not running in virtual environment")
+
+    # Check required packages
+    required_packages = [
+        "streamlit",
+        "sqlalchemy",
+        "sentence_transformers",
+        "docling",
+        "psycopg2",
+        "elasticsearch",
+        "redis",
+    ]
+
+    for package in required_packages:
+        try:
+            __import__(package)
+        except ImportError:
+            issues.append(f"Missing package: {package}")
+
+    # Check database connectivity
+    try:
+        from database.models import SessionLocal
+
+        db = SessionLocal()
+        db.execute("SELECT 1")
+        db.close()
+    except Exception as e:
+        issues.append(f"Database connection failed: {e}")
+
+    return issues
+
+
 # Page configuration
 st.set_page_config(
     page_title="Local RAG System",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # Custom CSS
-st.markdown("""
+st.markdown(
+    """
 <style>
     .welcome-header {
         font-size: 3rem;
@@ -67,12 +135,20 @@ st.markdown("""
         font-size: 0.9rem;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
+
 
 def main():
     """Main landing page"""
-    st.markdown('<h1 class="welcome-header">🤖 Local RAG System</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="welcome-subtitle">Retrieval-Augmented Generation for local document analysis</p>', unsafe_allow_html=True)
+    st.markdown(
+        '<h1 class="welcome-header">🤖 Local RAG System</h1>', unsafe_allow_html=True
+    )
+    st.markdown(
+        '<p class="welcome-subtitle">Retrieval-Augmented Generation for local document analysis</p>',
+        unsafe_allow_html=True,
+    )
 
     st.markdown("---")
 
@@ -120,40 +196,52 @@ def main():
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.markdown("""
+        st.markdown(
+            """
         <div class="feature-card">
             <div class="feature-icon">🔍</div>
             <div class="feature-title">Smart Search</div>
             <div class="feature-description">Advanced retrieval using vector similarity</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
     with col2:
-        st.markdown("""
+        st.markdown(
+            """
         <div class="feature-card">
             <div class="feature-icon">🤖</div>
             <div class="feature-title">AI Generation</div>
             <div class="feature-description">Ollama-powered answer generation</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
     with col3:
-        st.markdown("""
+        st.markdown(
+            """
         <div class="feature-card">
             <div class="feature-icon">📁</div>
             <div class="feature-title">Multi-Format</div>
             <div class="feature-description">Support for PDF, DOCX, XLSX, PPTX, TXT</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
     with col4:
-        st.markdown("""
+        st.markdown(
+            """
         <div class="feature-card">
             <div class="feature-icon">🔒</div>
             <div class="feature-title">Local & Private</div>
             <div class="feature-description">All processing happens locally</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
 
@@ -187,7 +275,10 @@ def main():
 
     # Footer
     st.markdown("---")
-    st.markdown("*Built with Streamlit, LangChain, FAISS, and Ollama • [View Source](https://github.com/your-repo)*")
+    st.markdown(
+        "*Built with Streamlit, LangChain, FAISS, and Ollama • [View Source](https://github.com/your-repo)*"
+    )
+
 
 if __name__ == "__main__":
     main()

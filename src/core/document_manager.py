@@ -18,7 +18,7 @@ import time
 
 from sqlalchemy.orm import Session
 from langdetect import detect, LangDetectException
-from .base_processor import BaseProcessor
+from src.core.base_processor import BaseProcessor
 import spacy
 
 from database.models import (
@@ -36,7 +36,7 @@ from data.loader import split_documents
 from core.embeddings import get_embedding_model, create_embeddings
 from database.opensearch_setup import get_elasticsearch_client
 from ai.tag_suggester import AITagSuggester
-from utils.tag_colors import TagColorManager
+from src.utils.tag_colors import TagColorManager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ class TagManager:
     def create_tag(self, name: str, color: Optional[str] = None) -> DocumentTag:
         """Create a new tag with optional color."""
         if color is None:
-            color = self.color_manager.generate_unique_color()
+            color = self.color_manager.generate_color(name)
 
         tag = DocumentTag(name=name, color=color)
         self.db.add(tag)
@@ -448,12 +448,13 @@ class DocumentProcessor(BaseProcessor):
             if progress_callback:
                 progress_callback(10, f"Detected language: {language}")
 
-            # Load and split document
-            documents = split_documents([file_path])
-            if not documents:
+            # Load document content
+            doc_content = split_documents([file_path])
+            if not doc_content:
                 return {"success": False, "error": "Failed to load document"}
 
-            doc_content = documents[0]
+            # Detect language from extracted content
+            language = self._detect_language_from_content(doc_content)
 
             # Create document record
             import hashlib
@@ -467,6 +468,7 @@ class DocumentProcessor(BaseProcessor):
                 file_hash=file_hash,
                 detected_language=language,
                 status="processing",
+                full_content=doc_content,
             )
             self.db.add(document)
             self.db.commit()
@@ -474,26 +476,47 @@ class DocumentProcessor(BaseProcessor):
             if progress_callback:
                 progress_callback(20, "Document record created")
 
+            # Detect chapters from full content first
+            all_chapters = self._detect_all_chapters(doc_content)
+
             # Process content into chunks
-            chunks = self._create_chunks(doc_content, document.id)
+            chunks = self._create_chunks(doc_content, document.id, all_chapters)
 
             if progress_callback:
-                progress_callback(60, f"Created {len(chunks)} chunks")
+                progress_callback(
+                    60,
+                    f"Created {len(chunks)} chunks, detected {len(all_chapters)} chapters",
+                )
+
+            # Store chapters in database
+            for chapter in all_chapters:
+                chapter_record = DocumentChapter(
+                    document_id=document.id,
+                    chapter_title=chapter["title"],
+                    chapter_path=chapter["path"],
+                    level=chapter.get("level", 1),
+                    word_count=len(chapter["title"].split()),
+                    content=chapter["title"],  # Store title as content for now
+                )
+                self.db.add(chapter_record)
+            self.db.commit()
 
             # Generate embeddings
             embeddings_array, model = create_embeddings(
                 [chunk["content"] for chunk in chunks]
             )
 
-            # Store chunks with embeddings
+            # Store chunks with embeddings and enhanced metadata
             for i, (chunk_data, embedding) in enumerate(zip(chunks, embeddings_array)):
+                metadata = chunk_data.get("metadata", {})
+
                 chunk = DocumentChunk(
                     document_id=document.id,
                     chunk_index=i,
                     content=chunk_data["content"],
                     embedding_model="nomic-ai/nomic-embed-text-v1.5",
-                    chapter_title=chunk_data.get("chapter_title"),
-                    chapter_path=chunk_data.get("chapter_path"),
+                    chapter_title=metadata.get("chapter_title"),
+                    chapter_path=metadata.get("chapter_path"),
                 )
                 self.db.add(chunk)
                 self.db.flush()  # Get chunk ID
@@ -513,6 +536,35 @@ class DocumentProcessor(BaseProcessor):
 
             # Index in Elasticsearch
             self._index_document(document, chunks, embeddings_array.tolist())
+
+            # AI enrichment
+            if progress_callback:
+                progress_callback(95, "Running AI enrichment...")
+
+            try:
+                from ai.enrichment import AIEnrichmentService
+
+                enrichment_service = AIEnrichmentService()
+                enrichment_result = enrichment_service.enrich_document(document.id)
+
+                # Update document with enrichment data
+                if "summary" in enrichment_result:
+                    document.document_summary = enrichment_result["summary"]
+                if "topics" in enrichment_result:
+                    document.key_topics = enrichment_result["topics"]
+
+                self.db.commit()
+
+                if progress_callback:
+                    progress_callback(98, "AI enrichment completed")
+
+            except Exception as e:
+                print(f"⚠️ AI enrichment failed: {e}")
+                # Continue without enrichment
+
+            # Update document status to processed
+            document.status = "processed"
+            self.db.commit()
 
             if progress_callback:
                 progress_callback(100, "Document processing complete")
@@ -538,9 +590,343 @@ class DocumentProcessor(BaseProcessor):
         except (LangDetectException, FileNotFoundError):
             return "en"
 
-    def _create_chunks(self, content: str, document_id: int) -> List[Dict[str, Any]]:
-        """Create chunks from document content."""
-        # Simple chunking for now - can be enhanced with hierarchical chunking
+    def _detect_language_from_content(self, content: str) -> str:
+        """Detect language from extracted content."""
+        try:
+            # Use multiple samples for better detection
+            samples = [
+                content[:2000],  # Beginning
+                content[len(content) // 3 : len(content) // 3 + 2000]
+                if len(content) > 6000
+                else content[len(content) // 2 : len(content) // 2 + 1000],  # Middle
+                content[-2000:]
+                if len(content) > 2000
+                else content[len(content) // 2 :],  # End
+            ]
+
+            # Try to detect language from each sample
+            detections = []
+            for sample in samples:
+                if len(sample.strip()) > 100:  # Only use substantial samples
+                    try:
+                        lang = detect(sample)
+                        detections.append(lang)
+                    except LangDetectException:
+                        continue
+
+            # Return the most common detection, or 'en' as fallback
+            if detections:
+                return max(set(detections), key=detections.count)
+            else:
+                return "en"
+        except (LangDetectException, ValueError):
+            return "en"
+
+    def _detect_all_chapters(self, content: str) -> List[Dict[str, Any]]:
+        """Detect all chapters from the full document content."""
+        chapters = []
+
+        # Look for ## headers
+        lines = content.split("\n")
+        for i, line in enumerate(lines):
+            if line.strip().startswith("##"):
+                header_text = line.strip()[2:].strip()  # Remove ##
+                if header_text and len(header_text) > 3:
+                    chapters.append(
+                        {
+                            "title": header_text,
+                            "path": f"section_{len(chapters) + 1}",
+                            "start_line": i,
+                            "level": 2,
+                        }
+                    )
+
+        # Look for table format | number | title |
+        import re
+
+        table_matches = re.findall(
+            r"\|\s*(\d+(?:\.\d+)*)\s*\|\s*([^\|]+?)\s*\|", content
+        )
+        for number, title in table_matches:
+            title = title.strip()
+            if title and len(title) > 3:
+                chapters.append(
+                    {
+                        "title": title,
+                        "path": number,
+                        "start_line": -1,  # Table entries don't have line numbers
+                        "level": 1 if "." not in number else len(number.split(".")) + 1,
+                    }
+                )
+
+        return chapters
+
+    def _check_memory_usage(self, memory_limit_mb: int = 512) -> bool:
+        """Check if current memory usage is within limits."""
+        try:
+            import psutil
+            import os
+
+            process = psutil.Process(os.getpid())
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            return memory_mb < memory_limit_mb
+        except ImportError:
+            # psutil not available, skip memory check
+            return True
+
+    def _process_document_streaming(
+        self,
+        file_path: str,
+        document_id: int,
+        memory_limit_mb: int = 512,
+        progress_callback: Optional[Callable[[str, int, str], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Process document with streaming/chunked approach for large files.
+
+        Args:
+            file_path: Path to the document file
+            document_id: Database ID of the document
+            memory_limit_mb: Memory limit in MB
+            progress_callback: Optional progress callback
+
+        Returns:
+            Processing results dictionary
+        """
+        import gc
+        from data.loader import split_documents
+
+        if progress_callback:
+            progress_callback(os.path.basename(file_path), 10, "Extracting content...")
+
+        # Extract content with memory monitoring
+        try:
+            content = split_documents([file_path])
+            content_length = len(content)
+
+            if not self._check_memory_usage(memory_limit_mb):
+                logger.warning(
+                    f"High memory usage detected during content extraction for {file_path}"
+                )
+                gc.collect()
+
+        except Exception as e:
+            logger.error(f"Failed to extract content from {file_path}: {e}")
+            return {"error": f"Content extraction failed: {e}"}
+
+        if progress_callback:
+            progress_callback(os.path.basename(file_path), 20, "Detecting language...")
+
+        # Language detection
+        language = self._detect_language_from_content(content)
+
+        if progress_callback:
+            progress_callback(os.path.basename(file_path), 30, "Detecting chapters...")
+
+        # Chapter detection
+        all_chapters = self._detect_all_chapters(content)
+
+        if progress_callback:
+            progress_callback(os.path.basename(file_path), 40, "Creating chunks...")
+
+        # Create chunks with memory monitoring
+        try:
+            chunks = self._create_chunks(content, document_id, all_chapters)
+
+            if not self._check_memory_usage(memory_limit_mb):
+                logger.warning(
+                    f"High memory usage detected during chunking for {file_path}"
+                )
+                gc.collect()
+
+        except Exception as e:
+            logger.error(f"Failed to create chunks for {file_path}: {e}")
+            return {"error": f"Chunking failed: {e}"}
+
+        # Store chapters in database (batched)
+        if all_chapters:
+            if progress_callback:
+                progress_callback(
+                    os.path.basename(file_path),
+                    50,
+                    f"Storing {len(all_chapters)} chapters...",
+                )
+
+            try:
+                batch_size = 50  # Process chapters in batches
+                for i in range(0, len(all_chapters), batch_size):
+                    batch = all_chapters[i : i + batch_size]
+                    for chapter in batch:
+                        chapter_record = DocumentChapter(
+                            document_id=document_id,
+                            chapter_title=chapter["title"],
+                            chapter_path=chapter["path"],
+                            level=chapter.get("level", 1),
+                            word_count=len(chapter["title"].split()),
+                            content=chapter["title"],
+                        )
+                        self.db.add(chapter_record)
+                    self.db.commit()  # Commit batch
+
+                    if not self._check_memory_usage(memory_limit_mb):
+                        logger.warning(
+                            f"High memory usage during chapter storage for {file_path}"
+                        )
+                        gc.collect()
+
+            except Exception as e:
+                logger.error(f"Failed to store chapters for {file_path}: {e}")
+                self.db.rollback()
+                return {"error": f"Chapter storage failed: {e}"}
+
+        # Process chunks and embeddings in batches
+        total_embeddings_created = 0
+        if chunks:
+            if progress_callback:
+                progress_callback(
+                    os.path.basename(file_path),
+                    70,
+                    f"Processing {len(chunks)} chunks...",
+                )
+
+            try:
+                # Process embeddings in smaller batches to manage memory
+                batch_size = 20
+
+                for i in range(0, len(chunks), batch_size):
+                    batch = chunks[i : i + batch_size]
+                    chunk_texts = [chunk["content"] for chunk in batch]
+
+                    if progress_callback:
+                        progress_callback(
+                            os.path.basename(file_path),
+                            75 + int((i / len(chunks)) * 20),
+                            f"Creating embeddings for batch {i // batch_size + 1}...",
+                        )
+
+                    # Create embeddings for this batch
+                    embeddings_array, _ = create_embeddings(chunk_texts)
+
+                    # Store chunks and embeddings
+                    for j, (chunk_data, embedding) in enumerate(
+                        zip(batch, embeddings_array)
+                    ):
+                        # Create chunk record
+                        chunk = DocumentChunk(
+                            document_id=document_id,
+                            content=chunk_data["content"],
+                            chunk_index=chunk_data["metadata"]["chunk_index"],
+                            chapter_path=chunk_data["metadata"].get("chapter_path"),
+                            chapter_title=chunk_data["metadata"].get("chapter_title"),
+                        )
+                        self.db.add(chunk)
+                        self.db.flush()  # Get chunk ID
+
+                        # Create embedding record
+                        doc_embedding = DocumentEmbedding(
+                            chunk_id=chunk.id,
+                            embedding=embedding.tolist(),
+                            embedding_model="nomic-ai/nomic-embed-text-v1.5",
+                        )
+                        self.db.add(doc_embedding)
+                        total_embeddings_created += 1
+
+                    # Commit batch
+                    self.db.commit()
+
+                    # Memory check and cleanup
+                    if not self._check_memory_usage(memory_limit_mb):
+                        logger.warning(
+                            f"High memory usage during embedding creation for {file_path}"
+                        )
+                        gc.collect()
+
+            except Exception as e:
+                logger.error(
+                    f"Failed to process chunks/embeddings for {file_path}: {e}"
+                )
+                self.db.rollback()
+                return {"error": f"Chunk/embedding processing failed: {e}"}
+
+        # Index in search systems
+        if progress_callback:
+            progress_callback(os.path.basename(file_path), 95, "Indexing for search...")
+
+        try:
+            self._index_document_chunks(document_id)
+        except Exception as e:
+            logger.warning(f"Search indexing failed for {file_path}: {e}")
+            # Don't fail the whole process for indexing issues
+
+        if progress_callback:
+            progress_callback(os.path.basename(file_path), 100, "Processing complete!")
+
+        return {
+            "success": True,
+            "chunks_created": len(chunks),
+            "chapters_created": len(all_chapters),
+            "embeddings_created": total_embeddings_created,
+            "language": language,
+            "content_length": content_length,
+        }
+
+    def _index_document_chunks(self, document_id: int) -> None:
+        """
+        Index document chunks in search systems.
+
+        Args:
+            document_id: Database ID of the document
+        """
+        try:
+            # Get document and chunks
+            document = (
+                self.db.query(Document).filter(Document.id == document_id).first()
+            )
+            if not document:
+                logger.warning(f"Document {document_id} not found for indexing")
+                return
+
+            chunks = (
+                self.db.query(DocumentChunk)
+                .filter(DocumentChunk.document_id == document_id)
+                .order_by(DocumentChunk.chunk_index)
+                .all()
+            )
+
+            if not chunks:
+                logger.warning(f"No chunks found for document {document_id}")
+                return
+
+            # Get embeddings for chunks
+            chunk_ids = [chunk.id for chunk in chunks]
+            embeddings = (
+                self.db.query(DocumentEmbedding)
+                .filter(DocumentEmbedding.chunk_id.in_(chunk_ids))
+                .all()
+            )
+
+            # Create embedding lookup
+            embedding_lookup = {emb.chunk_id: emb.embedding for emb in embeddings}
+
+            # Prepare data for indexing
+            chunk_texts = [chunk.content for chunk in chunks]
+            embeddings_list = [embedding_lookup.get(chunk.id, []) for chunk in chunks]
+
+            # Index in search systems
+            self._index_document(document, chunks, embeddings_list)
+
+        except Exception as e:
+            logger.error(f"Failed to index document chunks for {document_id}: {e}")
+            raise
+
+    def _create_chunks(
+        self,
+        content: str,
+        document_id: int,
+        chapters: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Create intelligent chunks from document content with semantic awareness."""
+        # Enhanced chunking with semantic awareness
         chunk_size = 1000
         overlap = 200
 
@@ -548,36 +934,249 @@ class DocumentProcessor(BaseProcessor):
         start = 0
         chunk_index = 0
 
+        # Pre-process content for better chunking
+        content = self._preprocess_content(content)
+
         while start < len(content):
             end = start + chunk_size
             chunk_content = content[start:end]
 
-            # Find sentence boundary for better chunks
+            # Find semantic boundary for better chunks
             if end < len(content):
-                # Look for sentence endings
-                sentence_endings = [". ", "! ", "? ", "\n\n"]
-                best_end = end
-                for ending in sentence_endings:
-                    pos = chunk_content.rfind(ending)
-                    if pos > chunk_size * 0.7:  # Don't break too early
-                        best_end = start + pos + len(ending)
-                        break
-                end = best_end
+                end = self._find_semantic_boundary(content, start, end, chunk_size)
+
+            # Extract chunk with metadata
+            chunk_text = content[start:end]
+            chunk_metadata = self._extract_chunk_metadata(
+                chunk_text, chunk_index, start, end, chapters
+            )
 
             chunk = {
-                "content": content[start:end],
-                "metadata": {
-                    "chunk_index": chunk_index,
-                    "start_pos": start,
-                    "end_pos": end,
-                },
+                "content": chunk_text,
+                "metadata": chunk_metadata,
             }
             chunks.append(chunk)
 
-            start = end - overlap
+            # Adaptive overlap based on content type
+            adaptive_overlap = self._calculate_adaptive_overlap(chunk_text, overlap)
+            start = end - adaptive_overlap
             chunk_index += 1
 
         return chunks
+
+    def _preprocess_content(self, content: str) -> str:
+        """Preprocess content for better chunking."""
+        # Normalize whitespace
+        content = re.sub(r"\s+", " ", content.strip())
+
+        # Handle code blocks and special formatting
+        # This is a basic implementation - could be enhanced with more sophisticated preprocessing
+
+        return content
+
+    def _find_semantic_boundary(
+        self, content: str, start: int, end: int, chunk_size: int
+    ) -> int:
+        """Find the best semantic boundary for chunking."""
+        chunk_content = content[start:end]
+
+        # Priority order for boundaries
+        boundary_markers = [
+            "\n\n",  # Paragraph breaks
+            ". ",  # Sentence endings
+            "! ",  # Exclamation sentences
+            "? ",  # Question sentences
+            "\n",  # Line breaks
+            "; ",  # Semicolon
+            ": ",  # Colon
+        ]
+
+        best_end = end
+        for marker in boundary_markers:
+            pos = chunk_content.rfind(marker)
+            if pos > chunk_size * 0.6:  # Don't break too early (60% of chunk size)
+                best_end = start + pos + len(marker)
+                break
+
+        return min(best_end, len(content))  # Don't exceed content length
+
+    def _extract_chunk_metadata(
+        self,
+        chunk_text: str,
+        chunk_index: int,
+        start_pos: int,
+        end_pos: int,
+        chapters: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Extract metadata for a chunk."""
+        metadata = {
+            "chunk_index": chunk_index,
+            "start_pos": start_pos,
+            "end_pos": end_pos,
+            "word_count": len(chunk_text.split()),
+            "char_count": len(chunk_text),
+        }
+
+        # Detect if chunk contains code-like content
+        code_indicators = [
+            "```",
+            "def ",
+            "class ",
+            "import ",
+            "function",
+            "var ",
+            "const ",
+        ]
+        metadata["contains_code"] = any(
+            indicator in chunk_text for indicator in code_indicators
+        )
+
+        # Detect if chunk contains lists or structured content
+        list_indicators = ["• ", "- ", "* ", "1. ", "2. ", "3. "]
+        metadata["contains_list"] = any(
+            indicator in chunk_text for indicator in list_indicators
+        )
+
+        # Assign chapter/section information from pre-detected chapters
+        if chapters:
+            # Find the chapter that this chunk belongs to based on position
+            chunk_center = (start_pos + end_pos) // 2
+            for chapter in chapters:
+                # Simple assignment: if chunk contains chapter title or is near chapter position
+                if chapter.get("title") and chapter["title"] in chunk_text:
+                    metadata["chapter_title"] = chapter["title"]
+                    metadata["chapter_path"] = chapter["path"]
+                    break
+
+        return metadata
+
+    def _detect_chapter_info(
+        self, chunk_text: str
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Detect chapter/section information in chunk text."""
+        lines = chunk_text.split("\n")
+
+        # Look for chapter/section headers - simplified approach
+        # Find ## headers
+        if "##" in chunk_text:
+            # Extract text after ## until next ## or end
+            parts = chunk_text.split("##")
+            for i, part in enumerate(parts[1:], 1):  # Skip first part (before first ##)
+                # Get the header text (first line or reasonable chunk)
+                lines = part.strip().split("\n", 1)
+                header_text = lines[0].strip()
+
+                # Clean up the header
+                header_text = re.sub(r"[^\w\s\-.,()]", "", header_text).strip()
+                header_text = re.sub(r"\s+", " ", header_text).strip()
+
+                if 5 <= len(header_text) <= 100:
+                    # Determine path based on header content
+                    if header_text.startswith(("1.", "2.", "3.", "4.", "5.")):
+                        # Numbered section
+                        path = header_text.split()[0] if header_text.split() else str(i)
+                    else:
+                        path = str(i)
+
+                    return header_text, path
+
+        # Look for table format | number | title |
+        table_matches = re.findall(
+            r"\\|\\s*(\\d+(?:\\.\\d+)*)\\s*\\|\\s*([^\\|]+?)\\s*\\|", chunk_text
+        )
+        if table_matches:
+            for number, title in table_matches:
+                title = title.strip()
+                title = re.sub(r"[^\w\s\-.,()]", "", title).strip()
+                if 5 <= len(title) <= 100:
+                    return title, number
+
+        # Simplified chapter detection
+        # Find ## headers
+        if "##" in chunk_text:
+            # Extract text after ## until next ## or end
+            parts = chunk_text.split("##")
+            for i, part in enumerate(parts[1:], 1):  # Skip first part (before first ##)
+                # Get the header text (first meaningful chunk)
+                header_part = part.strip().split("\n", 1)[0]  # Take first line
+                # Take reasonable amount of text from the beginning
+                header_text = header_part[:60]  # Shorter limit
+
+                # Clean up the header first
+                header_text = re.sub(r"[^\w\s\-.,()]", "", header_text).strip()
+                header_text = re.sub(r"\s+", " ", header_text).strip()
+
+                # Take first few words that form a reasonable title
+                words = header_text.split()
+                if words:
+                    # If it starts with a number, take number + next few meaningful words
+                    if words[0].replace(".", "").isdigit():
+                        # For numbered sections, take the number + up to 4 more words, but avoid duplicates
+                        title_words = []
+                        seen = set()
+                        for word in words[:5]:  # Take up to 5 words
+                            if word not in seen:
+                                title_words.append(word)
+                                seen.add(word)
+                            if len(title_words) >= 4:  # Limit to 4 unique words
+                                break
+                    else:
+                        title_words = words[
+                            : min(3, len(words))
+                        ]  # Take up to 3 words for other headers
+
+                    header_text = " ".join(title_words)
+
+                if 3 <= len(header_text) <= 60:  # Reasonable title length
+                    # Determine path based on header content
+                    if header_text.startswith(("1.", "2.", "3.", "4.", "5.")):
+                        # Numbered section
+                        path = header_text.split()[0] if header_text.split() else str(i)
+                    else:
+                        path = str(i)
+
+                    return header_text, path
+
+        # Look for table format | number | title |
+        table_matches = re.findall(
+            r"\\|\\s*(\\d+(?:\\.\\d+)*)\\s*\\|\\s*([^\\|]+?)\\s*\\|", chunk_text
+        )
+        if table_matches:
+            for number, title in table_matches:
+                title = title.strip()
+                title = re.sub(r"[^\w\s\-.,()]", "", title).strip()
+                if 5 <= len(title) <= 100:
+                    return title, number
+
+        return None, None
+
+    def _calculate_adaptive_overlap(self, chunk_text: str, base_overlap: int) -> int:
+        """Calculate adaptive overlap based on chunk content characteristics."""
+        overlap = base_overlap
+
+        # Increase overlap for code content to maintain context
+        if any(
+            indicator in chunk_text
+            for indicator in ["```", "def ", "class ", "function"]
+        ):
+            overlap = int(base_overlap * 1.5)
+
+        # Increase overlap for complex technical content
+        technical_terms = [
+            "algorithm",
+            "implementation",
+            "architecture",
+            "framework",
+            "system",
+        ]
+        if any(term in chunk_text.lower() for term in technical_terms):
+            overlap = int(base_overlap * 1.3)
+
+        # Decrease overlap for simple content
+        if len(chunk_text.split()) < 50:  # Short chunks
+            overlap = int(base_overlap * 0.7)
+
+        return max(50, min(overlap, base_overlap * 2))  # Keep within reasonable bounds
 
     def _index_document(
         self,
@@ -585,12 +1184,14 @@ class DocumentProcessor(BaseProcessor):
         chunks: List[Dict[str, Any]],
         embeddings: List[List[float]],
     ):
-        """Index document in Elasticsearch."""
+        """Index document in Elasticsearch with enhanced metadata."""
         try:
             es_client = get_elasticsearch_client()
 
-            # Index each chunk
+            # Index each chunk with enhanced metadata
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                metadata = chunk.get("metadata", {})
+
                 doc = {
                     "document_id": document.id,
                     "content": chunk["content"],
@@ -598,7 +1199,15 @@ class DocumentProcessor(BaseProcessor):
                     "chunk_index": i,
                     "filename": document.filename,
                     "language": document.detected_language,
-                    "metadata": chunk.get("metadata", {}),
+                    "metadata": metadata,
+                    # Enhanced fields for better search
+                    "word_count": metadata.get("word_count", 0),
+                    "char_count": metadata.get("char_count", 0),
+                    "contains_code": metadata.get("contains_code", False),
+                    "contains_list": metadata.get("contains_list", False),
+                    "avg_words_per_sentence": metadata.get("avg_words_per_sentence", 0),
+                    "chapter_title": chunk.get("chapter_title"),
+                    "chapter_path": chunk.get("chapter_path"),
                 }
                 es_client.index(index="documents", id=f"{document.id}_{i}", body=doc)
 
@@ -808,11 +1417,11 @@ class UploadProcessor(BaseProcessor):
 
             if "chunks" in processing_result:
                 for chunk_data in processing_result["chunks"]:
+                    metadata = chunk_data.get("metadata", {})
                     chunk = DocumentChunk(
                         document_id=existing_doc.id,
                         content=chunk_data["content"],
                         chunk_index=chunk_data["chunk_index"],
-                        word_count=chunk_data.get("word_count", 0),
                         chapter_path=chunk_data.get("chapter_path"),
                         chapter_title=chunk_data.get("chapter_title"),
                     )
@@ -856,11 +1465,17 @@ class UploadProcessor(BaseProcessor):
                     )
                     self.db.add(doc_embedding)
 
-                # Update search index
+                # Update search index with enhanced metadata
                 processor = DocumentProcessor()
                 processor._index_document(
                     existing_doc,
-                    [{"content": chunk.content, "id": chunk.id} for chunk in chunks],
+                    [
+                        {
+                            "content": chunk.content,
+                            "metadata": {"word_count": len(chunk.content.split())},
+                        }
+                        for chunk in chunks
+                    ],
                     embeddings_array.tolist(),
                 )
 
@@ -907,17 +1522,17 @@ class UploadProcessor(BaseProcessor):
             self.db.add(doc)
             self.db.flush()  # Get the document ID
 
-            # Add chunks and chapters
+            # Add chunks and chapters with enhanced metadata
             chunks_created = 0
             chapters_created = 0
 
             if "chunks" in processing_result:
                 for chunk_data in processing_result["chunks"]:
+                    metadata = chunk_data.get("metadata", {})
                     chunk = DocumentChunk(
                         document_id=doc.id,
                         content=chunk_data["content"],
                         chunk_index=chunk_data["chunk_index"],
-                        word_count=chunk_data.get("word_count", 0),
                         chapter_path=chunk_data.get("chapter_path"),
                         chapter_title=chunk_data.get("chapter_title"),
                     )
@@ -955,11 +1570,17 @@ class UploadProcessor(BaseProcessor):
                     )
                     self.db.add(doc_embedding)
 
-                # Index in search
+                # Index in search with enhanced metadata
                 processor = DocumentProcessor()
                 processor._index_document(
                     doc,
-                    [{"content": chunk.content, "id": chunk.id} for chunk in chunks],
+                    [
+                        {
+                            "content": chunk.content,
+                            "metadata": {"word_count": len(chunk.content.split())},
+                        }
+                        for chunk in chunks
+                    ],
                     embeddings_array.tolist(),
                 )
 
@@ -995,9 +1616,12 @@ class UploadProcessor(BaseProcessor):
     def upload_files(
         self,
         uploaded_files,
-        data_dir: str = "data",
-        use_parallel: bool = True,
-        max_workers: int = 4,
+        data_dir="data",
+        use_parallel=False,
+        max_workers=4,
+        enable_streaming=True,
+        memory_limit_mb=512,
+        large_file_threshold_mb=50,
     ) -> Dict[str, Any]:
         """
         Upload and process multiple files from Streamlit file uploader.

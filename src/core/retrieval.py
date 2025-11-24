@@ -19,6 +19,15 @@ import asyncio
 from database.models import SessionLocal, Document, DocumentChunk
 from core.embeddings import get_embedding_model
 from core.knowledge_graph import KnowledgeGraph
+from src.utils.error_handler import (
+    ErrorHandler,
+    ValidationError,
+    ProcessingError,
+    DatabaseError,
+    handle_errors,
+    error_context,
+    validate_and_handle,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,17 +38,40 @@ class DatabaseRetriever:
     and metadata queries in PostgreSQL.
     """
 
-    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", use_batch_processing: bool = False):
+    def __init__(
+        self,
+        model_name: str = "nomic-ai/nomic-embed-text-v1.5",
+        use_batch_processing: bool = False,
+        hybrid_alpha: float = 0.7,
+    ):
         """
         Initialize the retriever with specified embedding model and knowledge graph.
 
         Args:
             model_name (str): Name of the sentence-transformers model to use
             use_batch_processing (bool): Whether to use batch embedding for improved performance
+            hybrid_alpha (float): Weight for BM25 in the hybrid search (0=vector only, 1=BM25 only)
         """
+        # Input validation
+        if not isinstance(model_name, str) or not model_name.strip():
+            raise ValidationError("model_name must be a non-empty string")
+
+        if not isinstance(hybrid_alpha, (int, float)) or not (
+            0.0 <= hybrid_alpha <= 1.0
+        ):
+            raise ValidationError("hybrid_alpha must be a float between 0.0 and 1.0")
+
         self.model_name = model_name
         self.use_batch_processing = use_batch_processing
-        self.model = get_embedding_model(model_name)
+        self.hybrid_alpha = hybrid_alpha
+
+        # Initialize error handler
+        self.error_handler = ErrorHandler(__name__)
+
+        try:
+            self.model = get_embedding_model(model_name)
+        except Exception as e:
+            raise ProcessingError(f"Failed to load embedding model '{model_name}': {e}")
 
         # Batch processing can be added later if needed
 
@@ -49,10 +81,12 @@ class DatabaseRetriever:
 
     def __del__(self):
         """Clean up database connections."""
-        if hasattr(self, 'db'):
+        if hasattr(self, "db"):
             self.db.close()
 
-    def retrieve_with_knowledge_graph(self, query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def retrieve_with_knowledge_graph(
+        self, query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
         """
         Retrieve documents using hybrid search with knowledge graph expansion.
 
@@ -71,14 +105,16 @@ class DatabaseRetriever:
         results = self.hybrid_search(
             query=query,
             top_k=top_k,
-            expanded_tags=expanded_context.get('expanded_tags', []),
-            expanded_categories=expanded_context.get('expanded_categories', []),
-            filters=filters
+            expanded_tags=expanded_context.get("expanded_tags", []),
+            expanded_categories=expanded_context.get("expanded_categories", []),
+            filters=filters,
         )
 
         return results
 
-    def _build_enhanced_context(self, query: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_enhanced_context(
+        self, query: str, filters: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Build enhanced search context using knowledge graph relationships.
 
@@ -90,8 +126,8 @@ class DatabaseRetriever:
             Dict with expanded search context
         """
         # Extract tags and categories from filters
-        tag_names = filters.get('tags', [])
-        category_names = filters.get('categories', [])
+        tag_names = filters.get("tags", [])
+        category_names = filters.get("categories", [])
 
         # If no explicit filters, try to infer from query
         if not tag_names and not category_names:
@@ -102,8 +138,21 @@ class DatabaseRetriever:
             potential_categories = []
 
             # Look for common academic/technical terms
-            academic_terms = ['research', 'study', 'analysis', 'method', 'theory', 'model']
-            technical_terms = ['algorithm', 'implementation', 'system', 'framework', 'architecture']
+            academic_terms = [
+                "research",
+                "study",
+                "analysis",
+                "method",
+                "theory",
+                "model",
+            ]
+            technical_terms = [
+                "algorithm",
+                "implementation",
+                "system",
+                "framework",
+                "architecture",
+            ]
 
             for term in academic_terms + technical_terms:
                 if term in query_lower:
@@ -114,15 +163,19 @@ class DatabaseRetriever:
 
         # Expand context using knowledge graph
         expanded_context = self.knowledge_graph.expand_query_context(
-            tag_names=tag_names,
-            category_names=category_names,
-            context_depth=2
+            tag_names=tag_names, category_names=category_names, context_depth=2
         )
 
         return expanded_context
 
-    def hybrid_search(self, query: str, top_k: int = 5, expanded_tags: Optional[List[str]] = None,
-                     expanded_categories: Optional[List[str]] = None, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def hybrid_search(
+        self,
+        query: str,
+        top_k: int = 5,
+        expanded_tags: Optional[List[str]] = None,
+        expanded_categories: Optional[List[str]] = None,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Perform hybrid search combining vector similarity and keyword matching.
 
@@ -140,7 +193,13 @@ class DatabaseRetriever:
         query_embedding = self.model.encode([query])[0]
 
         # Build Elasticsearch query
-        es_query = self._build_es_query(query, query_embedding, expanded_tags or [], expanded_categories or [], filters or {})
+        es_query = self._build_es_query(
+            query,
+            query_embedding,
+            expanded_tags or [],
+            expanded_categories or [],
+            filters or {},
+        )
 
         # Execute search
         try:
@@ -148,29 +207,29 @@ class DatabaseRetriever:
             response = es_client.search(
                 index="documents",
                 body=es_query,
-                size=top_k * 2  # Get more results for reranking
+                size=top_k * 2,  # Get more results for reranking
             )
 
             # Process results
             results = []
-            for hit in response['hits']['hits']:
-                source = hit['_source']
-                score = hit['_score']
+            for hit in response["hits"]["hits"]:
+                source = hit["_source"]
+                score = hit["_score"]
 
                 # Get document metadata
-                doc_id = source.get('document_id')
+                doc_id = source.get("document_id")
                 document = self.db.query(Document).filter(Document.id == doc_id).first()
 
                 if document:
                     result = {
-                        'chunk_id': hit['_id'],
-                        'content': source.get('content', ''),
-                        'score': score,
-                        'document_title': document.filename,
-                        'document_id': doc_id,
-                        'tags': [tag.name for tag in document.tags],
-                        'categories': [cat.name for cat in document.categories],
-                        'metadata': source.get('metadata', {})
+                        "chunk_id": hit["_id"],
+                        "content": source.get("content", ""),
+                        "score": score,
+                        "document_title": document.filename,
+                        "document_id": doc_id,
+                        "tags": [tag.name for tag in document.tags],
+                        "categories": [cat.name for cat in document.categories],
+                        "metadata": source.get("metadata", {}),
                     }
                     results.append(result)
 
@@ -181,34 +240,44 @@ class DatabaseRetriever:
             logger.error(f"Search failed: {e}")
             return []
 
-    def _build_es_query(self, query: str, query_embedding: np.ndarray, expanded_tags: List[str],
-                       expanded_categories: List[str], filters: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_es_query(
+        self,
+        query: str,
+        query_embedding: np.ndarray,
+        expanded_tags: List[str],
+        expanded_categories: List[str],
+        filters: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """Build Elasticsearch query with hybrid scoring."""
-        # Base query with BM25 and vector similarity
+        # Base query with weighted BM25 and vector similarity
         es_query = {
             "query": {
                 "bool": {
                     "should": [
-                        # BM25 text search
+                        # BM25 text search with boost
                         {
                             "multi_match": {
                                 "query": query,
                                 "fields": ["content^2", "title", "tags", "categories"],
-                                "type": "best_fields"
+                                "type": "best_fields",
+                                "boost": self.hybrid_alpha,
                             }
                         },
-                        # Vector similarity
+                        # Vector similarity with boost
                         {
                             "script_score": {
                                 "query": {"match_all": {}},
                                 "script": {
-                                    "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                                    "params": {"query_vector": query_embedding.tolist()}
-                                }
+                                    "source": f"({1.0 - self.hybrid_alpha} * (cosineSimilarity(params.query_vector, 'embedding') + 1.0))",
+                                    "params": {
+                                        "query_vector": query_embedding.tolist()
+                                    },
+                                },
+                                "boost": 1.0 - self.hybrid_alpha,
                             }
-                        }
+                        },
                     ],
-                    "minimum_should_match": 1
+                    "minimum_should_match": 1,
                 }
             }
         }
@@ -217,12 +286,12 @@ class DatabaseRetriever:
         filter_clauses = []
 
         # Tag filters
-        tags_to_search = set(filters.get('tags', []) + expanded_tags)
+        tags_to_search = set(filters.get("tags", []) + expanded_tags)
         if tags_to_search:
             filter_clauses.append({"terms": {"tags": list(tags_to_search)}})
 
         # Category filters
-        categories_to_search = set(filters.get('categories', []) + expanded_categories)
+        categories_to_search = set(filters.get("categories", []) + expanded_categories)
         if categories_to_search:
             filter_clauses.append({"terms": {"categories": list(categories_to_search)}})
 
@@ -234,22 +303,47 @@ class DatabaseRetriever:
     def _get_es_client(self) -> Elasticsearch:
         """Get Elasticsearch client."""
         from database.opensearch_setup import get_elasticsearch_client
+
         return get_elasticsearch_client()
 
-    def _rerank_results(self, results: List[Dict[str, Any]], query: str, top_k: int) -> List[Dict[str, Any]]:
-        """Rerank results based on relevance and recency."""
-        # Simple reranking - could be enhanced with more sophisticated scoring
+    def _rerank_results(
+        self, results: List[Dict[str, Any]], query: str, top_k: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Rerank search results using additional relevance signals.
+
+        This post-processing step enhances the initial Elasticsearch scoring with:
+        - Exact phrase matches (20% boost)
+        - Tag/category keyword matches (10% per matching term)
+        - Future: recency, document authority, user preferences, etc.
+        """
+        query_lower = query.lower()
+        query_terms = set(query.split())
+
         for result in results:
-            # Boost score for exact matches
-            if query.lower() in result['content'].lower():
-                result['score'] *= 1.2
+            original_score = result["score"]
 
-            # Boost score for tag/category matches
-            tag_match_boost = len(set(result.get('tags', [])) & set(query.split())) * 0.1
-            result['score'] *= (1 + tag_match_boost)
+            # Boost for exact query matches in content (case-insensitive)
+            if query_lower in result["content"].lower():
+                result["score"] *= 1.2
 
-        # Sort by score and return top_k
-        results.sort(key=lambda x: x['score'], reverse=True)
+            # Boost for matching tags/categories in query terms
+            # This helps when users mention topics that are tagged
+            result_tags = set(result.get("tags", []))
+            result_categories = set(result.get("categories", []))
+            matching_terms = len((result_tags | result_categories) & query_terms)
+            if matching_terms > 0:
+                result["score"] *= 1.0 + matching_terms * 0.1
+
+            # Log significant score changes for debugging
+            score_change = result["score"] / original_score
+            if score_change > 1.5:
+                logger.debug(
+                    f"Reranking boosted result by {score_change:.2f}x: {result['document_title']}"
+                )
+
+        # Sort by final score and return top results
+        results.sort(key=lambda x: x["score"], reverse=True)
         return results[:top_k]
 
 
@@ -259,7 +353,13 @@ class RAGPipelineDB:
     and Ollama LLM for answer generation.
     """
 
-    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", llm_model: str = "llama3.2:latest", cache_enabled: Optional[bool] = None, cache_settings: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        model_name: str = "nomic-ai/nomic-embed-text-v1.5",
+        llm_model: str = "llama3.2:latest",
+        cache_enabled: Optional[bool] = None,
+        cache_settings: Optional[Dict[str, Any]] = None,
+    ):
         """
         Initialize the RAG pipeline.
 
@@ -274,17 +374,18 @@ class RAGPipelineDB:
 
         # Initialize cache if enabled
         if cache_enabled is None:
-            cache_enabled = os.getenv('CACHE_ENABLED', 'false').lower() == 'true'
+            cache_enabled = os.getenv("CACHE_ENABLED", "false").lower() == "true"
 
         if cache_enabled:
             try:
                 from cache.redis_cache import RedisCache
+
                 cache_config = cache_settings or {}
                 self.cache = RedisCache(
-                    host=cache_config.get('host', os.getenv('REDIS_HOST', 'localhost')),
-                    port=cache_config.get('port', int(os.getenv('REDIS_PORT', 6379))),
-                    db=cache_config.get('db', int(os.getenv('REDIS_DB', 0))),
-                    password=cache_config.get('password', os.getenv('REDIS_PASSWORD'))
+                    host=cache_config.get("host", os.getenv("REDIS_HOST", "localhost")),
+                    port=cache_config.get("port", int(os.getenv("REDIS_PORT", 6379))),
+                    db=cache_config.get("db", int(os.getenv("REDIS_DB", 0))),
+                    password=cache_config.get("password", os.getenv("REDIS_PASSWORD")),
                 )
             except ImportError:
                 logger.warning("Redis cache not available, disabling caching")
@@ -292,8 +393,14 @@ class RAGPipelineDB:
         else:
             self.cache = None
 
-    def query(self, question: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None,
-              language: Optional[str] = None) -> Dict[str, Any]:
+    def query(
+        self,
+        question: str,
+        top_k: int = 5,
+        filters: Optional[Dict[str, Any]] = None,
+        language: Optional[str] = None,
+        hybrid_alpha: Optional[float] = None,
+    ) -> Dict[str, Any]:
         """
         Answer a question using retrieval-augmented generation.
 
@@ -302,26 +409,83 @@ class RAGPipelineDB:
             top_k: Number of documents to retrieve
             filters: Optional filters for search
             language: Target language for response
+            hybrid_alpha: Weight for BM25 in hybrid search (0=vector only, 1=BM25 only)
 
         Returns:
             Dict with answer and sources
         """
-        # Check cache first
-        cache_key = self._generate_cache_key(question, top_k, filters, language)
-        if self.cache:
-            cached_result = self.cache.get(cache_key)
-            if cached_result:
-                logger.info("Cache hit for query")
-                return cached_result
+        # Validate inputs
+        if not isinstance(question, str) or not question.strip():
+            raise ValidationError("question must be a non-empty string")
 
-        # Retrieve relevant documents
-        retrieved_docs = self.retriever.retrieve_with_knowledge_graph(question, top_k=top_k, filters=filters)
+        if hybrid_alpha is not None and (
+            not isinstance(hybrid_alpha, (int, float))
+            or not (0.0 <= hybrid_alpha <= 1.0)
+        ):
+            raise ValidationError("hybrid_alpha must be a float between 0.0 and 1.0")
+
+        # Set hybrid_alpha if provided
+        original_alpha = None
+        if hybrid_alpha is not None:
+            original_alpha = self.retriever.hybrid_alpha
+            self.retriever.hybrid_alpha = hybrid_alpha
+
+        try:
+            # Check cache first
+            cache_key = self._generate_cache_key(
+                question,
+                top_k,
+                filters,
+                language,
+                hybrid_alpha or self.retriever.hybrid_alpha,
+            )
+            if self.cache:
+                cached_result = self.cache.get(cache_key)
+                if cached_result:
+                    logger.info("Cache hit for query")
+                    return cached_result
+
+            # Retrieve relevant documents
+            retrieved_docs = self.retriever.retrieve_with_knowledge_graph(
+                question, top_k=top_k, filters=filters
+            )
+
+            if not retrieved_docs:
+                result = {
+                    "answer": "I could not find relevant information to answer your question.",
+                    "sources": [],
+                    "language": language or "en",
+                }
+            else:
+                # Generate answer
+                answer = self._generate_answer(question, retrieved_docs, language)
+
+                # Format sources
+                sources = self._format_sources(retrieved_docs)
+
+                result = {
+                    "answer": answer,
+                    "sources": sources,
+                    "language": language or self._detect_language(answer),
+                    "retrieved_count": len(retrieved_docs),
+                }
+
+            # Cache the result
+            if self.cache:
+                self.cache.set(cache_key, result)
+
+            return result
+
+        finally:
+            # Restore original alpha if it was changed
+            if original_alpha is not None:
+                self.retriever.hybrid_alpha = original_alpha
 
         if not retrieved_docs:
             result = {
-                'answer': 'I could not find relevant information to answer your question.',
-                'sources': [],
-                'language': language or 'en'
+                "answer": "I could not find relevant information to answer your question.",
+                "sources": [],
+                "language": language or "en",
             }
         else:
             # Generate answer
@@ -331,10 +495,10 @@ class RAGPipelineDB:
             sources = self._format_sources(retrieved_docs)
 
             result = {
-                'answer': answer,
-                'sources': sources,
-                'language': language or self._detect_language(answer),
-                'retrieved_count': len(retrieved_docs)
+                "answer": answer,
+                "sources": sources,
+                "language": language or self._detect_language(answer),
+                "retrieved_count": len(retrieved_docs),
             }
 
         # Cache result
@@ -343,12 +507,19 @@ class RAGPipelineDB:
 
         return result
 
-    def _generate_answer(self, question: str, documents: List[Dict[str, Any]], language: Optional[str] = None) -> str:
+    def _generate_answer(
+        self,
+        question: str,
+        documents: List[Dict[str, Any]],
+        language: Optional[str] = None,
+    ) -> str:
         """Generate answer using retrieved documents."""
         # Prepare context from retrieved documents
         context_parts = []
         for i, doc in enumerate(documents[:3]):  # Limit to top 3 for context length
-            context_parts.append(f"Document {i+1}: {doc['content'][:1000]}...")  # Truncate for context length
+            context_parts.append(
+                f"Document {i + 1}: {doc['content'][:1000]}..."
+            )  # Truncate for context length
 
         context = "\n\n".join(context_parts)
 
@@ -381,12 +552,14 @@ class RAGPipelineDB:
         sources = []
         for doc in documents:
             source = {
-                'title': doc.get('document_title', 'Unknown'),
-                'document_id': doc.get('document_id'),
-                'content_preview': doc.get('content', '')[:200] + '...' if len(doc.get('content', '')) > 200 else doc.get('content', ''),
-                'tags': doc.get('tags', []),
-                'categories': doc.get('categories', []),
-                'score': doc.get('score', 0)
+                "title": doc.get("document_title", "Unknown"),
+                "document_id": doc.get("document_id"),
+                "content_preview": doc.get("content", "")[:200] + "..."
+                if len(doc.get("content", "")) > 200
+                else doc.get("content", ""),
+                "tags": doc.get("tags", []),
+                "categories": doc.get("categories", []),
+                "score": doc.get("score", 0),
             }
             sources.append(source)
         return sources
@@ -396,13 +569,22 @@ class RAGPipelineDB:
         try:
             return detect(text)
         except LangDetectException:
-            return 'en'
+            return "en"
 
-    def _generate_cache_key(self, question: str, top_k: int, filters: Optional[Dict[str, Any]], language: Optional[str]) -> str:
+    def _generate_cache_key(
+        self,
+        question: str,
+        top_k: int,
+        filters: Optional[Dict[str, Any]],
+        language: Optional[str],
+        hybrid_alpha: Optional[float] = None,
+    ) -> str:
         """Generate a cache key for the query."""
         key_components = [question, str(top_k), str(language)]
         if filters:
             key_components.append(str(sorted(filters.items())))
+        if hybrid_alpha is not None:
+            key_components.append(str(hybrid_alpha))
         return hashlib.md5("|".join(key_components).encode()).hexdigest()
 
 
@@ -422,13 +604,17 @@ def format_results_db(results: List[Dict[str, Any]]) -> str:
 
     lines = []
     for i, result in enumerate(results, 1):
-        doc = result.get('document', {})
-        score = result.get('score', 0)
-        topic_boost = result.get('topic_boost', 0)
+        doc = result.get("document", {})
+        score = result.get("score", 0)
+        topic_boost = result.get("topic_boost", 0)
 
         # Get document info
-        filename = doc.get('filename', 'Unknown')
-        content_preview = doc.get('page_content', '')[:100] + '...' if len(doc.get('page_content', '')) > 100 else doc.get('page_content', '')
+        filename = doc.get("filename", "Unknown")
+        content_preview = (
+            doc.get("page_content", "")[:100] + "..."
+            if len(doc.get("page_content", "")) > 100
+            else doc.get("page_content", "")
+        )
 
         lines.append(f"{i}. {filename} (Score: {score:.4f})")
         if topic_boost > 0:
@@ -457,12 +643,12 @@ def format_answer_db(answer: str) -> str:
 
     # Convert simple line breaks to proper markdown paragraphs
     # This is a basic formatter - could be enhanced
-    paragraphs = [p.strip() for p in formatted.split('\n\n') if p.strip()]
+    paragraphs = [p.strip() for p in formatted.split("\n\n") if p.strip()]
     if len(paragraphs) > 1:
-        formatted = '\n\n'.join(paragraphs)
+        formatted = "\n\n".join(paragraphs)
     else:
         # Handle single paragraph with line breaks
-        lines = [line.strip() for line in formatted.split('\n') if line.strip()]
-        formatted = ' '.join(lines)
+        lines = [line.strip() for line in formatted.split("\n") if line.strip()]
+        formatted = " ".join(lines)
 
     return formatted

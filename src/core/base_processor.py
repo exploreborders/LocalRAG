@@ -8,17 +8,17 @@ import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
-from ..database.models import Document
+from src.database.models import Document
 
 logger = logging.getLogger(__name__)
 
 
 class BaseProcessor:
     """Base class for document processors with shared functionality."""
-    
+
     def __init__(self, db: Session):
         self.db = db
-    
+
     def process_existing_documents(self) -> Dict[str, Any]:
         """
         Process documents that exist in the database but haven't been processed yet.
@@ -88,51 +88,55 @@ class BaseProcessor:
             logger.error(f"Error in process_existing_documents: {e}")
             self.db.rollback()
             return {"success": False, "error": str(e)}
-    
+
     def _process_single_document(self, file_path: str, filename: str) -> Dict[str, Any]:
         """
         Process a single document. To be implemented by subclasses.
-        
+
         Args:
             file_path: Path to the document file
             filename: Name of the document
-            
+
         Returns:
             Dictionary with processing results
         """
         raise NotImplementedError("Subclasses must implement _process_single_document")
-    
+
     def _validate_file_path(self, file_path: str) -> bool:
         """
         Validate file path to prevent directory traversal attacks.
-        
+
         Args:
             file_path: Path to validate
-            
+
         Returns:
             True if path is safe, False otherwise
         """
         try:
             # Normalize the path
             normalized_path = os.path.normpath(file_path)
-            
+
             # Check for directory traversal attempts
-            if '..' in normalized_path:
+            if ".." in normalized_path:
                 logger.warning(f"Directory traversal attempt detected: {file_path}")
                 return False
-            
+
             # Check if path is absolute (should be relative to data directory)
             if os.path.isabs(normalized_path):
                 logger.warning(f"Absolute path not allowed: {file_path}")
                 return False
-            
+
             # Check file exists and is a regular file
-            if not os.path.exists(normalized_path) or not os.path.isfile(normalized_path):
-                logger.warning(f"File does not exist or is not a regular file: {file_path}")
+            if not os.path.exists(normalized_path) or not os.path.isfile(
+                normalized_path
+            ):
+                logger.warning(
+                    f"File does not exist or is not a regular file: {file_path}"
+                )
                 return False
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Error validating file path {file_path}: {e}")
             return False

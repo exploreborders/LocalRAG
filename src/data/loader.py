@@ -2,9 +2,6 @@ from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from docling.document_converter import DocumentConverter
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions
-from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 import os
 
 
@@ -22,7 +19,7 @@ def load_documents(data_dir="data"):
     """
     documents = []
 
-    # Use default Docling configuration for best quality
+    # Use Docling with default configuration (it handles PDFs well out of the box)
     doc_converter = DocumentConverter()
 
     for file in os.listdir(data_dir):
@@ -57,16 +54,22 @@ def load_documents(data_dir="data"):
             print(f"Error loading {file_path}: {e}")
             # Fallback to basic text loading if Docling fails
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                documents.append(
-                    Document(
-                        page_content=content,
-                        metadata={"source": file_path, "fallback": True},
+                # Only try text fallback for text-based files, not binaries like PDFs
+                if file_path.lower().endswith(
+                    (".txt", ".md", ".py", ".json", ".xml", ".html")
+                ):
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    documents.append(
+                        Document(
+                            page_content=content,
+                            metadata={"source": file_path, "fallback": True},
+                        )
                     )
-                )
-            except:
-                print(f"Failed to load {file_path} with fallback method")
+                else:
+                    print(f"Skipping {file_path} - not a text file and Docling failed")
+            except Exception as e2:
+                print(f"Failed to load {file_path} with fallback method: {e2}")
 
     return documents
 
@@ -137,7 +140,7 @@ def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap
         chunk_size=chunk_size, chunk_overlap=chunk_overlap
     )
 
-    # Use default Docling configuration for best quality
+    # Use Docling with default configuration
     doc_converter = DocumentConverter()
 
     for file in os.listdir(data_dir):
@@ -186,16 +189,22 @@ def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap
             print(f"Error loading {file_path}: {e}")
             # Fallback to basic text loading if Docling fails
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                documents.append(
-                    Document(
-                        page_content=content,
-                        metadata={"source": file_path, "fallback": True},
+                # Only try text fallback for text-based files, not binaries like PDFs
+                if file_path.lower().endswith(
+                    (".txt", ".md", ".py", ".json", ".xml", ".html")
+                ):
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    documents.append(
+                        Document(
+                            page_content=content,
+                            metadata={"source": file_path, "fallback": True},
+                        )
                     )
-                )
-            except:
-                print(f"Failed to load {file_path} with fallback method")
+                else:
+                    print(f"Skipping {file_path} - not a text file and Docling failed")
+            except Exception as e2:
+                print(f"Failed to load {file_path} with fallback method: {e2}")
 
     return documents
 
