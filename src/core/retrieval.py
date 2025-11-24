@@ -227,9 +227,21 @@ class DatabaseRetriever:
                         "score": score,
                         "document_title": document.filename,
                         "document_id": doc_id,
-                        "tags": [tag.name for tag in document.tags],
-                        "categories": [cat.name for cat in document.categories],
+                        "tags": [
+                            tag_assignment.tag.name
+                            for tag_assignment in document.tags
+                            if tag_assignment.tag
+                        ],
+                        "categories": [
+                            cat_assignment.category.name
+                            for cat_assignment in document.categories
+                            if cat_assignment.category
+                        ],
                         "metadata": source.get("metadata", {}),
+                        "chapter_title": source.get("metadata", {}).get(
+                            "chapter_title"
+                        ),
+                        "chapter_path": source.get("metadata", {}).get("chapter_path"),
                     }
                     results.append(result)
 
@@ -560,6 +572,9 @@ class RAGPipelineDB:
                 "tags": doc.get("tags", []),
                 "categories": doc.get("categories", []),
                 "score": doc.get("score", 0),
+                "chapter_title": doc.get("chapter_title"),
+                "chapter_path": doc.get("chapter_path"),
+                "chunk_index": doc.get("chunk_index", 0),
             }
             sources.append(source)
         return sources

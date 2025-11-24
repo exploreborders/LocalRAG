@@ -823,10 +823,15 @@ def main():
                 else:
                     edge_widths = [2] * len(G.edges())
 
+                # Use average edge width for the trace (Plotly doesn't support per-edge widths in multi-edge traces)
+                avg_edge_width = (
+                    sum(edge_widths) / len(edge_widths) if edge_widths else 2
+                )
+
                 edge_trace = go.Scatter(
                     x=edge_x,
                     y=edge_y,
-                    line=dict(width=edge_widths, color="#888"),
+                    line=dict(width=avg_edge_width, color="#888"),
                     hoverinfo="none",
                     mode="lines",
                 )

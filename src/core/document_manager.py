@@ -399,6 +399,83 @@ class CategoryManager:
             for stat in cat_stats
         ]
 
+    def get_category_tree(self) -> List[Dict[str, Any]]:
+        """Get the complete category tree with hierarchy."""
+        from sqlalchemy import func
+
+        def build_tree(parent_id=None, level=0):
+            categories = (
+                self.db.query(DocumentCategory)
+                .filter(DocumentCategory.parent_category_id == parent_id)
+                .order_by(DocumentCategory.name)
+                .all()
+            )
+
+            tree = []
+            for category in categories:
+                # Get document count for this category
+                doc_count = (
+                    self.db.query(func.count(DocumentCategoryAssignment.document_id))
+                    .filter(DocumentCategoryAssignment.category_id == category.id)
+                    .scalar()
+                )
+
+                node = {
+                    "id": category.id,
+                    "name": category.name,
+                    "description": category.description,
+                    "level": level,
+                    "document_count": doc_count or 0,
+                    "children": build_tree(category.id, level + 1),
+                }
+                tree.append(node)
+
+            return tree
+
+        return build_tree()
+
+    def delete_category(self, category_id: int) -> bool:
+        """Delete a category and all its subcategories."""
+        from sqlalchemy import func
+
+        try:
+            # First, get all descendant categories (recursive deletion)
+            def get_descendants(cat_id):
+                descendants = [cat_id]
+                children = (
+                    self.db.query(DocumentCategory.id)
+                    .filter(DocumentCategory.parent_category_id == cat_id)
+                    .all()
+                )
+                for child in children:
+                    descendants.extend(get_descendants(child.id))
+                return descendants
+
+            all_category_ids = get_descendants(category_id)
+
+            # Remove all category assignments for these categories
+            self.db.query(DocumentCategoryAssignment).filter(
+                DocumentCategoryAssignment.category_id.in_(all_category_ids)
+            ).delete(synchronize_session=False)
+
+            # Delete the categories themselves (in reverse order to handle foreign keys)
+            for cat_id in reversed(all_category_ids):
+                category = (
+                    self.db.query(DocumentCategory)
+                    .filter(DocumentCategory.id == cat_id)
+                    .first()
+                )
+                if category:
+                    self.db.delete(category)
+
+            self.db.commit()
+            return True
+
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to delete category {category_id}: {e}")
+            return False
+
 
 class DocumentProcessor(BaseProcessor):
     """
@@ -492,11 +569,11 @@ class DocumentProcessor(BaseProcessor):
             for chapter in all_chapters:
                 chapter_record = DocumentChapter(
                     document_id=document.id,
-                    chapter_title=chapter["title"],
+                    chapter_title=chapter["title"],  # Short title (max 255 chars)
                     chapter_path=chapter["path"],
                     level=chapter.get("level", 1),
                     word_count=len(chapter["title"].split()),
-                    content=chapter["title"],  # Store title as content for now
+                    content=chapter.get("content", chapter["title"]),  # Full content
                 )
                 self.db.add(chapter_record)
             self.db.commit()
@@ -632,9 +709,14 @@ class DocumentProcessor(BaseProcessor):
             if line.strip().startswith("##"):
                 header_text = line.strip()[2:].strip()  # Remove ##
                 if header_text and len(header_text) > 3:
+                    # Extract just the title (first line, truncated to 255 chars)
+                    title_lines = header_text.split("\n")
+                    short_title = title_lines[0].strip()[:255]  # Limit to 255 chars
+
                     chapters.append(
                         {
-                            "title": header_text,
+                            "title": short_title,
+                            "content": header_text,  # Store full content separately
                             "path": f"section_{len(chapters) + 1}",
                             "start_line": i,
                             "level": 2,
@@ -650,9 +732,13 @@ class DocumentProcessor(BaseProcessor):
         for number, title in table_matches:
             title = title.strip()
             if title and len(title) > 3:
+                # Truncate title to 255 characters for database
+                short_title = title[:255]
+
                 chapters.append(
                     {
-                        "title": title,
+                        "title": short_title,
+                        "content": title,  # Store full content separately
                         "path": number,
                         "start_line": -1,  # Table entries don't have line numbers
                         "level": 1 if "." not in number else len(number.split(".")) + 1,
@@ -759,11 +845,15 @@ class DocumentProcessor(BaseProcessor):
                     for chapter in batch:
                         chapter_record = DocumentChapter(
                             document_id=document_id,
-                            chapter_title=chapter["title"],
+                            chapter_title=chapter[
+                                "title"
+                            ],  # Short title (max 255 chars)
                             chapter_path=chapter["path"],
                             level=chapter.get("level", 1),
                             word_count=len(chapter["title"].split()),
-                            content=chapter["title"],
+                            content=chapter.get(
+                                "content", chapter["title"]
+                            ),  # Full content
                         )
                         self.db.add(chapter_record)
                     self.db.commit()  # Commit batch
@@ -909,11 +999,24 @@ class DocumentProcessor(BaseProcessor):
             embedding_lookup = {emb.chunk_id: emb.embedding for emb in embeddings}
 
             # Prepare data for indexing
-            chunk_texts = [chunk.content for chunk in chunks]
-            embeddings_list = [embedding_lookup.get(chunk.id, []) for chunk in chunks]
+            chunk_data = []
+            embeddings_list = []
+
+            for chunk in chunks:
+                chunk_dict = {
+                    "content": chunk.content,
+                    "metadata": {
+                        "word_count": len(chunk.content.split()),
+                        "char_count": len(chunk.content),
+                        "chapter_title": chunk.chapter_title,
+                        "chapter_path": chunk.chapter_path,
+                    },
+                }
+                chunk_data.append(chunk_dict)
+                embeddings_list.append(embedding_lookup.get(chunk.id, []))
 
             # Index in search systems
-            self._index_document(document, chunks, embeddings_list)
+            self._index_document(document, chunk_data, embeddings_list)
 
         except Exception as e:
             logger.error(f"Failed to index document chunks for {document_id}: {e}")

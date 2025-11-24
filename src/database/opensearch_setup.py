@@ -8,6 +8,7 @@ from elasticsearch import Elasticsearch
 import json
 import os
 
+
 def get_elasticsearch_client():
     """
     Get Elasticsearch client configured for RAG operations.
@@ -17,8 +18,9 @@ def get_elasticsearch_client():
     """
     return Elasticsearch(
         hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}],
-        verify_certs=False
+        verify_certs=False,
     )
+
 
 def setup_opensearch_indices():
     """
@@ -30,7 +32,7 @@ def setup_opensearch_indices():
     # Connect to Elasticsearch (using instead of OpenSearch due to Docker issues)
     client = Elasticsearch(
         hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}],
-        verify_certs=False
+        verify_certs=False,
     )
 
     # Document index for full-text search
@@ -42,7 +44,7 @@ def setup_opensearch_indices():
                 "content": {"type": "text", "analyzer": "standard"},
                 "embedding_model": {"type": "keyword"},
                 "chunk_index": {"type": "integer"},
-                "created_at": {"type": "date"}
+                "created_at": {"type": "date"},
             }
         }
     }
@@ -56,19 +58,16 @@ def setup_opensearch_indices():
                 "content": {"type": "text"},
                 "embedding": {
                     "type": "dense_vector",
-                    "dims": 768  # Adjust based on model
+                    "dims": 768,  # Adjust based on model
                 },
                 "embedding_model": {"type": "keyword"},
-                "metadata": {"type": "object"}
+                "metadata": {"type": "object"},
             }
         }
     }
 
     # Create indices
-    indices = {
-        "rag_documents": document_index,
-        "rag_vectors": vector_index
-    }
+    indices = {"documents": document_index, "vectors": vector_index}
 
     for index_name, index_config in indices.items():
         if not client.indices.exists(index=index_name):
@@ -76,6 +75,7 @@ def setup_opensearch_indices():
             print(f"Created index {index_name}: {response}")
         else:
             print(f"Index {index_name} already exists")
+
 
 if __name__ == "__main__":
     setup_opensearch_indices()
