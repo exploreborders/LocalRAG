@@ -77,7 +77,7 @@ def check_system_setup():
 
     # Check database connectivity
     try:
-        from database.models import SessionLocal
+        from src.database.models import SessionLocal
 
         db = SessionLocal()
         db.execute("SELECT 1")

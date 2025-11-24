@@ -22,7 +22,7 @@ def test_retrieval_validation():
 
     try:
         # Test invalid question
-        from core.retrieval import RAGPipelineDB
+        from src.core.retrieval import RAGPipelineDB
 
         # Mock the dependencies to avoid actual initialization
         with patch("core.retrieval.DatabaseRetriever") as mock_retriever_class:
@@ -72,7 +72,7 @@ def test_hybrid_search_parameter():
     print("🧪 Testing hybrid search parameter...")
 
     try:
-        from core.retrieval import DatabaseRetriever
+        from src.core.retrieval import DatabaseRetriever
 
         # Test valid hybrid_alpha values
         retriever = DatabaseRetriever(hybrid_alpha=0.8)
@@ -97,7 +97,7 @@ def test_error_handler_integration():
     print("🧪 Testing error handler integration...")
 
     try:
-        from core.retrieval import DatabaseRetriever
+        from src.core.retrieval import DatabaseRetriever
 
         retriever = DatabaseRetriever()
         assert hasattr(retriever, "error_handler"), (
@@ -125,7 +125,7 @@ def test_cache_key_generation():
     print("🧪 Testing cache key generation...")
 
     try:
-        from core.retrieval import RAGPipelineDB
+        from src.core.retrieval import RAGPipelineDB
 
         # Mock dependencies
         with patch("core.retrieval.DatabaseRetriever") as mock_retriever_class:

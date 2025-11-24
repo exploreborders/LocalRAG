@@ -76,7 +76,7 @@ def get_system_metrics():
 
     # Database-driven document metrics
     try:
-        from database.models import (
+        from src.database.models import (
             SessionLocal,
             Document,
             DocumentChunk,
@@ -333,7 +333,7 @@ def initialize_system_if_needed():
     if not st.session_state.get("system_initialized", False):
         try:
             # Import system components
-            from core.retrieval import DatabaseRetriever, RAGPipelineDB
+            from src.core.retrieval import DatabaseRetriever, RAGPipelineDB
             from web_interface.utils.session_manager import load_settings
 
             # Get configured models from settings
@@ -519,7 +519,11 @@ def main():
         st.markdown("### 🏷️ Tag Analytics")
 
         try:
-            from database.models import SessionLocal, DocumentTag, DocumentTagAssignment
+            from src.database.models import (
+                SessionLocal,
+                DocumentTag,
+                DocumentTagAssignment,
+            )
             from sqlalchemy import func
 
             db = SessionLocal()
@@ -627,8 +631,8 @@ def main():
         st.markdown("### 📂 Category Analytics")
 
         try:
-            from core.document_manager import CategoryManager
-            from database.models import SessionLocal
+            from src.core.document_manager import CategoryManager
+            from src.database.models import SessionLocal
 
             db = SessionLocal()
             cat_manager = CategoryManager(db)
@@ -702,7 +706,7 @@ def main():
     st.markdown("### 🕸️ Knowledge Graph Analytics")
 
     try:
-        from core.knowledge_graph import KnowledgeGraph
+        from src.core.knowledge_graph import KnowledgeGraph
         from database.models import SessionLocal
         import networkx as nx
 

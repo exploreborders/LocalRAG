@@ -13,7 +13,7 @@ project_root = Path(__file__).parent.parent
 src_path = project_root / "src"
 sys.path.insert(0, str(src_path))
 
-from core.document_manager import UploadProcessor
+from src.core.document_manager import UploadProcessor
 
 
 class MockUploadedFile:

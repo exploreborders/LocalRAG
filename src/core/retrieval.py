@@ -17,8 +17,8 @@ import logging
 import asyncio
 
 from database.models import SessionLocal, Document, DocumentChunk
-from core.embeddings import get_embedding_model
-from core.knowledge_graph import KnowledgeGraph
+from src.core.embeddings import get_embedding_model
+from src.core.knowledge_graph import KnowledgeGraph
 from src.utils.error_handler import (
     ErrorHandler,
     ValidationError,

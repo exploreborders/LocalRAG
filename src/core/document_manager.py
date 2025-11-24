@@ -19,9 +19,10 @@ import time
 from sqlalchemy.orm import Session
 from langdetect import detect, LangDetectException
 from src.core.base_processor import BaseProcessor
+from src.data.loader import AdvancedDocumentProcessor
 import spacy
 
-from database.models import (
+from src.database.models import (
     Document,
     DocumentChunk,
     DocumentChapter,
@@ -32,10 +33,10 @@ from database.models import (
     DocumentCategoryAssignment,
     SessionLocal,
 )
-from data.loader import split_documents
-from core.embeddings import get_embedding_model, create_embeddings
-from database.opensearch_setup import get_elasticsearch_client
-from ai.tag_suggester import AITagSuggester
+from src.data.loader import split_documents
+from src.core.embeddings import get_embedding_model, create_embeddings
+from src.database.opensearch_setup import get_elasticsearch_client
+from src.ai.tag_suggester import AITagSuggester
 from src.utils.tag_colors import TagColorManager
 import logging
 
@@ -523,7 +524,141 @@ class DocumentProcessor(BaseProcessor):
             self.db.close()
 
     def process_document(
-        self, file_path: str, filename: str = None, progress_callback: Callable = None
+        self,
+        file_path: str,
+        filename: Optional[str] = None,
+        use_advanced_processing: bool = False,
+        progress_callback: Optional[Callable[[str, int, str], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Process a document with optional advanced AI-powered pipeline.
+
+        Args:
+            file_path: Path to the document file
+            filename: Optional filename override
+            use_advanced_processing: Whether to use comprehensive AI pipeline
+            progress_callback: Optional progress callback
+
+        Returns:
+            Processing results
+        """
+        if use_advanced_processing:
+            logger.info(
+                f"Using ADVANCED processing for {filename or os.path.basename(file_path)}"
+            )
+            return self._process_document_advanced(
+                file_path, filename, progress_callback
+            )
+        else:
+            logger.info(
+                f"Using STANDARD processing for {filename or os.path.basename(file_path)}"
+            )
+            return self._process_document_standard(
+                file_path, filename, progress_callback
+            )
+
+    def _process_document_advanced(
+        self,
+        file_path: str,
+        filename: Optional[str] = None,
+        progress_callback: Optional[Callable[[str, int, str], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Process document using comprehensive AI-powered pipeline.
+        """
+        try:
+            # Initialize advanced processor
+            advanced_processor = AdvancedDocumentProcessor()
+
+            if progress_callback:
+                progress_callback(
+                    filename or os.path.basename(file_path),
+                    5,
+                    "Starting advanced AI processing...",
+                )
+
+            # Run comprehensive processing
+            results = advanced_processor.process_document_comprehensive(file_path)
+
+            if progress_callback:
+                progress_callback(
+                    filename or os.path.basename(file_path),
+                    50,
+                    "AI processing complete, storing results...",
+                )
+
+            # Store results in database (simplified for now)
+            # This would need to be expanded to store all the advanced metadata
+            with open(file_path, "rb") as f:
+                file_hash = hashlib.sha256(f.read()).hexdigest()
+
+            processing_result = {
+                "file_hash": file_hash,
+                "detected_language": results.get("language", "en"),
+                "document_summary": f"Processed with advanced AI pipeline. {len(results.get('chapters', []))} chapters detected.",
+                "key_topics": results.get("topics", []),
+                "reading_time_minutes": max(
+                    1, len(results.get("extracted_content", "")) // 2000
+                ),  # Rough estimate
+            }
+
+            document = Document(
+                filename=filename or os.path.basename(file_path),
+                filepath=file_path,
+                file_hash=processing_result["file_hash"],
+                status="processed",
+                detected_language=processing_result["detected_language"],
+                document_summary=processing_result["document_summary"],
+                key_topics=processing_result["key_topics"],
+                reading_time_minutes=processing_result["reading_time_minutes"],
+            )
+            self.db.add(document)
+            self.db.flush()
+
+            # Store basic chunks (would need to expand for full pipeline)
+            for i, chunk_data in enumerate(
+                results.get("chunks", [])[:20]
+            ):  # Limit for testing
+                chunk = DocumentChunk(
+                    document_id=document.id,
+                    content=chunk_data["content"],
+                    chunk_index=i,
+                    chapter_title=chunk_data.get("chapter", "auto"),
+                    embedding_model="sentence-transformers",  # Default embedding model
+                )
+                self.db.add(chunk)
+
+            self.db.commit()
+
+            if progress_callback:
+                progress_callback(
+                    filename or os.path.basename(file_path),
+                    100,
+                    "Advanced processing complete!",
+                )
+
+            return {
+                "success": True,
+                "document_id": document.id,
+                "advanced_processing": True,
+                "processing_stages": results.get("processing_stages", []),
+                "chapters_detected": len(results.get("chapters", [])),
+                "chunks_created": len(results.get("chunks", [])),
+                "topics_identified": len(results.get("topics", [])),
+            }
+
+        except Exception as e:
+            logger.error(f"Advanced document processing failed for {file_path}: {e}")
+            # Fallback to standard processing
+            return self._process_document_standard(
+                file_path, filename, progress_callback
+            )
+
+    def _process_document_standard(
+        self,
+        file_path: str,
+        filename: Optional[str] = None,
+        progress_callback: Optional[Callable[[str, int, str], None]] = None,
     ) -> Dict[str, Any]:
         """
         Process a single document with enhanced structure extraction.
@@ -855,7 +990,7 @@ class DocumentProcessor(BaseProcessor):
                             )
 
         # For scanned PDFs with no clear chapter structure, create synthetic chapters
-        # based on document length and common Deep Learning chapter topics
+        # based on document length and common technical content
         if (
             not chapters and len(content) > 1000
         ):  # Any reasonable content but no chapters found
@@ -863,40 +998,102 @@ class DocumentProcessor(BaseProcessor):
                 "No chapters found in scanned PDF, creating synthetic chapters for technical content"
             )
 
-            # Common technical/ML chapter topics (works for various technical books)
-            synthetic_chapters = [
-                "Einführung und Grundlagen",
-                "Mathematische Grundlagen",
-                "Kernkonzepte und Architekturen",
-                "Training und Optimierung",
-                "Erweiterte Techniken",
-                "Praktische Anwendungen",
-                "Fallstudien und Beispiele",
-                "Best Practices und Tipps",
-                "Troubleshooting und Debugging",
-                "Performance und Optimierung",
-                "Deployment und Produktion",
-                "Zukunftsaussichten",
-            ]
+            # Try to use advanced structure analysis if available
+            try:
+                from src.data.loader import AdvancedDocumentProcessor
 
-            # Create chapters distributed throughout the document
-            content_length = len(content)
-            chapter_count = min(
-                len(synthetic_chapters), max(6, content_length // 8000)
-            )  # 1 chapter per ~8k chars
+                processor = AdvancedDocumentProcessor()
+                structure_analysis = processor._analyze_document_structure(content)
 
-            for i in range(chapter_count):
-                chapters.append(
-                    {
-                        "title": synthetic_chapters[i][:255],
-                        "content": synthetic_chapters[i],
-                        "path": str(i + 1),
-                        "start_line": (i * content_length) // chapter_count,
-                        "level": 1,
-                    }
+                if structure_analysis.get("sections"):
+                    # Use AI-analyzed structure
+                    for section in structure_analysis["sections"]:
+                        chapters.append(
+                            {
+                                "title": section.get(
+                                    "title", f"Chapter {len(chapters) + 1}"
+                                )[:255],
+                                "content": section.get("title", ""),
+                                "path": str(len(chapters) + 1),
+                                "start_line": section.get("start_line", 0),
+                                "level": section.get("level", 1),
+                            }
+                        )
+                    logger.info(
+                        f"Created {len(chapters)} AI-analyzed chapters for scanned PDF"
+                    )
+                else:
+                    # Fallback to synthetic chapters
+                    synthetic_chapters = [
+                        "Einführung und Grundlagen",
+                        "Mathematische Grundlagen",
+                        "Kernkonzepte und Architekturen",
+                        "Training und Optimierung",
+                        "Erweiterte Techniken",
+                        "Praktische Anwendungen",
+                        "Fallstudien und Beispiele",
+                        "Best Practices und Tipps",
+                        "Troubleshooting und Debugging",
+                        "Performance und Optimierung",
+                        "Deployment und Produktion",
+                        "Zukunftsaussichten",
+                    ]
+
+                    # Create chapters distributed throughout the document
+                    content_length = len(content)
+                    chapter_count = min(
+                        len(synthetic_chapters), max(6, content_length // 8000)
+                    )  # 1 chapter per ~8k chars
+
+                    for i in range(chapter_count):
+                        chapters.append(
+                            {
+                                "title": synthetic_chapters[i][:255],
+                                "content": synthetic_chapters[i],
+                                "path": str(i + 1),
+                                "start_line": (i * content_length) // chapter_count,
+                                "level": 1,
+                            }
+                        )
+
+                    logger.info(
+                        f"Created {len(chapters)} synthetic chapters for scanned PDF"
+                    )
+
+            except Exception as e:
+                logger.warning(
+                    f"Advanced structure analysis failed, using basic synthetic chapters: {e}"
                 )
 
-            logger.info(f"Created {len(chapters)} synthetic chapters for scanned PDF")
+                # Basic fallback
+                synthetic_chapters = [
+                    "Einführung und Grundlagen",
+                    "Mathematische Grundlagen",
+                    "Kernkonzepte und Architekturen",
+                    "Training und Optimierung",
+                    "Erweiterte Techniken",
+                    "Praktische Anwendungen",
+                ]
+
+                content_length = len(content)
+                chapter_count = min(
+                    len(synthetic_chapters), max(3, content_length // 10000)
+                )
+
+                for i in range(chapter_count):
+                    chapters.append(
+                        {
+                            "title": synthetic_chapters[i][:255],
+                            "content": synthetic_chapters[i],
+                            "path": str(i + 1),
+                            "start_line": (i * content_length) // chapter_count,
+                            "level": 1,
+                        }
+                    )
+
+                logger.info(
+                    f"Created {len(chapters)} basic synthetic chapters for scanned PDF"
+                )
 
         return chapters
 
@@ -933,7 +1130,7 @@ class DocumentProcessor(BaseProcessor):
             Processing results dictionary
         """
         import gc
-        from data.loader import split_documents
+        from src.data.loader import split_documents
 
         if progress_callback:
             progress_callback(os.path.basename(file_path), 10, "Extracting content...")
@@ -1548,6 +1745,7 @@ class UploadProcessor(BaseProcessor):
         filename: str = None,
         file_hash: str = None,
         force_enrichment: bool = False,
+        use_advanced_processing: bool = None,
     ) -> Dict[str, Any]:
         """
         Process a single file with optional reprocessing capabilities.
@@ -1557,6 +1755,7 @@ class UploadProcessor(BaseProcessor):
             filename: Optional filename (used for database lookup)
             file_hash: Optional file hash (used for database lookup)
             force_enrichment: Whether to force AI enrichment even if document exists
+            use_advanced_processing: Whether to use advanced AI processing (auto-detected for scanned PDFs)
 
         Returns:
             Dict with processing results
@@ -1595,9 +1794,25 @@ class UploadProcessor(BaseProcessor):
                     "chapters_created": 0,
                 }
 
+            # Determine if we should use advanced processing
+            if use_advanced_processing is None:
+                # Auto-detect scanned PDFs and enable advanced processing for them
+                if file_path.lower().endswith(".pdf"):
+                    from src.data.loader import is_scanned_pdf
+
+                    is_scanned = is_scanned_pdf(file_path)
+                    use_advanced_processing = is_scanned
+                    logger.info(
+                        f"Auto-detected scanned PDF: {is_scanned}, using advanced processing: {use_advanced_processing}"
+                    )
+                else:
+                    use_advanced_processing = False
+
             # Process the document
             processor = DocumentProcessor()
-            result = processor.process_document(file_path, filename)
+            result = processor.process_document(
+                file_path, filename, use_advanced_processing=use_advanced_processing
+            )
 
             # If this is a reprocessing operation, update existing document
             if existing_doc and force_enrichment:
@@ -1862,8 +2077,21 @@ class UploadProcessor(BaseProcessor):
     def _process_single_file(self, file_path: str) -> Dict[str, Any]:
         """Process a single file (runs in separate process)."""
         try:
+            # Auto-detect scanned PDFs and enable advanced processing
+            use_advanced_processing = False
+            if file_path.lower().endswith(".pdf"):
+                from src.data.loader import is_scanned_pdf
+
+                is_scanned = is_scanned_pdf(file_path)
+                use_advanced_processing = is_scanned
+                logger.info(
+                    f"Auto-detected scanned PDF for parallel processing: {is_scanned}, using advanced processing: {use_advanced_processing}"
+                )
+
             processor = DocumentProcessor()
-            result = processor.process_document(file_path)
+            result = processor.process_document(
+                file_path, use_advanced_processing=use_advanced_processing
+            )
             result["file_path"] = file_path
             return result
         except Exception as e:
