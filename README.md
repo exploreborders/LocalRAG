@@ -5,23 +5,25 @@ A modern **Retrieval-Augmented Generation (RAG) system** for intelligent documen
 ## 🚀 Key Features
 
 ### **AI-Powered Document Intelligence**
-- **Hierarchical Structure Extraction**: Automatic chapter/section/subsection detection with proper path relationships
-- **Topic Classification**: Intelligent document categorization with cross-document relationship mapping
-- **Multi-Model Processing Pipeline**: Integrated vision fallback (qwen2.5vl), structure analysis (phi3.5), and generation (llama3.2)
-- **Content Relevance Scoring**: Semantic importance ranking with topic-aware chunking
+- **Advanced OCR Processing**: DeepSeek-OCR for scanned PDFs with 96% accuracy, Tesseract fallback for German technical documents
+- **Hierarchical Structure Extraction**: Automatic chapter/section/subsection detection with proper path relationships (up to 188+ chapters detected)
+- **AI-Generated Summaries**: Intelligent document summaries focusing on topics, purpose, and target audience
+- **Multi-Model Processing Pipeline**: Integrated vision (DeepSeek-OCR), structure analysis (llama3.2), and generation (llama3.2)
+- **Smart Categorization**: AI-powered category assignment (Technical, Educational, Scientific, etc.)
 
 ### **Advanced Document Processing**
 - **Docling Integration**: Superior document parsing with layout awareness, table extraction, and OCR fallback
-- **Vision Model Fallback**: qwen2.5vl for complex PDFs, scanned documents, and poor OCR quality
-- **Hierarchical Chunking**: Chapter-aware token-based chunking with parent-child relationships
-- **12-Language Multilingual Support**: Automatic language detection (91.7% accuracy) with language-aware LLM responses
+- **Advanced OCR Pipeline**: DeepSeek-OCR primary, Tesseract fallback with German technical document optimization
+- **Hierarchical Chunking**: Chapter-aware token-based chunking with parent-child relationships (up to 270 chunks per document)
+- **Structure Analysis**: Automatic detection of 10-188+ chapters with proper hierarchy mapping
+- **Language Detection**: Automatic language identification with German technical document support
 
 ### **Intelligent Knowledge Management**
-- **Document Tagging System**: Color-coded tags with manual management
+- **AI-Powered Tagging**: Automatic tag generation from document content (PyTorch, Machine Learning, etc.)
+- **Smart Categorization**: AI-driven category assignment (Technical, Educational, Scientific, etc.)
+- **Document Summaries**: AI-generated summaries focusing on topics, purpose, and target audience
 - **Hierarchical Categories**: Parent-child category relationships for sophisticated organization
 - **Knowledge Graph**: AI-powered tag relationships and category mappings for contextual expansion
-- **Topic-Based Relationships**: Connect documents across topics for knowledge synthesis
-- **Hierarchical Navigation**: Tree-structured document organization with section paths
 
 ### **High-Performance Architecture**
 - **Unified PostgreSQL Storage**: Single database with pgvector for embeddings and JSONB for structures
@@ -31,13 +33,15 @@ A modern **Retrieval-Augmented Generation (RAG) system** for intelligent documen
 
 ### **Modern Web Interface**
 - **Streamlit-based UI**: Clean, responsive interface with multiple pages
-- **Document Management**: Upload, organize, and manage document collections
+- **Document Management**: Upload, organize, and manage document collections with AI-generated summaries
 - **Advanced Analytics**: Real-time performance monitoring and usage statistics
-- **Flexible Configuration**: Customizable settings for AI models, caching, and processing parameters
+- **Reprocessing Capability**: Update existing documents with improved AI analysis
+- **Full Summary Display**: Complete document summaries without truncation
 
 ### **Production-Ready Features**
 - **Auto-Initialization**: Zero-click setup with automatic system configuration
-- **Document Organization**: Advanced tagging and hierarchical categorization system
+- **AI-Powered Organization**: Automatic tagging, categorization, and summarization
+- **Document Reprocessing**: Update existing documents with improved AI analysis
 - **Source Citations**: All LLM responses include document references ([Source 1: filename.pdf])
 - **Advanced Analytics**: Real-time performance monitoring with tag/category usage statistics
 - **Modern Web Interface**: Streamlit-based UI with document management and topic exploration
@@ -50,11 +54,11 @@ Document Input
      ↓
 Docling Parser (baseline extraction)
      ↓
-Quality Check → Vision Fallback (qwen2.5vl:7b) [if needed]
+Quality Check → OCR Processing (DeepSeek-OCR + Tesseract fallback)
      ↓
-Structure Analysis (phi3.5:3.8b for hierarchy + topics)
+Structure Analysis (llama3.2:latest for hierarchy detection)
      ↓
-Topic Classification (multi-strategy approach)
+AI Summarization + Tag/Category Generation (llama3.2:latest)
      ↓
 Hierarchical Chunking (chapter-aware, token-based)
      ↓
@@ -62,44 +66,21 @@ Relevance Scoring (semantic + topic-aware)
      ↓
 Embedding Generation (nomic-embed-text-v1.5)
      ↓
-Storage: PostgreSQL + JSONB structures + topic relationships
+Storage: PostgreSQL + JSONB structures + AI metadata
      ↓
 Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
 ```
 
 ## 🏆 Performance Metrics
 
-- **Processing Speed**: Efficient document processing with AI-enhanced pipeline
-- **Search Quality**: Enhanced relevance through hierarchical and topic understanding
-- **Language Detection**: 91.7% accuracy across 12 languages
+- **OCR Accuracy**: 96% accuracy with DeepSeek-OCR for scanned PDFs
+- **Structure Detection**: Automatic chapter detection (10-188+ chapters per document)
+- **Chunking Efficiency**: Up to 270 hierarchical chunks with proper metadata
+- **AI Summaries**: Clean, professional document summaries without unwanted prefixes
 - **Cache Performance**: 172.5x speedup for repeated queries (3.45s → 0.02s)
-- **Query Latency**: 30-50% reduction through optimized database operations
-- **System Monitoring**: Real-time analytics with accurate component status tracking
+- **Language Support**: German technical document optimization with automatic detection
 
 ## 🏗️ Architecture
-
-### **AI-Powered Processing Pipeline**
-```
-Document Input
-     ↓
-Docling Parser (baseline extraction)
-     ↓
-Quality Assessment → Vision Fallback (qwen2.5vl:7b) [if needed]
-     ↓
-Structure Analysis (phi3.5:3.8b for hierarchy + topics)
-     ↓
-Topic Classification (multi-strategy approach)
-     ↓
-Hierarchical Chunking (chapter-aware, token-based)
-     ↓
-Relevance Scoring (semantic + topic-aware)
-     ↓
-Embedding Generation (nomic-embed-text-v1.5)
-     ↓
-Storage: PostgreSQL + JSONB structures + topic relationships
-     ↓
-Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
-```
 
 ### **Multi-Layer Storage Architecture**
 - **Primary**: PostgreSQL with pgvector (relational data, vector search, JSONB structures)
@@ -145,9 +126,8 @@ Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
 - **16GB+ RAM** (recommended for AI models)
 
 ### **AI Models**
-- **llama3.2:latest** - Generation model
-- **qwen2.5vl:7b** - Vision fallback for complex documents
-- **phi3.5:3.8b** - Structure analysis and topic classification
+- **llama3.2:latest** - Generation, structure analysis, and summarization
+- **deepseek-ocr:latest** - OCR processing for scanned PDFs (96% accuracy)
 - **nomic-embed-text-v1.5** - Embeddings (auto-downloaded)
 
 ### **Database Stack**

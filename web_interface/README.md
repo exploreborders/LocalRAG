@@ -4,12 +4,12 @@ A modern Streamlit-based web interface for the Local RAG document intelligence s
 
 ## Features
 
-- **🏠 Home**: Query interface for AI-powered document Q&A
-- **📁 Documents**: Upload and manage document collections
+- **🏠 Home**: Query interface for AI-powered document Q&A with source citations
+- **📁 Documents**: Upload, manage, and reprocess document collections with AI summaries
 - **⚙️ Settings**: Configure AI models, caching, and system parameters
 - **📊 Analytics**: Performance monitoring and usage statistics
-- **Multilingual Support**: 12+ languages with automatic detection
-- **Real-time Processing**: Live status updates and progress indicators
+- **AI-Powered Features**: Automatic tagging, categorization, and summarization
+- **Full Summary Display**: Complete document summaries without truncation
 
 ## Quick Start
 
@@ -33,10 +33,11 @@ A modern Streamlit-based web interface for the Local RAG document intelligence s
 - **Query History**: Track and revisit previous searches
 
 ### 📁 Documents
-- **File Upload**: Support for PDF, DOCX, XLSX, PPTX, TXT files
-- **Document Library**: Browse and manage uploaded documents
-- **Batch Processing**: Efficient processing of multiple documents
-- **Tagging System**: Organize documents with custom tags
+- **File Upload**: Support for PDF, DOCX, XLSX, PPTX, TXT files with automatic processing
+- **Document Library**: Browse and manage uploaded documents with AI-generated summaries
+- **Reprocessing**: Update existing documents with improved AI analysis
+- **AI Organization**: Automatic tagging, categorization, and summarization
+- **Full Summary Display**: Complete document descriptions without truncation
 
 ### ⚙️ Settings
 - **AI Configuration**: Set Ollama model parameters and embedding options
