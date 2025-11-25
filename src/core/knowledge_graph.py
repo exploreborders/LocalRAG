@@ -197,31 +197,41 @@ class KnowledgeGraph:
         # Get all tag names
         all_tags = list(tag_categories.keys())
 
-        # Build relationships based on shared categories
+        # Build relationships based on shared categories (only specific categories)
+        specific_categories = {
+            "Machine Learning",
+            "Deep Learning",
+            "Database",
+            "Project Management",
+            "AI",
+            "Computer Vision",
+        }
         for i, tag1 in enumerate(all_tags):
             for tag2 in all_tags[i + 1 :]:
                 shared_categories = tag_categories[tag1] & tag_categories[tag2]
-                if shared_categories:
-                    # Calculate relationship strength based on shared categories
+                # Only create relationships for specific, meaningful categories
+                meaningful_shared = shared_categories & specific_categories
+                if meaningful_shared and len(meaningful_shared) >= 1:
+                    # Calculate relationship strength based on shared meaningful categories
                     strength = min(
-                        1.0, len(shared_categories) * 0.3
-                    )  # 0.3 per shared category
+                        1.0, len(meaningful_shared) * 0.5
+                    )  # 0.5 per meaningful shared category
                     relationships[tag1].append(
                         {
                             "related_tag": tag2,
-                            "type": "shares_categories",
+                            "type": "shares_meaningful_categories",
                             "strength": strength,
-                            "shared_categories": list(shared_categories),
-                            "evidence_count": len(shared_categories),
+                            "shared_categories": list(meaningful_shared),
+                            "evidence_count": len(meaningful_shared),
                         }
                     )
                     relationships[tag2].append(
                         {
                             "related_tag": tag1,
-                            "type": "shares_categories",
+                            "type": "shares_meaningful_categories",
                             "strength": strength,
-                            "shared_categories": list(shared_categories),
-                            "evidence_count": len(shared_categories),
+                            "shared_categories": list(meaningful_shared),
+                            "evidence_count": len(meaningful_shared),
                         }
                     )
 

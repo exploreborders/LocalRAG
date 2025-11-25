@@ -151,14 +151,17 @@ class AITagSuggester:
             Raw LLM response with tag suggestions
         """
         prompt = f"""
-        Analyze the following document and suggest 5-7 relevant tags that would help categorize and find this document.
-        Focus on:
-        - Key topics and themes
-        - Important concepts and entities
-        - Document type and purpose
-        - Technical terms and keywords
+        Analyze the following document and suggest 3-5 high-level, reusable tags that would help categorize and find this document.
+        Focus on BROAD categories and main topics that could connect multiple related documents.
 
-        Return only a comma-separated list of tags (single words or short phrases), no explanations or numbering.
+        Prioritize tags like:
+        - Technical domains: "Machine Learning", "Database", "Web Development", "AI", "Computer Vision"
+        - Academic fields: "Computer Science", "Mathematics", "Engineering"
+        - Business areas: "Project Management", "Business Analysis", "Marketing"
+        - Content types: "Tutorial", "Reference", "Research", "Documentation"
+
+        Avoid overly specific tags that would only apply to this one document.
+        Return only a comma-separated list of tags, no explanations.
 
         Document Title: {title}
         Document Content: {content}

@@ -1215,8 +1215,96 @@ def main():
         if st.button("🔄 Reprocess Selected", key="bulk_reprocess", width="stretch"):
             if selected_for_reprocess:
                 st.info(f"🔄 Reprocessing {len(selected_for_reprocess)} document(s)...")
-                # This would implement batch reprocessing - placeholder for now
-                st.success("✅ Batch reprocessing completed!")
+
+                # Create progress tracking
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+
+                def progress_callback(filename, progress, message):
+                    """Update progress display"""
+                    status_text.text(f"Reprocessing {filename}: {message}")
+                    progress_bar.progress(int(progress))
+
+                # Perform batch reprocessing
+                processor = UploadProcessor()
+                successful_reprocess = 0
+                total_chunks = 0
+                total_chapters = 0
+
+                # Extract document IDs from selected options
+                selected_doc_ids = []
+                for selected in selected_for_reprocess:
+                    # Extract ID from format "filename (id)"
+                    if "(" in selected and ")" in selected:
+                        try:
+                            doc_id = int(selected.split("(")[-1].rstrip(")"))
+                            selected_doc_ids.append(doc_id)
+                        except ValueError:
+                            continue
+
+                # Create database session for reprocessing
+                db_session = SessionLocal()
+
+                try:
+                    for i, doc_id in enumerate(selected_doc_ids):
+                        try:
+                            # Get document details
+                            doc = (
+                                db_session.query(Document)
+                                .filter(Document.id == doc_id)
+                                .first()
+                            )
+                            if not doc:
+                                continue
+
+                            status_text.text(f"🔄 Reprocessing {doc.filename}...")
+                            progress_bar.progress(
+                                int((i / len(selected_doc_ids)) * 100)
+                            )
+
+                            # Reprocess with enhanced processor
+                            result = processor.process_single_file(
+                                doc.filepath,
+                                doc.filename,
+                                doc.file_hash,
+                                force_enrichment=True,
+                            )
+
+                            if result["success"]:
+                                successful_reprocess += 1
+                                total_chunks += result.get("chunks_created", 0)
+                                total_chapters += result.get("chapters_created", 0)
+                            else:
+                                st.warning(
+                                    f"⚠️ Failed to reprocess {doc.filename}: {result.get('error', 'Unknown error')}"
+                                )
+
+                        except Exception as e:
+                            st.error(f"❌ Error reprocessing document {doc_id}: {e}")
+
+                finally:
+                    db_session.close()
+
+                # Clear progress indicators
+                progress_bar.empty()
+                status_text.empty()
+
+                if successful_reprocess > 0:
+                    st.success(
+                        f"✅ Successfully reprocessed {successful_reprocess}/{len(selected_for_reprocess)} document(s)"
+                    )
+                    if total_chunks > 0 or total_chapters > 0:
+                        st.info(
+                            f"📊 Created {total_chunks} chunks and {total_chapters} chapters"
+                        )
+
+                    # Update session state to force reinitialization
+                    if "system_initialized" in st.session_state:
+                        del st.session_state["system_initialized"]
+                    st.rerun()
+                else:
+                    st.error("❌ No documents were successfully reprocessed")
+
             else:
                 st.warning("⚠️ Please select documents to reprocess")
 

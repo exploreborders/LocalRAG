@@ -2010,6 +2010,23 @@ class UploadProcessor(BaseProcessor):
                     "chapters_created": 0,
                 }
 
+            # Handle reprocessing of existing documents differently
+            if existing_doc and force_enrichment:
+                # For reprocessing, run advanced processing directly without trying to create a new document
+                from src.data.loader import AdvancedDocumentProcessor
+
+                advanced_processor = AdvancedDocumentProcessor()
+                processing_result = advanced_processor.process_document_comprehensive(
+                    file_path
+                )
+
+                # Update the existing document with fresh processing results
+                result = self.reprocess_existing_document(
+                    existing_doc, processing_result, file_path
+                )
+                return result
+
+            # For new documents, proceed with normal processing
             # Determine if we should use advanced processing
             if use_advanced_processing is None:
                 # Auto-detect scanned PDFs and enable advanced processing for them
@@ -2030,12 +2047,7 @@ class UploadProcessor(BaseProcessor):
                 file_path, filename, use_advanced_processing=use_advanced_processing
             )
 
-            # If this is a reprocessing operation, update existing document
-            if existing_doc and force_enrichment:
-                result = self.reprocess_existing_document(
-                    existing_doc, result, file_path
-                )
-            elif result.get("success"):
+            if result.get("success"):
                 # DocumentProcessor already stored the document, just format the result
                 result["chunks_created"] = result.get("chunks_count", 0)
                 result["chapters_created"] = (
@@ -2074,11 +2086,73 @@ class UploadProcessor(BaseProcessor):
             existing_doc.last_modified = datetime.now()
             existing_doc.status = "processed"
 
-            # Update AI-enriched fields if available
-            if "document_summary" in processing_result:
-                existing_doc.document_summary = processing_result["document_summary"]
-            if "key_topics" in processing_result:
-                existing_doc.key_topics = processing_result["key_topics"]
+            # Regenerate AI content for reprocessing
+            extracted_content = processing_result.get("extracted_content", "")
+            if extracted_content and isinstance(extracted_content, str):
+                # Use DocumentProcessor for AI content regeneration
+                doc_processor = DocumentProcessor()
+
+                # Generate fresh AI content
+                content_for_analysis = extracted_content[:2000]
+
+                # Generate new tags
+                suggested_tags_data = doc_processor.tag_suggester.suggest_tags(
+                    content_for_analysis, existing_doc.filename
+                )
+                suggested_tags = [
+                    tag.get("tag", "") for tag in suggested_tags_data if tag.get("tag")
+                ]
+
+                # Generate new categories
+                suggested_categories = doc_processor._suggest_categories_ai(
+                    content_for_analysis, existing_doc.filename, suggested_tags
+                )
+
+                # Generate new summary
+                document_summary = doc_processor._generate_document_summary(
+                    content_for_analysis,
+                    existing_doc.filename,
+                    suggested_tags,
+                    processing_result.get("chapters_detected", 0),
+                )
+
+                # Update AI-enriched fields
+                existing_doc.document_summary = document_summary
+                existing_doc.key_topics = suggested_tags[:5]  # Store as key topics
+
+                # Clear existing tags and categories
+                self.db.query(DocumentTagAssignment).filter(
+                    DocumentTagAssignment.document_id == existing_doc.id
+                ).delete()
+                self.db.query(DocumentCategoryAssignment).filter(
+                    DocumentCategoryAssignment.document_id == existing_doc.id
+                ).delete()
+
+                # Add new tags
+                for tag_name in suggested_tags:
+                    if tag_name:
+                        tag = doc_processor.tag_manager.get_tag_by_name(tag_name)
+                        if not tag:
+                            tag = doc_processor.tag_manager.create_tag(tag_name)
+                        doc_processor.tag_manager.add_tag_to_document(
+                            existing_doc.id, tag.id
+                        )
+
+                # Add new categories
+                for category_name in suggested_categories:
+                    if category_name:
+                        category = doc_processor.category_manager.get_category_by_name(
+                            category_name
+                        )
+                        if not category:
+                            category = doc_processor.category_manager.create_category(
+                                category_name
+                            )
+                        doc_processor.category_manager.add_category_to_document(
+                            existing_doc.id, category.id
+                        )
+
+            # Update other fields if available
             if "reading_time_minutes" in processing_result:
                 existing_doc.reading_time_minutes = processing_result[
                     "reading_time_minutes"
@@ -2090,7 +2164,22 @@ class UploadProcessor(BaseProcessor):
             if "detected_language" in processing_result:
                 existing_doc.detected_language = processing_result["detected_language"]
 
-            # Clear existing chunks and chapters for this document
+            # Clear existing chunks, chapters, and embeddings for this document
+            # First, get existing chunk IDs to clear embeddings
+            existing_chunk_ids = [
+                chunk.id
+                for chunk in self.db.query(DocumentChunk)
+                .filter(DocumentChunk.document_id == existing_doc.id)
+                .all()
+            ]
+
+            # Clear embeddings first (before deleting chunks due to foreign key constraints)
+            if existing_chunk_ids:
+                self.db.query(DocumentEmbedding).filter(
+                    DocumentEmbedding.chunk_id.in_(existing_chunk_ids)
+                ).delete()
+
+            # Clear existing chunks and chapters
             self.db.query(DocumentChunk).filter(
                 DocumentChunk.document_id == existing_doc.id
             ).delete()
@@ -2102,69 +2191,103 @@ class UploadProcessor(BaseProcessor):
             chunks_created = 0
             chapters_created = 0
 
-            if "chunks" in processing_result:
-                for chunk_data in processing_result["chunks"]:
-                    metadata = chunk_data.get("metadata", {})
-                    chunk = DocumentChunk(
-                        document_id=existing_doc.id,
-                        content=chunk_data["content"],
-                        chunk_index=chunk_data["chunk_index"],
-                        chapter_path=chunk_data.get("chapter_path"),
-                        chapter_title=chunk_data.get("chapter_title"),
-                    )
-                    self.db.add(chunk)
-                    chunks_created += 1
+            if (
+                "chunks" in processing_result
+                and processing_result["chunks"] is not None
+            ):
+                chunks_list = processing_result["chunks"]
+                if isinstance(chunks_list, list):
+                    for i, chunk_data in enumerate(chunks_list):
+                        if isinstance(chunk_data, dict) and "content" in chunk_data:
+                            chunk = DocumentChunk(
+                                document_id=existing_doc.id,
+                                content=chunk_data["content"],
+                                chunk_index=i,  # Use sequential index starting from 0
+                                embedding_model="nomic-ai/nomic-embed-text-v1.5",
+                                chapter_path=chunk_data.get("chapter_path"),
+                                chapter_title=chunk_data.get("chapter_title"),
+                            )
+                            self.db.add(chunk)
+                            chunks_created += 1
 
-            if "chapters" in processing_result:
-                for chapter_data in processing_result["chapters"]:
-                    chapter = DocumentChapter(
-                        document_id=existing_doc.id,
-                        chapter_title=chapter_data["title"],
-                        chapter_path=chapter_data["path"],
-                        level=chapter_data["level"],
-                        word_count=chapter_data.get("word_count", 0),
-                        content=chapter_data.get("content"),
-                    )
-                    self.db.add(chapter)
-                    chapters_created += 1
+            if (
+                "chapters" in processing_result
+                and processing_result["chapters"] is not None
+            ):
+                chapters_list = processing_result["chapters"]
+                if isinstance(chapters_list, list):
+                    for i, chapter_data in enumerate(chapters_list):
+                        if isinstance(chapter_data, dict) and "title" in chapter_data:
+                            chapter = DocumentChapter(
+                                document_id=existing_doc.id,
+                                chapter_title=chapter_data["title"],
+                                chapter_path=chapter_data.get(
+                                    "path", f"chapter_{i + 1}"
+                                ),
+                                level=chapter_data.get("level", 1),
+                                word_count=chapter_data.get(
+                                    "word_count", len(chapter_data["title"].split())
+                                ),
+                                content=chapter_data.get(
+                                    "content",
+                                    chapter_data.get(
+                                        "content_preview", chapter_data["title"]
+                                    ),
+                                ),
+                            )
+                            self.db.add(chapter)
+                            chapters_created += 1
 
             # Create embeddings for new chunks
             if chunks_created > 0:
+                # Get the newly created chunks
                 chunks = (
                     self.db.query(DocumentChunk)
                     .filter(DocumentChunk.document_id == existing_doc.id)
+                    .order_by(DocumentChunk.chunk_index)
                     .all()
                 )
                 chunk_texts = [chunk.content for chunk in chunks]
-                embeddings_array, _ = create_embeddings(chunk_texts)
 
-                # Clear existing embeddings
-                self.db.query(DocumentEmbedding).filter(
-                    DocumentEmbedding.chunk_id.in_([chunk.id for chunk in chunks])
-                ).delete()
+                # Create embeddings with error handling
+                try:
+                    embeddings_array, _ = create_embeddings(chunk_texts)
 
-                # Store new embeddings
-                for i, (chunk, embedding) in enumerate(zip(chunks, embeddings_array)):
-                    doc_embedding = DocumentEmbedding(
-                        chunk_id=chunk.id,
-                        embedding=embedding.tolist(),
-                        embedding_model="nomic-ai/nomic-embed-text-v1.5",
+                    # Store new embeddings if creation was successful
+                    if embeddings_array is not None and len(embeddings_array) > 0:
+                        for chunk, embedding in zip(chunks, embeddings_array):
+                            if embedding is not None:
+                                doc_embedding = DocumentEmbedding(
+                                    chunk_id=chunk.id,
+                                    embedding=embedding.tolist(),
+                                    embedding_model="nomic-ai/nomic-embed-text-v1.5",
+                                )
+                                self.db.add(doc_embedding)
+                    else:
+                        logger.warning(
+                            f"Failed to create embeddings for document {existing_doc.id}"
+                        )
+
+                except Exception as e:
+                    logger.error(
+                        f"Embedding creation failed for document {existing_doc.id}: {e}"
                     )
-                    self.db.add(doc_embedding)
+                    # Continue without embeddings - document can still be searched by content
 
                 # Update search index with enhanced metadata
-                processor = DocumentProcessor()
-                processor._index_document(
-                    existing_doc,
-                    [
-                        {
-                            "content": chunk.content,
-                            "metadata": {"word_count": len(chunk.content.split())},
-                        }
-                        for chunk in chunks
-                    ],
-                    embeddings_array.tolist(),
-                )
+                if embeddings_array is not None:
+                    processor = DocumentProcessor()
+                    processor._index_document(
+                        existing_doc,
+                        [
+                            {
+                                "content": chunk.content,
+                                "metadata": {"word_count": len(chunk.content.split())},
+                            }
+                            for chunk in chunks
+                        ],
+                        embeddings_array.tolist(),
+                    )
 
             self.db.commit()
 
