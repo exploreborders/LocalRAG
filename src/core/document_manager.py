@@ -519,6 +519,84 @@ class DocumentProcessor(BaseProcessor):
         self.category_manager = CategoryManager(self.db)
         self.tag_suggester = AITagSuggester()
 
+    def _suggest_categories_ai(
+        self, content: str, filename: str, tags: List[str]
+    ) -> List[str]:
+        """
+        Suggest categories for a document using AI-based classification.
+
+        Args:
+            content: Document content
+            filename: Document filename
+            tags: Generated tags
+
+        Returns:
+            List of suggested category names
+        """
+        try:
+            # Use the tag suggester's LLM to classify categories
+            category_prompt = f"""
+            Analyze this document and suggest 1-3 relevant categories.
+            Choose from: Academic, Technical, Business, Scientific, Educational, Legal, Medical, Creative, Reference, General
+
+            Document: {filename}
+            Content preview: {content[:500]}
+            Tags: {", ".join(tags)}
+
+            Return only category names separated by commas (no explanations):
+            """
+
+            response = self.tag_suggester._call_llm(
+                category_prompt, max_tokens=50
+            ).strip()
+
+            # Parse the response
+            categories = [cat.strip() for cat in response.split(",") if cat.strip()]
+
+            # Validate categories
+            valid_categories = [
+                "Academic",
+                "Technical",
+                "Business",
+                "Scientific",
+                "Educational",
+                "Legal",
+                "Medical",
+                "Creative",
+                "Reference",
+                "General",
+            ]
+
+            # Filter to valid categories and limit to 3
+            validated_categories = [
+                cat for cat in categories if cat in valid_categories
+            ][:3]
+
+            return validated_categories
+
+        except Exception as e:
+            # Fallback to simple keyword-based categorization
+            content_lower = content.lower()
+            categories = []
+
+            if any(
+                word in content_lower
+                for word in ["deep learning", "neural", "machine learning", "ai"]
+            ):
+                categories.append("Technical")
+            if any(
+                word in content_lower
+                for word in ["academic", "research", "paper", "study"]
+            ):
+                categories.append("Academic")
+            if any(
+                word in content_lower
+                for word in ["tutorial", "guide", "course", "education"]
+            ):
+                categories.append("Educational")
+
+            return categories[:3] if categories else ["General"]
+
     def __del__(self):
         """Clean up database connections."""
         if hasattr(self, "db"):
@@ -605,15 +683,12 @@ class DocumentProcessor(BaseProcessor):
                 tag.get("tag", "") for tag in suggested_tags_data if tag.get("tag")
             ]
 
-            # Simple category suggestions based on content
-            suggested_categories = []
-            content_lower = content_for_analysis.lower()
-            if "deep learning" in content_lower or "neural" in content_lower:
-                suggested_categories.append("Machine Learning")
-            if "pytorch" in content_lower or "geometric" in content_lower:
-                suggested_categories.append("PyTorch")
-            if "open3d" in content_lower:
-                suggested_categories.append("3D Processing")
+            # Generate categories using AI-based classification
+            suggested_categories = self._suggest_categories_ai(
+                content_for_analysis,
+                filename or os.path.basename(file_path),
+                suggested_tags,
+            )
 
             processing_result = {
                 "file_hash": file_hash,
