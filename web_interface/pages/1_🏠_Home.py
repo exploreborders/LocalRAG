@@ -41,8 +41,11 @@ try:
         initialize_session_state,
         add_query_to_history,
     )
-    from components.query_interface import render_query_input, render_submit_button
-    from components.results_display import render_results
+    from web_interface.components.query_interface import (
+        render_query_input,
+        render_submit_button,
+    )
+    from web_interface.components.results_display import render_results
 except ImportError as e:
     st.error(f"❌ Could not import web interface components: {e}")
     st.stop()

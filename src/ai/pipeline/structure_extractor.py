@@ -1,5 +1,5 @@
 """
-Structure extractor for hierarchical document analysis using phi3.5.
+Structure extractor for hierarchical document analysis using llama3.2.
 
 This module analyzes document content to extract hierarchical structure
 (chapters, sections, subsections) and identify key topics.
@@ -14,15 +14,20 @@ import json
 
 logger = logging.getLogger(__name__)
 
+
 class StructureExtractor:
     """
-    AI-powered document structure extraction using phi3.5.
+    AI-powered document structure extraction using llama3.2.
 
     Extracts hierarchical document structure and identifies topics for
     enhanced retrieval and organization.
     """
 
-    def __init__(self, model_name: str = "phi3.5:latest", base_url: str = "http://localhost:11434"):
+    def __init__(
+        self,
+        model_name: str = "llama3.2:latest",
+        base_url: str = "http://localhost:11434",
+    ):
         """
         Initialize the structure extractor.
 
@@ -31,7 +36,7 @@ class StructureExtractor:
             base_url: Ollama API base URL
         """
         self.model_name = model_name
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.api_url = f"{self.base_url}/api/generate"
 
     def is_available(self) -> bool:
@@ -39,8 +44,8 @@ class StructureExtractor:
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             if response.status_code == 200:
-                models = response.json().get('models', [])
-                return any(model['name'] == self.model_name for model in models)
+                models = response.json().get("models", [])
+                return any(model["name"] == self.model_name for model in models)
             return False
         except Exception as e:
             logger.warning(f"Structure model availability check failed: {e}")
@@ -70,26 +75,28 @@ class StructureExtractor:
                 "stream": False,
                 "options": {
                     "temperature": 0.2,  # Balanced creativity for structure analysis
-                    "num_predict": 2048  # Allow detailed responses
-                }
+                    "num_predict": 2048,  # Allow detailed responses
+                },
             }
 
             response = requests.post(self.api_url, json=payload, timeout=120)
 
             if response.status_code == 200:
                 result = response.json()
-                response_text = result.get('response', '')
+                response_text = result.get("response", "")
 
                 # Parse the structured response
                 structure_data = self._parse_structure_response(response_text)
 
                 # Enhance with additional analysis
-                structure_data.update({
-                    'document_title': self._extract_title(text, filename),
-                    'key_topics': self._extract_topics(text),
-                    'reading_time_minutes': self._estimate_reading_time(text),
-                    'complexity_score': self._calculate_complexity(text)
-                })
+                structure_data.update(
+                    {
+                        "document_title": self._extract_title(text, filename),
+                        "key_topics": self._extract_topics(text),
+                        "reading_time_minutes": self._estimate_reading_time(text),
+                        "complexity_score": self._calculate_complexity(text),
+                    }
+                )
 
                 return structure_data
             else:
@@ -109,32 +116,32 @@ class StructureExtractor:
             text_sample = text
 
         prompt = f"""
-        Extract the EXACT table of contents from this document. Do not analyze or create new structure.
+        Analyze this German technical document and identify its chapter structure.
 
         Document: {filename}
         Content:
         {text_sample}
 
-        TASK: Find the table of contents section and extract each entry exactly as written.
+        TASK: Identify all chapters and sections in this document. Look for:
+        - Chapter headers like "Kapitel 1", "1. Einleitung", "Chapter 1"
+        - Section headers with numbers like "1.1", "2.3", etc.
+        - German technical terms that indicate chapters: Grundlagen, Theorie, Methoden, Algorithmen, Anwendung, etc.
 
-        For each line in the table of contents that looks like:
-        | number | title |  or  number | title
-
-        Extract the number and title exactly, maintaining the hierarchy (1, 1.1, 2, 2.1, etc.).
-
-        Return ONLY valid JSON:
+        Return ONLY valid JSON with the document structure:
         {{
             "hierarchy": [
-                {{"level": 1, "path": "1", "title": "EXACT TITLE FROM TABLE", "content_preview": "", "word_count": 0, "type": "chapter"}},
-                {{"level": 2, "path": "1.1", "title": "EXACT SUBTITLE FROM TABLE", "content_preview": "", "word_count": 0, "type": "section"}}
+                {{"level": 1, "path": "1", "title": "Chapter Title Here", "content_preview": "", "word_count": 0, "type": "chapter"}},
+                {{"level": 2, "path": "1.1", "title": "Section Title Here", "content_preview": "", "word_count": 0, "type": "section"}}
             ],
-            "document_type": "article",
-            "primary_topic": "General",
-            "secondary_topics": [],
+            "document_type": "technical_manual",
+            "primary_topic": "artificial_intelligence",
+            "secondary_topics": ["machine_learning", "deep_learning"],
             "technical_level": "intermediate",
             "content_quality": 0.8,
             "structure_confidence": 0.9
         }}
+
+        If you cannot find clear chapters, create reasonable chapter divisions based on content topics.
         """
 
         return prompt
@@ -143,8 +150,8 @@ class StructureExtractor:
         """Parse the JSON response from the structure analysis."""
         try:
             # Extract JSON from response
-            json_start = response_text.find('{')
-            json_end = response_text.rfind('}') + 1
+            json_start = response_text.find("{")
+            json_end = response_text.rfind("}") + 1
 
             if json_start >= 0:
                 # Find the first complete JSON object by counting braces
@@ -153,9 +160,9 @@ class StructureExtractor:
                 end_pos = 0
 
                 for i, char in enumerate(json_str):
-                    if char == '{':
+                    if char == "{":
                         brace_count += 1
-                    elif char == '}':
+                    elif char == "}":
                         brace_count -= 1
                         if brace_count == 0:
                             end_pos = i + 1
@@ -166,31 +173,32 @@ class StructureExtractor:
 
                     # Clean JSON by removing JavaScript-style comments
                     import re
+
                     # Remove // comments
-                    json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
+                    json_str = re.sub(r"//.*$", "", json_str, flags=re.MULTILINE)
                     # Remove /* */ comments
-                    json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+                    json_str = re.sub(r"/\*.*?\*/", "", json_str, flags=re.DOTALL)
 
                     parsed = json.loads(json_str)
 
                     # Validate required fields
-                    if 'hierarchy' not in parsed:
-                        parsed['hierarchy'] = []
+                    if "hierarchy" not in parsed:
+                        parsed["hierarchy"] = []
 
-                    if 'document_type' not in parsed:
-                        parsed['document_type'] = 'unknown'
+                    if "document_type" not in parsed:
+                        parsed["document_type"] = "unknown"
 
-                    if 'primary_topic' not in parsed:
-                        parsed['primary_topic'] = 'general'
+                    if "primary_topic" not in parsed:
+                        parsed["primary_topic"] = "general"
 
                     # Filter out non-chapter entries from hierarchy
                     filtered_hierarchy = []
-                    for item in parsed['hierarchy']:
-                        title = item.get('title', '').strip()
+                    for item in parsed["hierarchy"]:
+                        title = item.get("title", "").strip()
                         if title and not self._is_non_chapter_text(title):
                             filtered_hierarchy.append(item)
 
-                    parsed['hierarchy'] = filtered_hierarchy
+                    parsed["hierarchy"] = filtered_hierarchy
 
                     return parsed
 
@@ -204,16 +212,18 @@ class StructureExtractor:
 
     def _extract_table_of_contents(self, text: str) -> List[Dict[str, Any]]:
         """Extract table of contents from document text."""
-        lines = text.split('\n')
+        lines = text.split("\n")
         hierarchy = []
 
         # Look for table of contents section
         toc_start = -1
         for i, line in enumerate(lines):
             line_lower = line.lower().strip()
-            if ('inhaltsverzeichnis' in line_lower or  # German
-                'table of contents' in line_lower or
-                'contents' in line_lower):
+            if (
+                "inhaltsverzeichnis" in line_lower  # German
+                or "table of contents" in line_lower
+                or "contents" in line_lower
+            ):
                 toc_start = i
                 break
 
@@ -226,17 +236,17 @@ class StructureExtractor:
             line = lines[i].strip()
 
             # Skip table separators (|---| or |-----|)
-            if re.match(r'^\s*\|[\s\-\|]+\|\s*$', line):
+            if re.match(r"^\s*\|[\s\-\|]+\|\s*$", line):
                 continue
 
             # Look for table rows with | number | title |
-            match = re.match(r'^\s*\|\s*([\d\.]+)\s*\|\s*(.+?)\s*\|.*\|?\s*$', line)
+            match = re.match(r"^\s*\|\s*([\d\.]+)\s*\|\s*(.+?)\s*\|.*\|?\s*$", line)
             if match:
                 path = match.group(1).strip()
                 title = match.group(2).strip()
 
                 # Skip if it's not a proper chapter/section number
-                if not re.match(r'^\d+(\.\d+)*$', path):
+                if not re.match(r"^\d+(\.\d+)*$", path):
                     continue
 
                 # Filter out non-chapter text
@@ -244,16 +254,18 @@ class StructureExtractor:
                     continue
 
                 # Determine level based on dots in path
-                level = path.count('.') + 1
+                level = path.count(".") + 1
 
-                hierarchy.append({
-                    'level': level,
-                    'path': path,
-                    'title': title,
-                    'content_preview': '',
-                    'word_count': 0,
-                    'type': 'chapter' if level == 1 else 'section'
-                })
+                hierarchy.append(
+                    {
+                        "level": level,
+                        "path": path,
+                        "title": title,
+                        "content_preview": "",
+                        "word_count": 0,
+                        "type": "chapter" if level == 1 else "section",
+                    }
+                )
 
         return hierarchy
 
@@ -261,33 +273,33 @@ class StructureExtractor:
         """Check if a line contains text that shouldn't be considered a chapter heading."""
         # Common non-chapter patterns (case insensitive, with optional content after colon)
         non_chapter_patterns = [
-            r'^wobei:?.*',  # "Wobei:" - German "whereas" or "where"
-            r'^note:?.*',   # "Note:"
-            r'^see also:?.*',  # "See also:"
-            r'^example:?.*',   # "Example:"
-            r'^figure:?.*',    # "Figure:"
-            r'^table:?.*',     # "Table:"
-            r'^source:?.*',    # "Source:"
-            r'^references?:?.*',  # "Reference(s):"
-            r'^abstract:?.*',  # "Abstract:"
-            r'^summary:?.*',   # "Summary:"
-            r'^introduction:?.*',  # "Introduction:" (too generic)
-            r'^conclusion:?.*',   # "Conclusion:"
-            r'^acknowledgments?:?.*',  # "Acknowledgment(s):"
-            r'^appendix:?.*',   # "Appendix:"
-            r'^glossary:?.*',   # "Glossary:"
-            r'^index:?.*',      # "Index:"
-            r'^contents?:?.*',  # "Content(s):"
-            r'^table of contents?:?.*',  # "Table of contents:"
-            r'^in this (chapter|section|part):?.*',  # "In this chapter/section/part:"
-            r'^the following:?.*',  # "The following:"
-            r'^overview:?.*',   # "Overview:"
-            r'^background:?.*', # "Background:"
-            r'^related work:?.*',  # "Related work:"
-            r'^methodology:?.*',  # "Methodology:"
-            r'^results:?.*',     # "Results:"
-            r'^discussion:?.*',  # "Discussion:"
-            r'^future work:?.*', # "Future work:"
+            r"^wobei:?.*",  # "Wobei:" - German "whereas" or "where"
+            r"^note:?.*",  # "Note:"
+            r"^see also:?.*",  # "See also:"
+            r"^example:?.*",  # "Example:"
+            r"^figure:?.*",  # "Figure:"
+            r"^table:?.*",  # "Table:"
+            r"^source:?.*",  # "Source:"
+            r"^references?:?.*",  # "Reference(s):"
+            r"^abstract:?.*",  # "Abstract:"
+            r"^summary:?.*",  # "Summary:"
+            r"^introduction:?.*",  # "Introduction:" (too generic)
+            r"^conclusion:?.*",  # "Conclusion:"
+            r"^acknowledgments?:?.*",  # "Acknowledgment(s):"
+            r"^appendix:?.*",  # "Appendix:"
+            r"^glossary:?.*",  # "Glossary:"
+            r"^index:?.*",  # "Index:"
+            r"^contents?:?.*",  # "Content(s):"
+            r"^table of contents?:?.*",  # "Table of contents:"
+            r"^in this (chapter|section|part):?.*",  # "In this chapter/section/part:"
+            r"^the following:?.*",  # "The following:"
+            r"^overview:?.*",  # "Overview:"
+            r"^background:?.*",  # "Background:"
+            r"^related work:?.*",  # "Related work:"
+            r"^methodology:?.*",  # "Methodology:"
+            r"^results:?.*",  # "Results:"
+            r"^discussion:?.*",  # "Discussion:"
+            r"^future work:?.*",  # "Future work:"
         ]
 
         line_lower = line.lower().strip()
@@ -300,7 +312,7 @@ class StructureExtractor:
             return True
 
         # Exclude lines that are just numbers or symbols
-        if re.match(r'^[\d\s\.\-\(\)]+$', line.strip()):
+        if re.match(r"^[\d\s\.\-\(\)]+$", line.strip()):
             return True
 
         return False
@@ -308,13 +320,13 @@ class StructureExtractor:
     def _create_default_structure(self) -> Dict[str, Any]:
         """Create a default structure when parsing fails."""
         return {
-            'hierarchy': [],
-            'document_type': 'unknown',
-            'primary_topic': 'general',
-            'secondary_topics': [],
-            'technical_level': 'intermediate',
-            'content_quality': 0.5,
-            'structure_confidence': 0.3
+            "hierarchy": [],
+            "document_type": "unknown",
+            "primary_topic": "general",
+            "secondary_topics": [],
+            "technical_level": "intermediate",
+            "content_quality": 0.5,
+            "structure_confidence": 0.3,
         }
 
     def _fallback_structure(self, text: str, filename: str) -> Dict[str, Any]:
@@ -324,15 +336,17 @@ class StructureExtractor:
         # First priority: extract table of contents if it exists
         toc_hierarchy = self._extract_table_of_contents(text)
         if toc_hierarchy:
-            logger.info(f"Successfully extracted {len(toc_hierarchy)} items from table of contents")
+            logger.info(
+                f"Successfully extracted {len(toc_hierarchy)} items from table of contents"
+            )
             return {
-                'hierarchy': toc_hierarchy,
-                'document_type': self._guess_document_type(text, filename),
-                'primary_topic': 'general',
-                'secondary_topics': [],
-                'technical_level': 'intermediate',
-                'content_quality': 0.8,
-                'structure_confidence': 0.9
+                "hierarchy": toc_hierarchy,
+                "document_type": self._guess_document_type(text, filename),
+                "primary_topic": "general",
+                "secondary_topics": [],
+                "technical_level": "intermediate",
+                "content_quality": 0.8,
+                "structure_confidence": 0.9,
             }
 
         # Second priority: try LLM analysis if available
@@ -354,46 +368,52 @@ class StructureExtractor:
                     "model": self.model_name,
                     "prompt": prompt,
                     "stream": False,
-                    "options": {"temperature": 0.2, "num_predict": 500}
+                    "options": {"temperature": 0.2, "num_predict": 500},
                 }
 
                 import requests
+
                 response = requests.post(self.api_url, json=payload, timeout=30)
 
                 if response.status_code == 200:
                     result = response.json()
-                    response_text = result.get('response', '')
+                    response_text = result.get("response", "")
 
                     # Simple JSON extraction
-                    json_start = response_text.find('{')
-                    json_end = response_text.rfind('}') + 1
+                    json_start = response_text.find("{")
+                    json_end = response_text.rfind("}") + 1
 
                     if json_start >= 0 and json_end > json_start:
                         json_str = response_text[json_start:json_end]
                         import json
+
                         parsed = json.loads(json_str)
 
-                        if 'sections' in parsed:
+                        if "sections" in parsed:
                             hierarchy = []
-                            for i, title in enumerate(parsed['sections'], 1):
-                                hierarchy.append({
-                                    'level': 1,
-                                    'path': str(i),
-                                    'title': title,
-                                    'content_preview': '',
-                                    'word_count': 0,
-                                    'type': 'chapter'
-                                })
+                            for i, title in enumerate(parsed["sections"], 1):
+                                hierarchy.append(
+                                    {
+                                        "level": 1,
+                                        "path": str(i),
+                                        "title": title,
+                                        "content_preview": "",
+                                        "word_count": 0,
+                                        "type": "chapter",
+                                    }
+                                )
 
                             logger.info(f"LLM extracted {len(hierarchy)} sections")
                             return {
-                                'hierarchy': hierarchy,
-                                'document_type': self._guess_document_type(text, filename),
-                                'primary_topic': 'general',
-                                'secondary_topics': [],
-                                'technical_level': 'intermediate',
-                                'content_quality': 0.5,
-                                'structure_confidence': 0.6
+                                "hierarchy": hierarchy,
+                                "document_type": self._guess_document_type(
+                                    text, filename
+                                ),
+                                "primary_topic": "general",
+                                "secondary_topics": [],
+                                "technical_level": "intermediate",
+                                "content_quality": 0.5,
+                                "structure_confidence": 0.6,
                             }
 
             except Exception as e:
@@ -401,7 +421,7 @@ class StructureExtractor:
 
         # Final fallback: simple heuristic-based structure detection
         logger.info("Using heuristic structure extraction")
-        lines = text.split('\n')
+        lines = text.split("\n")
         hierarchy = []
 
         current_chapter = 0
@@ -413,58 +433,65 @@ class StructureExtractor:
                 continue
 
             # Look for chapter-like patterns (with filtering)
-            if (re.match(r'^(chapter|Chapter|CHAPTER)\s+\d+', line) or \
-                re.match(r'^\d+\.?\s+[A-Z]', line)) and \
-                not self._is_non_chapter_text(line):
+            if (
+                re.match(r"^(chapter|Chapter|CHAPTER)\s+\d+", line)
+                or re.match(r"^\d+\.?\s+[A-Z]", line)
+            ) and not self._is_non_chapter_text(line):
                 current_chapter += 1
-                hierarchy.append({
-                    'level': 1,
-                    'path': str(current_chapter),
-                    'title': line[:100],
-                    'content_preview': '',
-                    'word_count': 0,
-                    'type': 'chapter'
-                })
+                hierarchy.append(
+                    {
+                        "level": 1,
+                        "path": str(current_chapter),
+                        "title": line[:100],
+                        "content_preview": "",
+                        "word_count": 0,
+                        "type": "chapter",
+                    }
+                )
                 current_section = 0
 
             # Look for section-like patterns (more selective)
-            elif re.match(r'^\d+\.\d+', line) or \
-                  (re.match(r'^[A-Z][^.!?]*$', line) and len(line) < 80 and
-                   not self._is_non_chapter_text(line)):
+            elif re.match(r"^\d+\.\d+", line) or (
+                re.match(r"^[A-Z][^.!?]*$", line)
+                and len(line) < 80
+                and not self._is_non_chapter_text(line)
+            ):
                 current_section += 1
-                hierarchy.append({
-                    'level': 2,
-                    'path': f"{current_chapter}.{current_section}",
-                    'title': line[:100],
-                    'content_preview': '',
-                    'word_count': 0,
-                    'type': 'section'
-                })
+                hierarchy.append(
+                    {
+                        "level": 2,
+                        "path": f"{current_chapter}.{current_section}",
+                        "title": line[:100],
+                        "content_preview": "",
+                        "word_count": 0,
+                        "type": "section",
+                    }
+                )
 
         return {
-            'hierarchy': hierarchy,
-            'document_type': self._guess_document_type(text, filename),
-            'primary_topic': 'general',
-            'secondary_topics': [],
-            'technical_level': 'intermediate',
-            'content_quality': 0.4,
-            'structure_confidence': 0.2
+            "hierarchy": hierarchy,
+            "document_type": self._guess_document_type(text, filename),
+            "primary_topic": "general",
+            "secondary_topics": [],
+            "technical_level": "intermediate",
+            "content_quality": 0.4,
+            "structure_confidence": 0.2,
         }
 
     def _extract_title(self, text: str, filename: str) -> str:
         """Extract document title from content or filename."""
         # Look for title-like patterns at the beginning
-        lines = text.split('\n')[:10]
+        lines = text.split("\n")[:10]
 
         for line in lines:
             line = line.strip()
             if len(line) > 10 and len(line) < 200 and not line.isupper():
                 # Check if it looks like a title
-                if not re.match(r'^\d+', line) and not line.startswith('http'):
+                if not re.match(r"^\d+", line) and not line.startswith("http"):
                     return line
 
         # Fallback to filename
-        return filename.replace('_', ' ').replace('-', ' ').title()
+        return filename.replace("_", " ").replace("-", " ").title()
 
     def _extract_topics(self, text: str) -> List[str]:
         """Extract key topics from document content."""
@@ -474,11 +501,21 @@ class StructureExtractor:
 
         topics = []
         topic_keywords = {
-            'machine learning': ['machine learning', 'ml', 'neural network', 'deep learning'],
-            'data science': ['data science', 'statistics', 'analytics', 'data analysis'],
-            'programming': ['python', 'javascript', 'java', 'programming', 'code'],
-            'research': ['research', 'study', 'analysis', 'methodology'],
-            'business': ['business', 'management', 'strategy', 'marketing']
+            "machine learning": [
+                "machine learning",
+                "ml",
+                "neural network",
+                "deep learning",
+            ],
+            "data science": [
+                "data science",
+                "statistics",
+                "analytics",
+                "data analysis",
+            ],
+            "programming": ["python", "javascript", "java", "programming", "code"],
+            "research": ["research", "study", "analysis", "methodology"],
+            "business": ["business", "management", "strategy", "marketing"],
         }
 
         for topic, keywords in topic_keywords.items():
@@ -498,9 +535,11 @@ class StructureExtractor:
         # Simple complexity metrics
         avg_word_length = sum(len(word) for word in text.split()) / len(text.split())
         long_words = sum(1 for word in text.split() if len(word) > 6)
-        technical_terms = len(re.findall(r'\b[A-Z]{2,}\b', text))  # Acronyms
+        technical_terms = len(re.findall(r"\b[A-Z]{2,}\b", text))  # Acronyms
 
-        complexity = min(1.0, (avg_word_length * 0.1 + long_words * 0.001 + technical_terms * 0.01))
+        complexity = min(
+            1.0, (avg_word_length * 0.1 + long_words * 0.001 + technical_terms * 0.01)
+        )
         return round(complexity, 2)
 
     def _guess_document_type(self, text: str, filename: str) -> str:
@@ -509,21 +548,21 @@ class StructureExtractor:
         filename_lower = filename.lower()
 
         # Check filename patterns
-        if 'paper' in filename_lower or 'research' in filename_lower:
-            return 'research_paper'
-        elif 'manual' in filename_lower or 'guide' in filename_lower:
-            return 'manual'
-        elif 'report' in filename_lower:
-            return 'report'
-        elif 'book' in filename_lower:
-            return 'book'
+        if "paper" in filename_lower or "research" in filename_lower:
+            return "research_paper"
+        elif "manual" in filename_lower or "guide" in filename_lower:
+            return "manual"
+        elif "report" in filename_lower:
+            return "report"
+        elif "book" in filename_lower:
+            return "book"
 
         # Check content patterns
-        if 'abstract' in text_lower or 'introduction' in text_lower:
-            return 'research_paper'
-        elif 'chapter' in text_lower:
-            return 'book'
-        elif 'section' in text_lower and 'subsection' in text_lower:
-            return 'manual'
+        if "abstract" in text_lower or "introduction" in text_lower:
+            return "research_paper"
+        elif "chapter" in text_lower:
+            return "book"
+        elif "section" in text_lower and "subsection" in text_lower:
+            return "manual"
 
-        return 'article'
+        return "article"

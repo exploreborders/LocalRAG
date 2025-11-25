@@ -348,7 +348,7 @@ See detailed instructions below.
 
 3. **AI Models Setup:**
    ```bash
-   ollama pull llama3.2:3b      # Generation
+   ollama pull llama3.2:latest      # Generation
    ollama pull qwen2.5vl:7b     # Vision fallback
    ollama pull phi3.5:3.8b      # Structure analysis
    ```

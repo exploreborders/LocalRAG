@@ -517,6 +517,7 @@ class DocumentProcessor(BaseProcessor):
         super().__init__(db or SessionLocal())
         self.tag_manager = TagManager(self.db)
         self.category_manager = CategoryManager(self.db)
+        self.tag_suggester = AITagSuggester()
 
     def __del__(self):
         """Clean up database connections."""
@@ -592,14 +593,40 @@ class DocumentProcessor(BaseProcessor):
             with open(file_path, "rb") as f:
                 file_hash = hashlib.sha256(f.read()).hexdigest()
 
+            # Generate tags using AI
+            content_for_analysis = results.get("extracted_content", "")[
+                :2000
+            ]  # Sample for analysis
+            suggested_tags_data = self.tag_suggester.suggest_tags(
+                content_for_analysis, filename or os.path.basename(file_path)
+            )
+            # Extract tag names from the suggestion data
+            suggested_tags = [
+                tag.get("tag", "") for tag in suggested_tags_data if tag.get("tag")
+            ]
+
+            # Simple category suggestions based on content
+            suggested_categories = []
+            content_lower = content_for_analysis.lower()
+            if "deep learning" in content_lower or "neural" in content_lower:
+                suggested_categories.append("Machine Learning")
+            if "pytorch" in content_lower or "geometric" in content_lower:
+                suggested_categories.append("PyTorch")
+            if "open3d" in content_lower:
+                suggested_categories.append("3D Processing")
+
             processing_result = {
                 "file_hash": file_hash,
-                "detected_language": results.get("language", "en"),
-                "document_summary": f"Processed with advanced AI pipeline. {len(results.get('chapters', []))} chapters detected.",
+                "detected_language": results.get(
+                    "language", "de"
+                ),  # Default to German for technical docs
+                "document_summary": f"Processed with advanced AI pipeline. {results.get('chapters_detected', 0)} chapters detected.",
                 "key_topics": results.get("topics", []),
                 "reading_time_minutes": max(
                     1, len(results.get("extracted_content", "")) // 2000
                 ),  # Rough estimate
+                "suggested_tags": suggested_tags,
+                "suggested_categories": suggested_categories,
             }
 
             document = Document(
@@ -615,10 +642,47 @@ class DocumentProcessor(BaseProcessor):
             self.db.add(document)
             self.db.flush()
 
-            # Store basic chunks (would need to expand for full pipeline)
-            for i, chunk_data in enumerate(
-                results.get("chunks", [])[:20]
-            ):  # Limit for testing
+            # Store suggested tags
+            for tag_name in processing_result.get("suggested_tags", []):
+                if tag_name:
+                    tag = self.tag_manager.get_tag_by_name(tag_name)
+                    if not tag:
+                        tag = self.tag_manager.create_tag(tag_name)
+                    self.tag_manager.add_tag_to_document(document.id, tag.id)
+
+            # Store suggested categories
+            for category_name in processing_result.get("suggested_categories", []):
+                if category_name:
+                    category = self.category_manager.get_category_by_name(category_name)
+                    if not category:
+                        category = self.category_manager.create_category(category_name)
+                    self.category_manager.add_category_to_document(
+                        document.id, category.id
+                    )
+
+            # Store chapters from advanced processing
+            structure_info = results.get("structure_analysis", {})
+            hierarchy = structure_info.get("hierarchy", [])
+            for chapter_data in hierarchy:
+                chapter_record = DocumentChapter(
+                    document_id=document.id,
+                    chapter_title=chapter_data.get("title", "")[
+                        :255
+                    ],  # Limit to 255 chars
+                    chapter_path=chapter_data.get("path", ""),
+                    level=chapter_data.get("level", 1),
+                    word_count=chapter_data.get("word_count", 0),
+                    content=chapter_data.get(
+                        "content_preview", chapter_data.get("title", "")
+                    ),
+                    section_type="chapter"
+                    if chapter_data.get("level", 1) == 1
+                    else "section",
+                )
+                self.db.add(chapter_record)
+
+            # Store all chunks from advanced processing
+            for i, chunk_data in enumerate(results.get("chunks", [])):
                 chunk = DocumentChunk(
                     document_id=document.id,
                     content=chunk_data["content"],

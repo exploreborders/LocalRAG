@@ -52,7 +52,7 @@ try:
         DocumentCategoryAssignment,
         DocumentTag,
     )
-    from components.tag_analytics import render_tag_suggestions
+    from web_interface.components.tag_analytics import render_tag_suggestions
 
     IMPORTS_SUCCESSFUL = True
 except ImportError as e:
@@ -1442,7 +1442,7 @@ def main():
 
     # Tag Analytics Section
     st.markdown("---")
-    from components.tag_analytics import render_tag_analytics
+    from web_interface.components.tag_analytics import render_tag_analytics
 
     render_tag_analytics()
 

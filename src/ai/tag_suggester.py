@@ -23,7 +23,11 @@ class AITagSuggester:
     with confidence scoring and relevance ranking.
     """
 
-    def __init__(self, model_name: str = "llama3.2:3b", base_url: str = "http://localhost:11434"):
+    def __init__(
+        self,
+        model_name: str = "llama3.2:latest",
+        base_url: str = "http://localhost:11434",
+    ):
         """
         Initialize the AI tag suggester.
 
@@ -53,30 +57,34 @@ class AITagSuggester:
                 "stream": False,
                 "options": {
                     "num_predict": max_tokens,
-                    "temperature": 0.3  # Lower temperature for more consistent results
-                }
+                    "temperature": 0.3,  # Lower temperature for more consistent results
+                },
             }
 
             response = requests.post(
-                f"{self.base_url}/api/generate",
-                json=payload,
-                timeout=30
+                f"{self.base_url}/api/generate", json=payload, timeout=30
             )
 
             if response.status_code == 200:
                 result = response.json()
                 return result.get("response", "").strip()
             else:
-                logger.error(f"LLM call failed: {response.status_code} - {response.text}")
+                logger.error(
+                    f"LLM call failed: {response.status_code} - {response.text}"
+                )
                 return ""
 
         except Exception as e:
             logger.error(f"Error calling LLM: {e}")
             return ""
 
-    def suggest_tags(self, document_content: str, document_title: str = "",
-                    existing_tags: Optional[List[str]] = None,
-                    max_suggestions: int = 5) -> List[Dict[str, Any]]:
+    def suggest_tags(
+        self,
+        document_content: str,
+        document_title: str = "",
+        existing_tags: Optional[List[str]] = None,
+        max_suggestions: int = 5,
+    ) -> List[Dict[str, Any]]:
         """
         Generate intelligent tag suggestions based on document content.
 
@@ -96,7 +104,9 @@ class AITagSuggester:
         analysis_content = self._prepare_content(document_content)
 
         # Generate tag suggestions
-        raw_suggestions = self._generate_tag_suggestions(analysis_content, document_title)
+        raw_suggestions = self._generate_tag_suggestions(
+            analysis_content, document_title
+        )
 
         # Parse and clean suggestions
         parsed_tags = self._parse_tag_response(raw_suggestions)
@@ -121,10 +131,10 @@ class AITagSuggester:
         """
         # Truncate content if too long
         if len(content) > self.max_content_length:
-            content = content[:self.max_content_length] + "..."
+            content = content[: self.max_content_length] + "..."
 
         # Basic cleaning
-        content = re.sub(r'\s+', ' ', content)  # Normalize whitespace
+        content = re.sub(r"\s+", " ", content)  # Normalize whitespace
         content = content.strip()
 
         return content
@@ -174,7 +184,7 @@ class AITagSuggester:
         tags = []
 
         # Try different separators
-        for separator in [',', '\n', ';', '|']:
+        for separator in [",", "\n", ";", "|"]:
             if separator in response:
                 candidates = response.split(separator)
                 break
@@ -185,15 +195,15 @@ class AITagSuggester:
             tag = tag.strip()
 
             # Remove numbering and bullet points
-            tag = re.sub(r'^\d+\.?\s*', '', tag)
-            tag = re.sub(r'^[-•*]\s*', '', tag)
-            tag = re.sub(r'^["\'](.*)["\']$', r'\1', tag)  # Remove quotes
+            tag = re.sub(r"^\d+\.?\s*", "", tag)
+            tag = re.sub(r"^[-•*]\s*", "", tag)
+            tag = re.sub(r'^["\'](.*)["\']$', r"\1", tag)  # Remove quotes
 
             # Clean and validate
             tag = tag.strip()
             if tag and 2 <= len(tag) <= 50:  # Reasonable length limits
                 # Capitalize first letter of each word
-                tag = ' '.join(word.capitalize() for word in tag.split())
+                tag = " ".join(word.capitalize() for word in tag.split())
                 tags.append(tag)
 
         # Remove duplicates while preserving order
@@ -207,8 +217,9 @@ class AITagSuggester:
 
         return unique_tags
 
-    def _filter_existing_tags(self, suggestions: List[str],
-                            existing_tags: List[str]) -> List[str]:
+    def _filter_existing_tags(
+        self, suggestions: List[str], existing_tags: List[str]
+    ) -> List[str]:
         """
         Filter out tags that already exist.
 
@@ -263,15 +274,17 @@ class AITagSuggester:
 
         for tag in tags:
             confidence = self._calculate_confidence(tag, content_lower)
-            scored_tags.append({
-                'tag': tag,
-                'confidence': confidence,
-                'relevance_score': confidence,
-                'source': 'ai_generated'
-            })
+            scored_tags.append(
+                {
+                    "tag": tag,
+                    "confidence": confidence,
+                    "relevance_score": confidence,
+                    "source": "ai_generated",
+                }
+            )
 
         # Sort by confidence (highest first)
-        scored_tags.sort(key=lambda x: x['confidence'], reverse=True)
+        scored_tags.sort(key=lambda x: x["confidence"], reverse=True)
 
         return scored_tags
 
@@ -303,11 +316,11 @@ class AITagSuggester:
                 confidence += 0.2 * (matched_words / len(tag_words))
 
         # Boost for technical/academic terms (contains numbers, special chars)
-        if re.search(r'[0-9\-_]', tag):
+        if re.search(r"[0-9\-_]", tag):
             confidence += 0.1
 
         # Penalize very generic terms
-        generic_terms = {'document', 'file', 'text', 'content', 'information', 'data'}
+        generic_terms = {"document", "file", "text", "content", "information", "data"}
         if tag_lower in generic_terms:
             confidence -= 0.2
 
@@ -316,8 +329,9 @@ class AITagSuggester:
 
         return confidence
 
-    def get_tag_suggestions_for_documents(self, documents: List[Dict[str, Any]],
-                                       max_per_document: int = 3) -> Dict[int, List[Dict[str, Any]]]:
+    def get_tag_suggestions_for_documents(
+        self, documents: List[Dict[str, Any]], max_per_document: int = 3
+    ) -> Dict[int, List[Dict[str, Any]]]:
         """
         Generate tag suggestions for multiple documents.
 
@@ -331,10 +345,10 @@ class AITagSuggester:
         results = {}
 
         for doc in documents:
-            doc_id = doc['id']
-            content = doc.get('content', '')
-            title = doc.get('title', '')
-            existing_tags = doc.get('existing_tags', [])
+            doc_id = doc["id"]
+            content = doc.get("content", "")
+            title = doc.get("title", "")
+            existing_tags = doc.get("existing_tags", [])
 
             suggestions = self.suggest_tags(
                 content, title, existing_tags, max_per_document
@@ -388,5 +402,5 @@ class AITagSuggester:
                 "themes": [],
                 "entities": [],
                 "category": "general",
-                "content_type": "document"
+                "content_type": "document",
             }

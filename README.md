@@ -145,7 +145,7 @@ Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
 - **16GB+ RAM** (recommended for AI models)
 
 ### **AI Models**
-- **llama3.2:3b** - Generation model
+- **llama3.2:latest** - Generation model
 - **qwen2.5vl:7b** - Vision fallback for complex documents
 - **phi3.5:3.8b** - Structure analysis and topic classification
 - **nomic-embed-text-v1.5** - Embeddings (auto-downloaded)
@@ -196,13 +196,12 @@ LocalRAG/
 │   ├── embeddings.py             # Embedding generation
 │   ├── upload_processor.py       # Batch document processing
 │   ├── document_managers.py      # Tag and category management
-│   ├── pipeline/
-│   │   ├── enhanced_processor.py # Complete AI processing pipeline
-│   │   ├── vision_fallback.py    # qwen2.5vl processing for complex docs
-│   │   ├── structure_extractor.py # phi3.5 hierarchy analysis
-│   │   ├── topic_classifier.py   # Cross-document topic classification
-│   │   ├── hierarchical_chunker.py # Chapter-aware chunking
-│   │   └── relevance_scorer.py   # Content importance scoring
+│   ├── ai/
+│   │   ├── pipeline/
+│   │   │   ├── structure_extractor.py # llama3.2 hierarchy analysis
+│   │   │   ├── topic_classifier.py   # Cross-document topic classification
+│   │   │   ├── hierarchical_chunker.py # Chapter-aware chunking
+│   │   │   └── relevance_scorer.py   # Content importance scoring
 │   ├── database/
 │   │   ├── models.py             # Enhanced SQLAlchemy models
 │   │   └── opensearch_setup.py   # Elasticsearch configuration
