@@ -597,6 +597,75 @@ class DocumentProcessor(BaseProcessor):
 
             return categories[:3] if categories else ["General"]
 
+    def _generate_document_summary(
+        self, content: str, filename: str, tags: List[str], chapters_count: int
+    ) -> str:
+        """
+        Generate an AI-powered document summary.
+
+        Args:
+            content: Document content sample
+            filename: Document filename
+            tags: Generated tags
+            chapters_count: Number of chapters detected
+
+        Returns:
+            AI-generated document summary
+        """
+        try:
+            # Create a comprehensive summary prompt
+            summary_prompt = f"""
+            Create a concise but informative summary of this document in 2-3 sentences.
+
+            Content preview: {content[:800]}
+            Tags: {", ".join(tags[:5])}  # Limit tags for prompt
+
+            Focus on:
+            - Main topics and subject matter
+            - Key concepts covered
+            - Document type and purpose
+            - Target audience (if apparent)
+
+            Summary should be professional and informative. Do not mention the filename or chapter/section counts.
+            """
+
+            summary = self.tag_suggester._call_llm(
+                summary_prompt, max_tokens=200
+            ).strip()
+
+            # Clean up the summary - remove unwanted prefixes
+            if summary:
+                # Remove common AI prefixes
+                prefixes_to_remove = [
+                    "Here is a concise summary of the document in 2-3 sentences:",
+                    "Here is a concise summary of the document:",
+                    "Here is a summary of the document:",
+                    "Summary:",
+                    "Document summary:",
+                ]
+
+                for prefix in prefixes_to_remove:
+                    if summary.lower().startswith(prefix.lower()):
+                        summary = summary[len(prefix) :].strip()
+                        break
+
+                # Remove any leading/trailing artifacts
+                summary = summary.strip()
+                if summary.startswith('"') and summary.endswith('"'):
+                    summary = summary[1:-1]
+                if summary.startswith("'") and summary.endswith("'"):
+                    summary = summary[1:-1]
+
+                # Return clean summary without structure info
+                return summary
+            else:
+                # Fallback summary
+                return f"Document about {', '.join(tags[:3]) if tags else 'various topics'}. {chapters_count} chapters detected."
+
+        except Exception as e:
+            # Fallback to basic summary
+            return f"Document processed with advanced AI pipeline. Covers {', '.join(tags[:3]) if tags else 'various topics'}. {chapters_count} chapters detected."
+
     def __del__(self):
         """Clean up database connections."""
         if hasattr(self, "db"):
@@ -690,12 +759,20 @@ class DocumentProcessor(BaseProcessor):
                 suggested_tags,
             )
 
+            # Generate AI-powered document summary
+            document_summary = self._generate_document_summary(
+                content_for_analysis,
+                filename or os.path.basename(file_path),
+                suggested_tags,
+                results.get("chapters_detected", 0),
+            )
+
             processing_result = {
                 "file_hash": file_hash,
                 "detected_language": results.get(
                     "language", "de"
                 ),  # Default to German for technical docs
-                "document_summary": f"Processed with advanced AI pipeline. {results.get('chapters_detected', 0)} chapters detected.",
+                "document_summary": document_summary,
                 "key_topics": results.get("topics", []),
                 "reading_time_minutes": max(
                     1, len(results.get("extracted_content", "")) // 2000

@@ -350,9 +350,9 @@ def reprocess_documents():
                 status_text.text(f"🔄 Reprocessing {doc.filename}...")
                 progress_bar.progress(int((i / len(docs)) * 100))
 
-                # Reprocess with enhanced processor
+                # Reprocess with enhanced processor - force reprocessing even if document exists
                 result = processor.process_single_file(
-                    doc.filepath, doc.filename, doc.file_hash
+                    doc.filepath, doc.filename, doc.file_hash, force_enrichment=True
                 )
 
                 if result["success"]:
@@ -730,11 +730,8 @@ def main():
                     with meta_col1:
                         if doc.get("document_summary"):
                             st.markdown("**📝 Summary:**")
-                            st.info(
-                                doc["document_summary"][:200] + "..."
-                                if len(doc["document_summary"]) > 200
-                                else doc["document_summary"]
-                            )
+                            # Show full summary without truncation
+                            st.info(doc["document_summary"])
 
                         if doc.get("key_topics"):
                             st.markdown("**🏷️ Key Topics:**")
