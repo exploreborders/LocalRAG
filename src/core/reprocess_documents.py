@@ -10,7 +10,7 @@ from pathlib import Path
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database.models import SessionLocal, Document
+from src.database.models import SessionLocal, Document
 from src.core.document_manager import UploadProcessor
 
 

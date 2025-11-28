@@ -47,7 +47,7 @@ class Document(Base):
     )  # File type/extension
     status: Mapped[str] = mapped_column(
         String(20), default="uploaded"
-    )  # Processing status
+    )  # Processing status: uploaded, processing, processed, needs_review, error
     upload_date: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP, default=func.current_timestamp()
     )

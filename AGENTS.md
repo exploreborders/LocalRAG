@@ -6,6 +6,7 @@
 - Manual Setup: `python -m venv rag_env && source rag_env/bin/activate && pip install -r requirements.txt`
 - Run all tests: `pytest -q`
 - Run single test: `pytest tests/<module>.py::<TestClass|function> -q`
+- Run basic tests: `python tests/run_tests.py`
 - Run web interface: `python run_web.py`
 - Run CLI: `python -m src.interfaces.cli`
 - Build Docker: `docker build -t local-rag .`

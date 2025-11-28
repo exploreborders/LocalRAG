@@ -38,6 +38,7 @@ from src.core.embeddings import get_embedding_model, create_embeddings
 from src.database.opensearch_setup import get_elasticsearch_client
 from src.ai.tag_suggester import AITagSuggester
 from src.utils.tag_colors import TagColorManager
+from src.utils.content_validator import ContentValidator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -2020,6 +2021,18 @@ class UploadProcessor(BaseProcessor):
                     file_path
                 )
 
+                # Check if processing was successful
+                if processing_result is None:
+                    logger.error(
+                        f"Document processing failed for {file_path} - received None result"
+                    )
+                    return {
+                        "success": False,
+                        "filename": filename,
+                        "error": "Document processing returned no results",
+                        "document_id": existing_doc.id,
+                    }
+
                 # Update the existing document with fresh processing results
                 result = self.reprocess_existing_document(
                     existing_doc, processing_result, file_path
@@ -2076,15 +2089,106 @@ class UploadProcessor(BaseProcessor):
         Args:
             existing_doc: The existing document record
             processing_result: Results from document processing
-            file_path: Path to the file being reprocessed
+            file_path: Path to the document file
 
         Returns:
             Dict with reprocessing results
         """
+        # Validate processing_result
+        if processing_result is None:
+            logger.error(
+                f"Cannot reprocess document {existing_doc.id} - processing_result is None"
+            )
+            return {
+                "success": False,
+                "filename": existing_doc.filename,
+                "error": "Processing result is None",
+                "document_id": existing_doc.id,
+                "chunks_created": 0,
+                "chapters_created": 0,
+            }
+
+        if not isinstance(processing_result, dict):
+            logger.error(
+                f"Cannot reprocess document {existing_doc.id} - processing_result is not a dict: {type(processing_result)}"
+            )
+            return {
+                "success": False,
+                "filename": existing_doc.filename,
+                "error": f"Invalid processing result type: {type(processing_result)}",
+                "document_id": existing_doc.id,
+                "chunks_created": 0,
+                "chapters_created": 0,
+            }
+
         try:
+            # Validate content quality before processing
+            extracted_content = processing_result.get("extracted_content", "")
+            chunks = processing_result.get("chunks", [])
+
+            # Debug: Check processing result structure
+            logger.debug(f"Processing result keys: {list(processing_result.keys())}")
+            logger.debug(
+                f"extracted_content type: {type(extracted_content)}, value preview: {str(extracted_content)[:100]}"
+            )
+            logger.debug(
+                f"chunks type: {type(chunks)}, length: {len(chunks) if isinstance(chunks, list) else 'N/A'}"
+            )
+
+            if isinstance(extracted_content, dict):
+                logger.error(f"extracted_content is a dict: {extracted_content}")
+                extracted_content = str(
+                    extracted_content
+                )  # Convert to string as fallback
+
+            # Ensure chunks is a list of strings
+            if isinstance(chunks, list):
+                logger.debug(f"Processing {len(chunks)} chunks")
+                for i, chunk in enumerate(chunks[:3]):  # Debug first 3 chunks
+                    logger.debug(
+                        f"Chunk {i}: type={type(chunk)}, keys={chunk.keys() if isinstance(chunk, dict) else 'N/A'}"
+                    )
+                chunks = [
+                    str(chunk) if not isinstance(chunk, str) else chunk
+                    for chunk in chunks
+                ]
+            else:
+                logger.warning(f"Chunks is not a list: {type(chunks)}")
+                chunks = []
+
+            validation_result = ContentValidator.validate_content_quality(
+                extracted_content, chunks
+            )
+
+            # Log validation results and handle quality issues
+            if not validation_result["is_valid"]:
+                logger.warning(
+                    f"Content quality issues detected for document {existing_doc.id}: "
+                    f"{validation_result['issues']}"
+                )
+                logger.info(f"Quality score: {validation_result['quality_score']:.2f}")
+
+                # Add quality issues to processing result for user feedback
+                processing_result["quality_issues"] = validation_result["issues"]
+                processing_result["quality_score"] = validation_result["quality_score"]
+                processing_result["quality_recommendations"] = validation_result[
+                    "recommendations"
+                ]
+
+                # Log recommendations for debugging
+                if validation_result["recommendations"]:
+                    logger.info(
+                        f"Quality improvement recommendations: {validation_result['recommendations']}"
+                    )
+
             # Update document metadata
             existing_doc.last_modified = datetime.now()
-            existing_doc.status = "processed"
+
+            # Set status based on content quality
+            if validation_result["is_valid"]:
+                existing_doc.status = "processed"
+            else:
+                existing_doc.status = "needs_review"  # New status for quality issues
 
             # Regenerate AI content for reprocessing
             extracted_content = processing_result.get("extracted_content", "")
@@ -2199,9 +2303,19 @@ class UploadProcessor(BaseProcessor):
                 if isinstance(chunks_list, list):
                     for i, chunk_data in enumerate(chunks_list):
                         if isinstance(chunk_data, dict) and "content" in chunk_data:
+                            # Ensure content is a string
+                            content = chunk_data["content"]
+                            if isinstance(content, dict):
+                                logger.warning(
+                                    f"Chunk content is a dict, converting to string: {content}"
+                                )
+                                content = str(content)
+                            elif not isinstance(content, str):
+                                content = str(content)
+
                             chunk = DocumentChunk(
                                 document_id=existing_doc.id,
-                                content=chunk_data["content"],
+                                content=content,
                                 chunk_index=i,  # Use sequential index starting from 0
                                 embedding_model="nomic-ai/nomic-embed-text-v1.5",
                                 chapter_path=chunk_data.get("chapter_path"),
@@ -2235,10 +2349,13 @@ class UploadProcessor(BaseProcessor):
                                     ),
                                 ),
                             )
-                            self.db.add(chapter)
-                            chapters_created += 1
+                    self.db.add(chapter)
+                    chapters_created += 1
 
-            # Create embeddings for new chunks
+            # Commit chunks and chapters before creating embeddings
+            self.db.commit()
+
+            # Create embeddings for new chunks in batches to avoid memory issues
             if chunks_created > 0:
                 # Get the newly created chunks
                 chunks = (
@@ -2247,46 +2364,108 @@ class UploadProcessor(BaseProcessor):
                     .order_by(DocumentChunk.chunk_index)
                     .all()
                 )
-                chunk_texts = [chunk.content for chunk in chunks]
 
-                # Create embeddings with error handling
-                try:
-                    embeddings_array, _ = create_embeddings(chunk_texts)
+                # Create embeddings in batches to avoid memory issues
+                embedding_batch_size = 100  # Process 100 chunks at a time
+                total_chunks = len(chunks)
 
-                    # Store new embeddings if creation was successful
-                    if embeddings_array is not None and len(embeddings_array) > 0:
-                        for chunk, embedding in zip(chunks, embeddings_array):
-                            if embedding is not None:
-                                doc_embedding = DocumentEmbedding(
-                                    chunk_id=chunk.id,
-                                    embedding=embedding.tolist(),
-                                    embedding_model="nomic-ai/nomic-embed-text-v1.5",
-                                )
-                                self.db.add(doc_embedding)
-                    else:
-                        logger.warning(
-                            f"Failed to create embeddings for document {existing_doc.id}"
-                        )
+                logger.info(
+                    f"Creating embeddings for {total_chunks} chunks in batches of {embedding_batch_size}"
+                )
 
-                except Exception as e:
-                    logger.error(
-                        f"Embedding creation failed for document {existing_doc.id}: {e}"
+                for batch_start in range(0, total_chunks, embedding_batch_size):
+                    batch_end = min(batch_start + embedding_batch_size, total_chunks)
+                    batch_chunks = chunks[batch_start:batch_end]
+                    batch_texts = [chunk.content for chunk in batch_chunks]
+
+                    logger.debug(
+                        f"Processing embedding batch {batch_start // embedding_batch_size + 1}/{(total_chunks + embedding_batch_size - 1) // embedding_batch_size}"
                     )
-                    # Continue without embeddings - document can still be searched by content
+
+                    try:
+                        # Create embeddings for this batch
+                        embeddings_array, _ = create_embeddings(batch_texts)
+
+                        # Store embeddings if creation was successful
+                        if embeddings_array is not None and len(embeddings_array) > 0:
+                            for chunk, embedding in zip(batch_chunks, embeddings_array):
+                                # Check if embedding is valid (not None and not all zeros)
+                                if (
+                                    embedding is not None
+                                    and hasattr(embedding, "shape")
+                                    and embedding.shape[0] > 0
+                                ):
+                                    try:
+                                        doc_embedding = DocumentEmbedding(
+                                            chunk_id=chunk.id,
+                                            embedding=embedding.tolist(),
+                                            embedding_model="nomic-ai/nomic-embed-text-v1.5",
+                                        )
+                                        self.db.add(doc_embedding)
+                                    except Exception as embed_error:
+                                        logger.warning(
+                                            f"Failed to store embedding for chunk {chunk.id}: {embed_error}"
+                                        )
+                                        continue
+                        else:
+                            logger.warning(
+                                f"Failed to create embeddings for batch {batch_start // embedding_batch_size + 1}"
+                            )
+
+                    except Exception as e:
+                        logger.error(
+                            f"Embedding creation failed for batch {batch_start // embedding_batch_size + 1}: {e}"
+                        )
+                        # Continue with next batch
+
+                logger.info(
+                    f"Completed embedding creation for document {existing_doc.id}"
+                )
+
+                # Commit embeddings to database before indexing
+                self.db.commit()
 
                 # Update search index with enhanced metadata
-                if embeddings_array is not None:
-                    processor = DocumentProcessor()
-                    processor._index_document(
-                        existing_doc,
-                        [
-                            {
-                                "content": chunk.content,
-                                "metadata": {"word_count": len(chunk.content.split())},
-                            }
-                            for chunk in chunks
-                        ],
-                        embeddings_array.tolist(),
+                # Get all embeddings for this document
+                all_embeddings = []
+                for chunk in chunks:
+                    embedding_record = (
+                        self.db.query(DocumentEmbedding)
+                        .filter(DocumentEmbedding.chunk_id == chunk.id)
+                        .first()
+                    )
+                    if embedding_record:
+                        all_embeddings.append(embedding_record.embedding)
+
+                if all_embeddings and len(all_embeddings) == len(chunks):
+                    logger.info(
+                        f"Indexing {len(all_embeddings)} chunks in Elasticsearch"
+                    )
+                    try:
+                        processor = DocumentProcessor()
+                        processor._index_document(
+                            existing_doc,
+                            [
+                                {
+                                    "content": chunk.content,
+                                    "metadata": {
+                                        "word_count": len(chunk.content.split())
+                                    },
+                                }
+                                for chunk in chunks
+                            ],
+                            all_embeddings,
+                        )
+                        logger.info(
+                            f"Successfully indexed document {existing_doc.id} in search"
+                        )
+                    except Exception as index_error:
+                        logger.error(
+                            f"Failed to index document {existing_doc.id} in search: {index_error}"
+                        )
+                else:
+                    logger.warning(
+                        f"Embeddings mismatch for document {existing_doc.id}: {len(all_embeddings)} embeddings vs {len(chunks)} chunks - skipping search indexing"
                     )
 
             self.db.commit()
@@ -2380,19 +2559,61 @@ class UploadProcessor(BaseProcessor):
                     )
                     self.db.add(doc_embedding)
 
-                # Index in search with enhanced metadata
-                processor = DocumentProcessor()
-                processor._index_document(
-                    doc,
-                    [
-                        {
-                            "content": chunk.content,
-                            "metadata": {"word_count": len(chunk.content.split())},
-                        }
-                        for chunk in chunks
-                    ],
-                    embeddings_array.tolist(),
-                )
+                # Update search index with enhanced metadata
+                # Get all embeddings for this document
+                all_embeddings = []
+                for chunk in chunks:
+                    embedding_record = (
+                        self.db.query(DocumentEmbedding)
+                        .filter(DocumentEmbedding.chunk_id == chunk.id)
+                        .first()
+                    )
+                    if embedding_record:
+                        all_embeddings.append(embedding_record.embedding)
+
+                if all_embeddings and len(all_embeddings) == len(chunks):
+                    logger.info(
+                        f"Indexing {len(all_embeddings)} chunks in Elasticsearch"
+                    )
+
+                    # Debug: Check what content we're indexing
+                    chunk_list = []
+                    for i, chunk in enumerate(chunks[:2]):  # Check first 2 chunks
+                        content = chunk.content
+                        logger.info(
+                            f"Indexing chunk {i} content preview: {content[:150]}..."
+                        )
+                        chunk_list.append(
+                            {
+                                "content": content,
+                                "metadata": {"word_count": len(content.split())},
+                            }
+                        )
+
+                    for chunk in chunks[2:]:  # Rest of chunks
+                        chunk_list.append(
+                            {
+                                "content": chunk.content,
+                                "metadata": {"word_count": len(chunk.content.split())},
+                            }
+                        )
+
+                    try:
+                        processor = DocumentProcessor()
+                        processor._index_document(
+                            doc,
+                            chunk_list,
+                            all_embeddings,
+                        )
+                        logger.info(f"Successfully indexed document {doc.id} in search")
+                    except Exception as index_error:
+                        logger.error(
+                            f"Failed to index document {doc.id} in search: {index_error}"
+                        )
+                else:
+                    logger.warning(
+                        f"Embeddings mismatch for document {doc.id}: {len(all_embeddings)} embeddings vs {len(chunks)} chunks - skipping search indexing"
+                    )
 
             self.db.commit()
 

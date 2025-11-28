@@ -209,6 +209,57 @@ LocalRAG/
 └── README.md                     # This documentation
 ```
 
+## 🔄 CI/CD Pipeline
+
+Every push to `main` or `develop` branches triggers automated validation:
+
+### **Test Stage** 🧪
+- **Unit Tests**: 44+ isolated tests with mocking (pytest)
+- **Integration Tests**: End-to-end workflow validation
+- **Coverage**: 60%+ code coverage requirement
+- **Parallel Execution**: pytest-xdist for faster runs
+
+### **Quality Stage** ✨
+- **Code Formatting**: Black (100 char lines, Python 3.11+)
+- **Import Sorting**: isort (Black-compatible)
+- **Linting**: flake8 (PEP 8 compliance, complexity checks)
+- **Type Checking**: mypy (optional, with external lib ignores)
+
+### **Security Stage** 🔒
+- **Static Analysis**: Bandit security linter
+- **Dependency Scanning**: Safety vulnerability checks
+- **File Validation**: Secure upload verification
+
+### **Documentation Stage** 📚
+- **README Validation**: Required sections and structure
+- **Test Documentation**: Comprehensive testing guides
+
+### **Running Quality Checks Locally**
+
+```bash
+# Run all quality checks
+python scripts/check_quality.py
+
+# Run individual checks
+black --check --diff src/ tests/          # Code formatting
+isort --check-only --diff src/ tests/     # Import sorting
+flake8 src/ tests/                        # Linting
+mypy src/                                 # Type checking
+pytest tests/unit/ --cov=src              # Unit tests
+bandit -r src/                            # Security scan
+safety check                              # Dependency security
+```
+
+### **Pre-commit Setup** (Recommended)
+
+```bash
+pip install pre-commit
+pre-commit install
+
+# Run on all files
+pre-commit run --all-files
+```
+
 ## 🏆 Status
 
 **Production-ready RAG system** with comprehensive testing, modern web interface, and optimized performance for document analysis workflows.

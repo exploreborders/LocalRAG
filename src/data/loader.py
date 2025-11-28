@@ -509,10 +509,19 @@ class AdvancedDocumentProcessor:
         results["processing_stages"].append("hierarchical_chunking")
         from src.ai.pipeline.hierarchical_chunker import HierarchicalChunker
 
+        # Clean and prepare content for chunking
+        extracted_content = results["extracted_content"]
+
+        # Clean OCR artifacts from vision content before chunking
+        if "deepseek_ocr_processing" in results.get("processing_stages", []):
+            logger.info("Cleaning vision OCR content before chunking")
+            extracted_content = self._clean_vision_ocr_content(extracted_content)
+
+        logger.info(f"Chunking content length: {len(extracted_content)}")
+        logger.info(f"Content preview: {extracted_content[:200]}...")
+
         chunker = HierarchicalChunker()
-        chunks = chunker.chunk_document(
-            results["extracted_content"], structure_info, pdf_path
-        )
+        chunks = chunker.chunk_document(extracted_content, structure_info, pdf_path)
         results["chunks"] = chunks
         results["chunks_created"] = len(chunks)
 
@@ -528,64 +537,6 @@ class AdvancedDocumentProcessor:
 
         logger.info(f"Comprehensive processing completed for {pdf_path}")
         return results
-
-    def _extract_with_docling(self, pdf_path: str) -> tuple[str, dict]:
-        """Extract content and structure using Docling parser."""
-        try:
-            from docling.document_converter import DocumentConverter
-
-            # Try with default settings first (Docling handles OCR automatically)
-            doc_converter = DocumentConverter()
-
-            result = doc_converter.convert(pdf_path)
-            content = result.document.export_to_markdown()
-
-            # Extract structure from Docling document
-            structure = self._extract_docling_structure(result.document)
-
-            return content, structure
-        except Exception as e:
-            logger.error(f"Docling extraction failed: {e}")
-            return "", {}
-
-    def _extract_docling_structure(self, docling_document) -> Dict[str, Any]:
-        """Extract hierarchical structure from Docling document."""
-        try:
-            structure = {
-                "hierarchy": [],
-                "sections": [],
-                "estimated_chapters": 0,
-                "headers_found": [],
-                "content_sections": [],
-            }
-
-            # Try to extract structure from Docling document
-            # Docling documents have a tree structure we can traverse
-            if hasattr(docling_document, "body") and docling_document.body:
-                self._traverse_docling_tree(
-                    docling_document.body, structure, level=1, path="1"
-                )
-
-            # If no structure found, create fallback
-            if not structure["hierarchy"]:
-                structure["estimated_chapters"] = max(
-                    1,
-                    len(docling_document.body.children)
-                    if hasattr(docling_document, "body") and docling_document.body
-                    else 1,
-                )
-
-            return structure
-
-        except Exception as e:
-            logger.warning(f"Failed to extract Docling structure: {e}")
-            return {
-                "hierarchy": [],
-                "sections": [],
-                "estimated_chapters": 1,
-                "headers_found": [],
-                "content_sections": [],
-            }
 
     def _traverse_docling_tree(
         self, node, structure: Dict[str, Any], level: int, path: str
@@ -686,82 +637,63 @@ class AdvancedDocumentProcessor:
                 f"DeepSeek-OCR processing for {len(doc)} pages using {VISION_BACKEND}"
             )
 
-            # Process more pages for comprehensive content extraction and chapter detection
-            # Prioritize: TOC pages (first 10), content pages (sampled throughout), last page
-            important_pages = list(
-                range(min(10, len(doc)))
-            )  # First 10 pages (TOC, intro, early chapters)
-
-            # Add more content pages for better chapter detection and content coverage
-            if len(doc) > 10:
-                # Sample pages throughout the document to capture all chapters
-                content_pages = [
-                    15,
-                    20,
-                    30,
-                    40,
-                    50,
-                    60,
-                    80,
-                    100,
-                    120,
-                    150,
-                    200,
-                    250,
-                    300,
-                    350,
-                ]  # More comprehensive sampling
-                important_pages.extend([p for p in content_pages if p < len(doc)])
-
-            # Add last page
-            if len(doc) > 1:
-                important_pages.append(len(doc) - 1)
-
-            # Remove duplicates and limit to reasonable number for comprehensive processing
-            important_pages = sorted(list(set(important_pages)))[
-                :25
-            ]  # Max 25 pages for better coverage
+            # Process ALL pages for comprehensive content extraction
+            # This ensures complete document coverage instead of selective sampling
+            all_pages = list(range(len(doc)))
 
             logger.info(
-                f"DeepSeek-OCR processing {len(important_pages)} key pages out of {len(doc)} total"
+                f"DeepSeek-OCR processing ALL {len(all_pages)} pages out of {len(doc)} total"
             )
 
-            # Process pages individually to avoid timeouts
-            for page_num in important_pages:
-                try:
-                    page = doc.load_page(page_num)
-                    pix = page.get_pixmap(
-                        matrix=fitz.Matrix(2, 2), colorspace=fitz.csRGB
-                    )
-                    img_data = pix.tobytes("png")
-                    img = Image.open(io.BytesIO(img_data))
+            # Process pages in batches to manage memory and provide progress updates
+            batch_size = 10  # Process 10 pages at a time
+            total_pages = len(all_pages)
 
-                    # Convert to base64 for Ollama (JPEG format for DeepSeek-OCR compatibility)
-                    if img.mode != "RGB":
-                        img = img.convert("RGB")
-                    jpeg_buffer = io.BytesIO()
-                    img.save(jpeg_buffer, format="JPEG", quality=95)
-                    img_base64 = base64.b64encode(jpeg_buffer.getvalue()).decode(
-                        "utf-8"
-                    )
+            for batch_start in range(0, total_pages, batch_size):
+                batch_end = min(batch_start + batch_size, total_pages)
+                batch_pages = all_pages[batch_start:batch_end]
 
-                    # Process single page with vision model
-                    page_content = self._process_single_image_with_vision(
-                        {
-                            "page_num": page_num + 1,
-                            "image": img_base64,
-                            "image_obj": img,
-                        }
-                    )
+                logger.info(
+                    f"Processing page batch {batch_start // batch_size + 1}/{(total_pages + batch_size - 1) // batch_size} "
+                    f"(pages {batch_start + 1}-{batch_end} of {total_pages})"
+                )
 
-                    if page_content:
-                        vision_content.append(page_content)
+                # Process pages in this batch
+                for page_num in batch_pages:
+                    try:
+                        page = doc.load_page(page_num)
+                        pix = page.get_pixmap(
+                            matrix=fitz.Matrix(2, 2), colorspace=fitz.csRGB
+                        )
+                        img_data = pix.tobytes("png")
+                        img = Image.open(io.BytesIO(img_data))
 
-                except Exception as page_error:
-                    logger.warning(
-                        f"Vision processing failed for page {page_num + 1}: {page_error}"
-                    )
-                    continue
+                        # Convert to base64 for Ollama (JPEG format for DeepSeek-OCR compatibility)
+                        if img.mode != "RGB":
+                            img = img.convert("RGB")
+                        jpeg_buffer = io.BytesIO()
+                        img.save(jpeg_buffer, format="JPEG", quality=95)
+                        img_base64 = base64.b64encode(jpeg_buffer.getvalue()).decode(
+                            "utf-8"
+                        )
+
+                        # Process single page with vision model
+                        page_content = self._process_single_image_with_vision(
+                            {
+                                "page_num": page_num + 1,
+                                "image": img_base64,
+                                "image_obj": img,
+                            }
+                        )
+
+                        if page_content:
+                            vision_content.append(page_content)
+
+                    except Exception as page_error:
+                        logger.warning(
+                            f"Vision processing failed for page {page_num + 1}: {page_error}"
+                        )
+                        continue
 
             doc.close()
 
@@ -769,6 +701,7 @@ class AdvancedDocumentProcessor:
             logger.info(
                 f"DeepSeek-OCR extracted {len(full_content)} characters from {len(vision_content)} pages"
             )
+            logger.debug(f"Vision content preview: {full_content[:300]}...")
             return full_content
 
         except Exception as e:
@@ -890,6 +823,276 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
         except Exception as e:
             logger.error(f"Ollama vision query failed for page {page_num}: {e}")
             return ""
+
+    def _process_page_with_ocr(
+        self, page_num: int, image_obj: Image.Image = None
+    ) -> str:
+        """
+        Process a single page using OCR with multiple fallback mechanisms and quality validation.
+        """
+        if image_obj is None:
+            return f"=== PAGE {page_num} (No Image Available) ==="
+
+        ocr_methods = [
+            ("deepseek_ocr", self._try_deepseek_ocr),
+            ("tesseract_enhanced", self._try_tesseract_enhanced),
+            ("tesseract_basic", self._try_tesseract_basic),
+            ("easyocr_fallback", self._try_easyocr_fallback),
+        ]
+
+        for method_name, ocr_function in ocr_methods:
+            try:
+                logger.debug(f"Trying OCR method: {method_name} for page {page_num}")
+                result = ocr_function(image_obj, page_num)
+
+                if result and self._validate_ocr_result(result):
+                    logger.info(
+                        f"OCR method {method_name} succeeded for page {page_num}"
+                    )
+                    return result
+                else:
+                    logger.warning(
+                        f"OCR method {method_name} produced invalid results for page {page_num}"
+                    )
+
+            except Exception as e:
+                logger.warning(
+                    f"OCR method {method_name} failed for page {page_num}: {e}"
+                )
+                continue
+
+        # All OCR methods failed
+        logger.error(f"All OCR methods failed for page {page_num}")
+        return f"=== PAGE {page_num} (All OCR Methods Failed) ==="
+
+    def _try_deepseek_ocr(self, image_obj: Image.Image, page_num: int) -> str:
+        """Try DeepSeek-OCR via Ollama"""
+        try:
+            response = ollama.chat(
+                model="deepseek-ocr:latest",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"""Extract all text from this image. Focus on technical content, preserve mathematical notation, and maintain document structure. Output clean, readable text without commentary.
+
+INPUT: Image of page {page_num} from a technical document.
+
+OUTPUT: Clean, structured text with proper German formatting. Preserve all technical content, mathematical notation, and document structure. Do not add commentary or explanations.""",
+                        "images": [self._image_to_base64(image_obj)],
+                    }
+                ],
+            )
+
+            if response and "message" in response and "content" in response["message"]:
+                content = response["message"]["content"].strip()
+                if content:
+                    return f"=== PAGE {page_num} ===\n{content}"
+
+        except Exception as e:
+            logger.debug(f"DeepSeek-OCR failed: {e}")
+
+        return ""
+
+    def _try_tesseract_enhanced(self, image_obj: Image.Image, page_num: int) -> str:
+        """Try enhanced Tesseract OCR with German technical configuration"""
+        try:
+            import pytesseract
+
+            # Enhanced OCR with improved configuration for German technical text
+            char_whitelist = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜßabcdefghijklmnopqrstuvwxyzäöüß.,:;!?()-+*/=><[]{}@#$%&\\|_~`"
+            custom_config = (
+                f"--psm 3 --oem 3 -c tessedit_char_whitelist={char_whitelist}"
+            )
+            text = pytesseract.image_to_string(
+                image_obj,
+                lang="deu+eng",
+                config=custom_config,
+            )
+
+            # Clean up common OCR errors
+            text = text.replace("|", "I")  # Common OCR error
+            text = text.replace("§", "S")  # Common OCR error
+            text = text.replace("©", "C")  # Common OCR error
+
+            if text.strip():
+                return f"=== PAGE {page_num} (Tesseract Enhanced) ===\n{text.strip()}"
+
+        except Exception as e:
+            logger.debug(f"Enhanced Tesseract OCR failed: {e}")
+
+        return ""
+
+    def _try_tesseract_basic(self, image_obj: Image.Image, page_num: int) -> str:
+        """Try basic Tesseract OCR"""
+        try:
+            import pytesseract
+
+            text = pytesseract.image_to_string(
+                image_obj,
+                lang="deu+eng",
+            )
+
+            if text.strip():
+                return f"=== PAGE {page_num} (Tesseract Basic) ===\n{text.strip()}"
+
+        except Exception as e:
+            logger.debug(f"Basic Tesseract OCR failed: {e}")
+
+        return ""
+
+    def _try_easyocr_fallback(self, image_obj: Image.Image, page_num: int) -> str:
+        """Try EasyOCR as final fallback"""
+        try:
+            import easyocr
+
+            # Initialize reader (this can be cached for performance)
+            reader = easyocr.Reader(["de", "en"])
+            results = reader.readtext(image_obj)
+
+            # Extract text from results
+            text_parts = []
+            for bbox, text, confidence in results:
+                if confidence > 0.5:  # Only include reasonably confident results
+                    text_parts.append(text)
+
+            if text_parts:
+                full_text = " ".join(text_parts)
+                return f"=== PAGE {page_num} (EasyOCR) ===\n{full_text}"
+
+        except Exception as e:
+            logger.debug(f"EasyOCR failed: {e}")
+
+        return ""
+
+    def _validate_ocr_result(self, result: str) -> bool:
+        """
+        Validate OCR result quality.
+        """
+        if not result or len(result.strip()) < 10:
+            return False
+
+        # Check for excessive OCR artifacts
+        artifact_indicators = ["=== page", "tesseract", "ocr failed", "no text found"]
+        result_lower = result.lower()
+
+        for indicator in artifact_indicators:
+            if indicator in result_lower:
+                # Allow some indicators but not too many
+                if result_lower.count(indicator) > 2:
+                    return False
+
+        return True
+
+    def _extract_with_docling(self, pdf_path: str) -> tuple[str, dict]:
+        """Extract content and structure using Docling parser."""
+        try:
+            from docling.document_converter import DocumentConverter
+
+            # Try with default settings first (Docling handles OCR automatically)
+            doc_converter = DocumentConverter()
+            result = doc_converter.convert(pdf_path)
+            content = result.document.export_to_markdown()
+
+            # Extract structure from Docling document
+            structure = self._extract_docling_structure(result.document)
+
+            return content, structure
+        except Exception as e:
+            logger.error(f"Docling extraction failed: {e}")
+            return "", {}
+
+    def _extract_docling_structure(self, docling_document) -> Dict[str, Any]:
+        """Extract hierarchical structure from Docling document."""
+        try:
+            structure = {
+                "hierarchy": [],
+                "sections": [],
+                "estimated_chapters": 0,
+                "headers_found": [],
+                "content_sections": [],
+            }
+
+            # Extract basic structure information
+            if hasattr(docling_document, "body") and docling_document.body:
+                structure["estimated_chapters"] = (
+                    len(docling_document.body.children)
+                    if hasattr(docling_document.body, "children")
+                    else 1
+                )
+
+            # Try to extract headers and sections
+            if hasattr(docling_document, "texts"):
+                headers = []
+                for text in docling_document.texts:
+                    if hasattr(text, "text") and text.text:
+                        line = text.text.strip()
+                        if len(line) < 200 and (line.isupper() or line.istitle()):
+                            headers.append(line)
+
+                structure["headers_found"] = headers[:10]  # Limit to first 10 headers
+
+            return structure
+
+        except Exception as e:
+            logger.warning(f"Failed to extract Docling structure: {e}")
+            return {
+                "hierarchy": [],
+                "sections": [],
+                "estimated_chapters": 1,
+                "headers_found": [],
+                "content_sections": [],
+            }
+
+    def _clean_vision_ocr_content(self, content: str) -> str:
+        """
+        Clean vision OCR content by removing page markers and artifacts.
+        """
+        if not content:
+            return content
+
+        # Remove page markers and OCR artifacts
+        cleaned = re.sub(r"=== PAGE \d+ ===", "", content, flags=re.IGNORECASE)
+        cleaned = re.sub(r"=== PAGE \d+ \(.*?\) ===", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"=== .*? ===", "", cleaned, flags=re.IGNORECASE)
+
+        # Remove excessive whitespace and normalize
+        cleaned = re.sub(
+            r"\n\s*\n\s*\n+", "\n\n", cleaned
+        )  # Multiple newlines to double
+        cleaned = re.sub(r"\s+", " ", cleaned)  # Multiple spaces to single
+
+        # Remove lines that are mostly OCR artifacts
+        lines = cleaned.split("\n")
+        cleaned_lines = []
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Skip lines that are just page numbers or minimal content
+            if re.match(r"^\d+$", line) and len(line) < 5:
+                continue
+
+            # Skip lines with excessive special characters
+            special_chars = sum(1 for c in line if not c.isalnum() and not c.isspace())
+            if len(line) > 0 and special_chars / len(line) > 0.5:
+                continue
+
+            cleaned_lines.append(line)
+
+        return "\n".join(cleaned_lines).strip()
+
+        # Check for meaningful content (should have some letters)
+        letters = sum(1 for c in result if c.isalpha())
+        if letters < 5:  # Too few letters
+            return False
+
+        # Check for reasonable text structure
+        lines = result.split("\n")
+        meaningful_lines = sum(1 for line in lines if len(line.strip()) > 10)
+
+        return meaningful_lines >= 1  # At least one meaningful line
 
     def _tesseract_ocr_fallback(self, image: Image.Image, page_num: int) -> str:
         """Fallback to Tesseract OCR for reliable text extraction"""

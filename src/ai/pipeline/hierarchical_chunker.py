@@ -455,11 +455,21 @@ class HierarchicalChunker:
         for chunk in chunks:
             original_word_count = chunk["word_count"]
 
-            # Skip very small chunks, but be less strict for hierarchical chunks
-            min_words = max(3, self.min_chunk_size // 20)  # 2-3 words minimum
+            # More aggressive filtering for vision OCR content
+            content = chunk["content"]
+
+            # Skip chunks that are mostly OCR artifacts
+            if self._is_ocr_artifact_chunk(content):
+                logger.debug(f"Filtering out OCR artifact chunk: {content[:100]}...")
+                continue
+
+            # Skip very small chunks, with higher minimum for vision content
+            min_words = max(
+                10, self.min_chunk_size // 10
+            )  # 10 words minimum for vision content
             if chunk["word_count"] < min_words:
                 logger.debug(
-                    f"Filtering out small chunk: {chunk['word_count']} words < {min_words} (content: {chunk['content'][:100]}...)"
+                    f"Filtering out small chunk: {chunk['word_count']} words < {min_words} (content: {content[:100]}...)"
                 )
                 continue
 
@@ -512,3 +522,69 @@ class HierarchicalChunker:
             f"Post-processed {len(chunks)} chunks -> {len(processed_chunks)} kept"
         )
         return processed_chunks
+
+    def _is_ocr_artifact_chunk(self, content: str) -> bool:
+        """
+        Check if a chunk contains mostly OCR artifacts and should be filtered out.
+        """
+        if not content or len(content.strip()) < 20:
+            return True
+
+        content_lower = content.lower()
+
+        # Check for page markers and OCR artifacts
+        ocr_indicators = [
+            "=== page",
+            "tesseract",
+            "no text found",
+            "ocr failed",
+            "easyocr",
+            "paddleocr",
+        ]
+
+        # Direct check for page markers - these should always be filtered
+        for indicator in ocr_indicators:
+            if indicator in content_lower:
+                # If the chunk contains OCR indicators, be more aggressive
+                words = content.split()
+                if not words:
+                    return True
+
+                ocr_words = sum(
+                    1
+                    for word in words
+                    if any(indicator in word.lower() for indicator in ocr_indicators)
+                )
+                if ocr_words / len(words) > 0.2:  # More than 20% OCR artifacts
+                    return True
+
+                # Also filter if the content contains page markers at the start
+                if content_lower.strip().startswith("=== page"):
+                    return True
+
+                ocr_words = sum(
+                    1
+                    for word in words
+                    if any(indicator in word.lower() for indicator in ocr_indicators)
+                )
+                if ocr_words / len(words) > 0.3:  # More than 30% OCR artifacts
+                    return True
+
+                # Also filter if the content is very short and contains OCR indicators
+                if len(content.strip()) < 100 and ocr_words > 0:
+                    return True
+
+        # Check for chunks that are just page numbers or minimal content
+        if len(content.strip()) < 50 and not any(char.isalpha() for char in content):
+            return True
+
+        # Check for chunks with excessive special characters (OCR corruption)
+        special_chars = sum(
+            1 for char in content if not char.isalnum() and not char.isspace()
+        )
+        if (
+            len(content) > 0 and special_chars / len(content) > 0.3
+        ):  # More than 30% special characters
+            return True
+
+        return False

@@ -16,7 +16,7 @@ import hashlib
 import logging
 import asyncio
 
-from database.models import SessionLocal, Document, DocumentChunk
+from src.database.models import SessionLocal, Document, DocumentChunk
 from src.core.embeddings import get_embedding_model
 from src.core.knowledge_graph import KnowledgeGraph
 from src.utils.error_handler import (
@@ -261,35 +261,13 @@ class DatabaseRetriever:
         filters: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Build Elasticsearch query with hybrid scoring."""
-        # Base query with weighted BM25 and vector similarity
+        # For now, use simple BM25 search until we fix the hybrid scoring
         es_query = {
             "query": {
-                "bool": {
-                    "should": [
-                        # BM25 text search with boost
-                        {
-                            "multi_match": {
-                                "query": query,
-                                "fields": ["content^2", "title", "tags", "categories"],
-                                "type": "best_fields",
-                                "boost": self.hybrid_alpha,
-                            }
-                        },
-                        # Vector similarity with boost
-                        {
-                            "script_score": {
-                                "query": {"match_all": {}},
-                                "script": {
-                                    "source": f"({1.0 - self.hybrid_alpha} * (cosineSimilarity(params.query_vector, 'embedding') + 1.0))",
-                                    "params": {
-                                        "query_vector": query_embedding.tolist()
-                                    },
-                                },
-                                "boost": 1.0 - self.hybrid_alpha,
-                            }
-                        },
-                    ],
-                    "minimum_should_match": 1,
+                "multi_match": {
+                    "query": query,
+                    "fields": ["content^2", "title", "tags", "categories"],
+                    "type": "best_fields",
                 }
             }
         }
@@ -308,13 +286,15 @@ class DatabaseRetriever:
             filter_clauses.append({"terms": {"categories": list(categories_to_search)}})
 
         if filter_clauses:
-            es_query["query"]["bool"]["filter"] = filter_clauses
+            es_query["query"] = {
+                "bool": {"must": es_query["query"], "filter": filter_clauses}
+            }
 
         return es_query
 
     def _get_es_client(self) -> Elasticsearch:
         """Get Elasticsearch client."""
-        from database.opensearch_setup import get_elasticsearch_client
+        from src.database.opensearch_setup import get_elasticsearch_client
 
         return get_elasticsearch_client()
 

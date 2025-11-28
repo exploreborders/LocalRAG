@@ -12,7 +12,7 @@ from sqlalchemy import and_, or_, func
 from collections import defaultdict, deque
 import logging
 
-from database.models import (
+from src.database.models import (
     DocumentTag,
     DocumentCategory,
     Document,

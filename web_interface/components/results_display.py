@@ -70,6 +70,39 @@ def render_rag_results(results):
                 "📄 **Scanned Document Detected**: This appears to be a scanned PDF with image-based content."
             )
 
+    # Show quality information if available
+    result_data = results.get("result", {})
+    quality_issues = result_data.get("quality_issues", [])
+    quality_score = result_data.get("quality_score")
+    quality_recommendations = result_data.get("quality_recommendations", [])
+
+    if quality_issues:
+        st.warning("⚠️ **Content Quality Issues Detected**")
+        for issue in quality_issues:
+            st.write(f"• {issue}")
+
+        if quality_score is not None:
+            # Show quality score with color coding
+            if quality_score >= 0.7:
+                st.success(f"✅ Quality Score: {quality_score:.2f} (Good)")
+            elif quality_score >= 0.4:
+                st.warning(f"⚠️ Quality Score: {quality_score:.2f} (Needs Review)")
+            else:
+                st.error(f"❌ Quality Score: {quality_score:.2f} (Poor Quality)")
+
+        if quality_recommendations:
+            st.info("💡 **Recommended Actions:**")
+            for rec in quality_recommendations:
+                st.write(f"• {rec}")
+
+            # Add reprocessing button if quality is poor
+            if quality_score is not None and quality_score < 0.5:
+                st.button(
+                    "🔄 Reprocess Document",
+                    key="reprocess_quality_issue",
+                    help="Reprocess this document with improved extraction methods",
+                )
+
     # Show summary statistics
     sources = result_data.get("sources", [])
     if sources:

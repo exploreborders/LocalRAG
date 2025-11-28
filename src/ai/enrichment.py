@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import json
 
-from database.models import Document, DocumentChunk, SessionLocal
+from src.database.models import Document, DocumentChunk, SessionLocal
 from src.core.document_manager import TagManager, CategoryManager
 
 
