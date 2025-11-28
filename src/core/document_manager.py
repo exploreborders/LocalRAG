@@ -3,43 +3,42 @@
 Combined document management system for processing, tagging, and categorization.
 """
 
-import os
 import hashlib
-import tempfile
-import shutil
-import re
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple, Callable
-from datetime import datetime
+import logging
 import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, as_completed
+import os
+import re
+import shutil
+import tempfile
 import threading
 import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from sqlalchemy.orm import Session
-from langdetect import detect, LangDetectException
-from src.core.base_processor import BaseProcessor
-from src.data.loader import AdvancedDocumentProcessor
 import spacy
+from langdetect import LangDetectException, detect
+from sqlalchemy.orm import Session
 
+from src.ai.tag_suggester import AITagSuggester
+from src.core.base_processor import BaseProcessor
+from src.core.embeddings import create_embeddings, get_embedding_model
+from src.data.loader import AdvancedDocumentProcessor, split_documents
 from src.database.models import (
     Document,
-    DocumentChunk,
+    DocumentCategory,
+    DocumentCategoryAssignment,
     DocumentChapter,
+    DocumentChunk,
     DocumentEmbedding,
     DocumentTag,
-    DocumentCategory,
     DocumentTagAssignment,
-    DocumentCategoryAssignment,
     SessionLocal,
 )
-from src.data.loader import split_documents
-from src.core.embeddings import get_embedding_model, create_embeddings
 from src.database.opensearch_setup import get_elasticsearch_client
-from src.ai.tag_suggester import AITagSuggester
-from src.utils.tag_colors import TagColorManager
 from src.utils.content_validator import ContentValidator
-import logging
+from src.utils.tag_colors import TagColorManager
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +121,7 @@ class TagManager:
         )
         return [assignment.tag for assignment in assignments if assignment.tag]
 
-    def suggest_tags_for_document(
-        self, document_id: int, max_suggestions: int = 5
-    ) -> List[str]:
+    def suggest_tags_for_document(self, document_id: int, max_suggestions: int = 5) -> List[str]:
         """Suggest tags for a document using AI."""
         document = self.db.query(Document).filter(Document.id == document_id).first()
         if not document:
@@ -207,7 +204,7 @@ class TagManager:
     def get_popular_tags(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get the most popular tags by usage count."""
         # Get tags sorted by document count (descending)
-        from sqlalchemy import func, desc
+        from sqlalchemy import desc, func
 
         popular_tags = (
             self.db.query(
@@ -326,9 +323,7 @@ class CategoryManager:
         if existing:
             return True
 
-        assignment = DocumentCategoryAssignment(
-            document_id=document_id, category_id=category_id
-        )
+        assignment = DocumentCategoryAssignment(document_id=document_id, category_id=category_id)
         self.db.add(assignment)
         self.db.commit()
         return True
@@ -357,18 +352,12 @@ class CategoryManager:
             .filter(DocumentCategoryAssignment.document_id == document_id)
             .all()
         )
-        return [
-            assignment.category for assignment in assignments if assignment.category
-        ]
+        return [assignment.category for assignment in assignments if assignment.category]
 
     def get_category_hierarchy(self, category_id: int) -> List[DocumentCategory]:
         """Get the full hierarchy path for a category."""
         hierarchy = []
-        current = (
-            self.db.query(DocumentCategory)
-            .filter(DocumentCategory.id == category_id)
-            .first()
-        )
+        current = self.db.query(DocumentCategory).filter(DocumentCategory.id == category_id).first()
 
         while current:
             hierarchy.insert(0, current)
@@ -406,9 +395,7 @@ class CategoryManager:
             self.db.query(
                 DocumentCategory.name,
                 DocumentCategory.description,
-                func.count(DocumentCategoryAssignment.document_id).label(
-                    "document_count"
-                ),
+                func.count(DocumentCategoryAssignment.document_id).label("document_count"),
             )
             .outerjoin(DocumentCategoryAssignment)
             .group_by(DocumentCategory.id)
@@ -486,9 +473,7 @@ class CategoryManager:
             # Delete the categories themselves (in reverse order to handle foreign keys)
             for cat_id in reversed(all_category_ids):
                 category = (
-                    self.db.query(DocumentCategory)
-                    .filter(DocumentCategory.id == cat_id)
-                    .first()
+                    self.db.query(DocumentCategory).filter(DocumentCategory.id == cat_id).first()
                 )
                 if category:
                     self.db.delete(category)
@@ -520,9 +505,7 @@ class DocumentProcessor(BaseProcessor):
         self.category_manager = CategoryManager(self.db)
         self.tag_suggester = AITagSuggester()
 
-    def _suggest_categories_ai(
-        self, content: str, filename: str, tags: List[str]
-    ) -> List[str]:
+    def _suggest_categories_ai(self, content: str, filename: str, tags: List[str]) -> List[str]:
         """
         Suggest categories for a document using AI-based classification.
 
@@ -547,9 +530,7 @@ class DocumentProcessor(BaseProcessor):
             Return only category names separated by commas (no explanations):
             """
 
-            response = self.tag_suggester._call_llm(
-                category_prompt, max_tokens=50
-            ).strip()
+            response = self.tag_suggester._call_llm(category_prompt, max_tokens=50).strip()
 
             # Parse the response
             categories = [cat.strip() for cat in response.split(",") if cat.strip()]
@@ -569,9 +550,7 @@ class DocumentProcessor(BaseProcessor):
             ]
 
             # Filter to valid categories and limit to 3
-            validated_categories = [
-                cat for cat in categories if cat in valid_categories
-            ][:3]
+            validated_categories = [cat for cat in categories if cat in valid_categories][:3]
 
             return validated_categories
 
@@ -585,15 +564,9 @@ class DocumentProcessor(BaseProcessor):
                 for word in ["deep learning", "neural", "machine learning", "ai"]
             ):
                 categories.append("Technical")
-            if any(
-                word in content_lower
-                for word in ["academic", "research", "paper", "study"]
-            ):
+            if any(word in content_lower for word in ["academic", "research", "paper", "study"]):
                 categories.append("Academic")
-            if any(
-                word in content_lower
-                for word in ["tutorial", "guide", "course", "education"]
-            ):
+            if any(word in content_lower for word in ["tutorial", "guide", "course", "education"]):
                 categories.append("Educational")
 
             return categories[:3] if categories else ["General"]
@@ -630,9 +603,7 @@ class DocumentProcessor(BaseProcessor):
             Summary should be professional and informative. Do not mention the filename or chapter/section counts.
             """
 
-            summary = self.tag_suggester._call_llm(
-                summary_prompt, max_tokens=200
-            ).strip()
+            summary = self.tag_suggester._call_llm(summary_prompt, max_tokens=200).strip()
 
             # Clean up the summary - remove unwanted prefixes
             if summary:
@@ -692,19 +663,11 @@ class DocumentProcessor(BaseProcessor):
             Processing results
         """
         if use_advanced_processing:
-            logger.info(
-                f"Using ADVANCED processing for {filename or os.path.basename(file_path)}"
-            )
-            return self._process_document_advanced(
-                file_path, filename, progress_callback
-            )
+            logger.info(f"Using ADVANCED processing for {filename or os.path.basename(file_path)}")
+            return self._process_document_advanced(file_path, filename, progress_callback)
         else:
-            logger.info(
-                f"Using STANDARD processing for {filename or os.path.basename(file_path)}"
-            )
-            return self._process_document_standard(
-                file_path, filename, progress_callback
-            )
+            logger.info(f"Using STANDARD processing for {filename or os.path.basename(file_path)}")
+            return self._process_document_standard(file_path, filename, progress_callback)
 
     def _process_document_advanced(
         self,
@@ -749,9 +712,7 @@ class DocumentProcessor(BaseProcessor):
                 content_for_analysis, filename or os.path.basename(file_path)
             )
             # Extract tag names from the suggestion data
-            suggested_tags = [
-                tag.get("tag", "") for tag in suggested_tags_data if tag.get("tag")
-            ]
+            suggested_tags = [tag.get("tag", "") for tag in suggested_tags_data if tag.get("tag")]
 
             # Generate categories using AI-based classification
             suggested_categories = self._suggest_categories_ai(
@@ -809,9 +770,7 @@ class DocumentProcessor(BaseProcessor):
                     category = self.category_manager.get_category_by_name(category_name)
                     if not category:
                         category = self.category_manager.create_category(category_name)
-                    self.category_manager.add_category_to_document(
-                        document.id, category.id
-                    )
+                    self.category_manager.add_category_to_document(document.id, category.id)
 
             # Store chapters from advanced processing
             structure_info = results.get("structure_analysis", {})
@@ -819,18 +778,12 @@ class DocumentProcessor(BaseProcessor):
             for chapter_data in hierarchy:
                 chapter_record = DocumentChapter(
                     document_id=document.id,
-                    chapter_title=chapter_data.get("title", "")[
-                        :255
-                    ],  # Limit to 255 chars
+                    chapter_title=chapter_data.get("title", "")[:255],  # Limit to 255 chars
                     chapter_path=chapter_data.get("path", ""),
                     level=chapter_data.get("level", 1),
                     word_count=chapter_data.get("word_count", 0),
-                    content=chapter_data.get(
-                        "content_preview", chapter_data.get("title", "")
-                    ),
-                    section_type="chapter"
-                    if chapter_data.get("level", 1) == 1
-                    else "section",
+                    content=chapter_data.get("content_preview", chapter_data.get("title", "")),
+                    section_type="chapter" if chapter_data.get("level", 1) == 1 else "section",
                 )
                 self.db.add(chapter_record)
 
@@ -867,9 +820,7 @@ class DocumentProcessor(BaseProcessor):
         except Exception as e:
             logger.error(f"Advanced document processing failed for {file_path}: {e}")
             # Fallback to standard processing
-            return self._process_document_standard(
-                file_path, filename, progress_callback
-            )
+            return self._process_document_standard(file_path, filename, progress_callback)
 
     def _process_document_standard(
         self,
@@ -954,9 +905,7 @@ class DocumentProcessor(BaseProcessor):
             self.db.commit()
 
             # Generate embeddings
-            embeddings_array, model = create_embeddings(
-                [chunk["content"] for chunk in chunks]
-            )
+            embeddings_array, model = create_embeddings([chunk["content"] for chunk in chunks])
 
             # Store chunks with embeddings and enhanced metadata
             for i, (chunk_data, embedding) in enumerate(zip(chunks, embeddings_array)):
@@ -1048,12 +997,12 @@ class DocumentProcessor(BaseProcessor):
             # Use multiple samples for better detection
             samples = [
                 content[:2000],  # Beginning
-                content[len(content) // 3 : len(content) // 3 + 2000]
-                if len(content) > 6000
-                else content[len(content) // 2 : len(content) // 2 + 1000],  # Middle
-                content[-2000:]
-                if len(content) > 2000
-                else content[len(content) // 2 :],  # End
+                (
+                    content[len(content) // 3 : len(content) // 3 + 2000]
+                    if len(content) > 6000
+                    else content[len(content) // 2 : len(content) // 2 + 1000]
+                ),  # Middle
+                content[-2000:] if len(content) > 2000 else content[len(content) // 2 :],  # End
             ]
 
             # Try to detect language from each sample
@@ -1101,9 +1050,7 @@ class DocumentProcessor(BaseProcessor):
         # Look for table format | number | title | (markdown tables)
         import re
 
-        table_matches = re.findall(
-            r"\|\s*(\d+(?:\.\d+)*)\s*\|\s*([^\|]+?)\s*\|", content
-        )
+        table_matches = re.findall(r"\|\s*(\d+(?:\.\d+)*)\s*\|\s*([^\|]+?)\s*\|", content)
         for number, title in table_matches:
             title = title.strip()
             if title and len(title) > 3:
@@ -1176,9 +1123,7 @@ class DocumentProcessor(BaseProcessor):
                 if (
                     line[0].isupper()  # Starts with capital
                     and not line.endswith(".")  # Not a sentence
-                    and not any(
-                        char.isdigit() for char in line[:10]
-                    )  # No early numbers
+                    and not any(char.isdigit() for char in line[:10])  # No early numbers
                     and sum(1 for c in line if c.isupper()) / len(line) < 0.5
                 ):  # Not ALL CAPS
                     # Additional heuristics for chapter-like content
@@ -1208,9 +1153,7 @@ class DocumentProcessor(BaseProcessor):
 
         # For scanned PDFs with no clear chapter structure, create synthetic chapters
         # based on document length and common technical content
-        if (
-            not chapters and len(content) > 1000
-        ):  # Any reasonable content but no chapters found
+        if not chapters and len(content) > 1000:  # Any reasonable content but no chapters found
             logger.info(
                 "No chapters found in scanned PDF, creating synthetic chapters for technical content"
             )
@@ -1227,18 +1170,14 @@ class DocumentProcessor(BaseProcessor):
                     for section in structure_analysis["sections"]:
                         chapters.append(
                             {
-                                "title": section.get(
-                                    "title", f"Chapter {len(chapters) + 1}"
-                                )[:255],
+                                "title": section.get("title", f"Chapter {len(chapters) + 1}")[:255],
                                 "content": section.get("title", ""),
                                 "path": str(len(chapters) + 1),
                                 "start_line": section.get("start_line", 0),
                                 "level": section.get("level", 1),
                             }
                         )
-                    logger.info(
-                        f"Created {len(chapters)} AI-analyzed chapters for scanned PDF"
-                    )
+                    logger.info(f"Created {len(chapters)} AI-analyzed chapters for scanned PDF")
                 else:
                     # Fallback to synthetic chapters
                     synthetic_chapters = [
@@ -1273,9 +1212,7 @@ class DocumentProcessor(BaseProcessor):
                             }
                         )
 
-                    logger.info(
-                        f"Created {len(chapters)} synthetic chapters for scanned PDF"
-                    )
+                    logger.info(f"Created {len(chapters)} synthetic chapters for scanned PDF")
 
             except Exception as e:
                 logger.warning(
@@ -1293,9 +1230,7 @@ class DocumentProcessor(BaseProcessor):
                 ]
 
                 content_length = len(content)
-                chapter_count = min(
-                    len(synthetic_chapters), max(3, content_length // 10000)
-                )
+                chapter_count = min(len(synthetic_chapters), max(3, content_length // 10000))
 
                 for i in range(chapter_count):
                     chapters.append(
@@ -1308,17 +1243,16 @@ class DocumentProcessor(BaseProcessor):
                         }
                     )
 
-                logger.info(
-                    f"Created {len(chapters)} basic synthetic chapters for scanned PDF"
-                )
+                logger.info(f"Created {len(chapters)} basic synthetic chapters for scanned PDF")
 
         return chapters
 
     def _check_memory_usage(self, memory_limit_mb: int = 512) -> bool:
         """Check if current memory usage is within limits."""
         try:
-            import psutil
             import os
+
+            import psutil
 
             process = psutil.Process(os.getpid())
             memory_mb = process.memory_info().rss / 1024 / 1024
@@ -1347,6 +1281,7 @@ class DocumentProcessor(BaseProcessor):
             Processing results dictionary
         """
         import gc
+
         from src.data.loader import split_documents
 
         if progress_callback:
@@ -1387,9 +1322,7 @@ class DocumentProcessor(BaseProcessor):
             chunks = self._create_chunks(content, document_id, all_chapters)
 
             if not self._check_memory_usage(memory_limit_mb):
-                logger.warning(
-                    f"High memory usage detected during chunking for {file_path}"
-                )
+                logger.warning(f"High memory usage detected during chunking for {file_path}")
                 gc.collect()
 
         except Exception as e:
@@ -1412,23 +1345,17 @@ class DocumentProcessor(BaseProcessor):
                     for chapter in batch:
                         chapter_record = DocumentChapter(
                             document_id=document_id,
-                            chapter_title=chapter[
-                                "title"
-                            ],  # Short title (max 255 chars)
+                            chapter_title=chapter["title"],  # Short title (max 255 chars)
                             chapter_path=chapter["path"],
                             level=chapter.get("level", 1),
                             word_count=len(chapter["title"].split()),
-                            content=chapter.get(
-                                "content", chapter["title"]
-                            ),  # Full content
+                            content=chapter.get("content", chapter["title"]),  # Full content
                         )
                         self.db.add(chapter_record)
                     self.db.commit()  # Commit batch
 
                     if not self._check_memory_usage(memory_limit_mb):
-                        logger.warning(
-                            f"High memory usage during chapter storage for {file_path}"
-                        )
+                        logger.warning(f"High memory usage during chapter storage for {file_path}")
                         gc.collect()
 
             except Exception as e:
@@ -1465,9 +1392,7 @@ class DocumentProcessor(BaseProcessor):
                     embeddings_array, _ = create_embeddings(chunk_texts)
 
                     # Store chunks and embeddings
-                    for j, (chunk_data, embedding) in enumerate(
-                        zip(batch, embeddings_array)
-                    ):
+                    for j, (chunk_data, embedding) in enumerate(zip(batch, embeddings_array)):
                         # Create chunk record
                         chunk = DocumentChunk(
                             document_id=document_id,
@@ -1499,9 +1424,7 @@ class DocumentProcessor(BaseProcessor):
                         gc.collect()
 
             except Exception as e:
-                logger.error(
-                    f"Failed to process chunks/embeddings for {file_path}: {e}"
-                )
+                logger.error(f"Failed to process chunks/embeddings for {file_path}: {e}")
                 self.db.rollback()
                 return {"error": f"Chunk/embedding processing failed: {e}"}
 
@@ -1536,9 +1459,7 @@ class DocumentProcessor(BaseProcessor):
         """
         try:
             # Get document and chunks
-            document = (
-                self.db.query(Document).filter(Document.id == document_id).first()
-            )
+            document = self.db.query(Document).filter(Document.id == document_id).first()
             if not document:
                 logger.warning(f"Document {document_id} not found for indexing")
                 return
@@ -1644,9 +1565,7 @@ class DocumentProcessor(BaseProcessor):
 
         return content
 
-    def _find_semantic_boundary(
-        self, content: str, start: int, end: int, chunk_size: int
-    ) -> int:
+    def _find_semantic_boundary(self, content: str, start: int, end: int, chunk_size: int) -> int:
         """Find the best semantic boundary for chunking."""
         chunk_content = content[start:end]
 
@@ -1697,15 +1616,11 @@ class DocumentProcessor(BaseProcessor):
             "var ",
             "const ",
         ]
-        metadata["contains_code"] = any(
-            indicator in chunk_text for indicator in code_indicators
-        )
+        metadata["contains_code"] = any(indicator in chunk_text for indicator in code_indicators)
 
         # Detect if chunk contains lists or structured content
         list_indicators = ["• ", "- ", "* ", "1. ", "2. ", "3. "]
-        metadata["contains_list"] = any(
-            indicator in chunk_text for indicator in list_indicators
-        )
+        metadata["contains_list"] = any(indicator in chunk_text for indicator in list_indicators)
 
         # Assign chapter/section information from pre-detected chapters
         if chapters:
@@ -1720,9 +1635,7 @@ class DocumentProcessor(BaseProcessor):
 
         return metadata
 
-    def _detect_chapter_info(
-        self, chunk_text: str
-    ) -> Tuple[Optional[str], Optional[str]]:
+    def _detect_chapter_info(self, chunk_text: str) -> Tuple[Optional[str], Optional[str]]:
         """Detect chapter/section information in chunk text."""
         lines = chunk_text.split("\n")
 
@@ -1825,10 +1738,7 @@ class DocumentProcessor(BaseProcessor):
         overlap = base_overlap
 
         # Increase overlap for code content to maintain context
-        if any(
-            indicator in chunk_text
-            for indicator in ["```", "def ", "class ", "function"]
-        ):
+        if any(indicator in chunk_text for indicator in ["```", "def ", "class ", "function"]):
             overlap = int(base_overlap * 1.5)
 
         # Increase overlap for complex technical content
@@ -1935,15 +1845,11 @@ class UploadProcessor(BaseProcessor):
 
                     if progress_callback:
                         progress = (i + 1) / total_files * 100
-                        progress_callback(
-                            progress, f"Processed {i + 1}/{total_files} files"
-                        )
+                        progress_callback(progress, f"Processed {i + 1}/{total_files} files")
 
                 except Exception as e:
                     logger.error(f"Failed to process {file_path}: {e}")
-                    results.append(
-                        {"file_path": file_path, "success": False, "error": str(e)}
-                    )
+                    results.append({"file_path": file_path, "success": False, "error": str(e)})
 
         # Summarize results
         successful = sum(1 for r in results if r.get("success", False))
@@ -1994,9 +1900,7 @@ class UploadProcessor(BaseProcessor):
             if filename and file_hash:
                 existing_doc = (
                     self.db.query(Document)
-                    .filter(
-                        Document.filename == filename, Document.file_hash == file_hash
-                    )
+                    .filter(Document.filename == filename, Document.file_hash == file_hash)
                     .first()
                 )
 
@@ -2017,9 +1921,7 @@ class UploadProcessor(BaseProcessor):
                 from src.data.loader import AdvancedDocumentProcessor
 
                 advanced_processor = AdvancedDocumentProcessor()
-                processing_result = advanced_processor.process_document_comprehensive(
-                    file_path
-                )
+                processing_result = advanced_processor.process_document_comprehensive(file_path)
 
                 # Check if processing was successful
                 if processing_result is None:
@@ -2063,9 +1965,7 @@ class UploadProcessor(BaseProcessor):
             if result.get("success"):
                 # DocumentProcessor already stored the document, just format the result
                 result["chunks_created"] = result.get("chunks_count", 0)
-                result["chapters_created"] = (
-                    0  # DocumentProcessor doesn't create chapters yet
-                )
+                result["chapters_created"] = 0  # DocumentProcessor doesn't create chapters yet
                 result["filename"] = filename
 
             return result
@@ -2096,9 +1996,7 @@ class UploadProcessor(BaseProcessor):
         """
         # Validate processing_result
         if processing_result is None:
-            logger.error(
-                f"Cannot reprocess document {existing_doc.id} - processing_result is None"
-            )
+            logger.error(f"Cannot reprocess document {existing_doc.id} - processing_result is None")
             return {
                 "success": False,
                 "filename": existing_doc.filename,
@@ -2137,9 +2035,7 @@ class UploadProcessor(BaseProcessor):
 
             if isinstance(extracted_content, dict):
                 logger.error(f"extracted_content is a dict: {extracted_content}")
-                extracted_content = str(
-                    extracted_content
-                )  # Convert to string as fallback
+                extracted_content = str(extracted_content)  # Convert to string as fallback
 
             # Ensure chunks is a list of strings
             if isinstance(chunks, list):
@@ -2148,17 +2044,12 @@ class UploadProcessor(BaseProcessor):
                     logger.debug(
                         f"Chunk {i}: type={type(chunk)}, keys={chunk.keys() if isinstance(chunk, dict) else 'N/A'}"
                     )
-                chunks = [
-                    str(chunk) if not isinstance(chunk, str) else chunk
-                    for chunk in chunks
-                ]
+                chunks = [str(chunk) if not isinstance(chunk, str) else chunk for chunk in chunks]
             else:
                 logger.warning(f"Chunks is not a list: {type(chunks)}")
                 chunks = []
 
-            validation_result = ContentValidator.validate_content_quality(
-                extracted_content, chunks
-            )
+            validation_result = ContentValidator.validate_content_quality(extracted_content, chunks)
 
             # Log validation results and handle quality issues
             if not validation_result["is_valid"]:
@@ -2171,9 +2062,7 @@ class UploadProcessor(BaseProcessor):
                 # Add quality issues to processing result for user feedback
                 processing_result["quality_issues"] = validation_result["issues"]
                 processing_result["quality_score"] = validation_result["quality_score"]
-                processing_result["quality_recommendations"] = validation_result[
-                    "recommendations"
-                ]
+                processing_result["quality_recommendations"] = validation_result["recommendations"]
 
                 # Log recommendations for debugging
                 if validation_result["recommendations"]:
@@ -2238,9 +2127,7 @@ class UploadProcessor(BaseProcessor):
                         tag = doc_processor.tag_manager.get_tag_by_name(tag_name)
                         if not tag:
                             tag = doc_processor.tag_manager.create_tag(tag_name)
-                        doc_processor.tag_manager.add_tag_to_document(
-                            existing_doc.id, tag.id
-                        )
+                        doc_processor.tag_manager.add_tag_to_document(existing_doc.id, tag.id)
 
                 # Add new categories
                 for category_name in suggested_categories:
@@ -2249,18 +2136,14 @@ class UploadProcessor(BaseProcessor):
                             category_name
                         )
                         if not category:
-                            category = doc_processor.category_manager.create_category(
-                                category_name
-                            )
+                            category = doc_processor.category_manager.create_category(category_name)
                         doc_processor.category_manager.add_category_to_document(
                             existing_doc.id, category.id
                         )
 
             # Update other fields if available
             if "reading_time_minutes" in processing_result:
-                existing_doc.reading_time_minutes = processing_result[
-                    "reading_time_minutes"
-                ]
+                existing_doc.reading_time_minutes = processing_result["reading_time_minutes"]
             if "author" in processing_result:
                 existing_doc.author = processing_result["author"]
             if "publication_date" in processing_result:
@@ -2295,10 +2178,7 @@ class UploadProcessor(BaseProcessor):
             chunks_created = 0
             chapters_created = 0
 
-            if (
-                "chunks" in processing_result
-                and processing_result["chunks"] is not None
-            ):
+            if "chunks" in processing_result and processing_result["chunks"] is not None:
                 chunks_list = processing_result["chunks"]
                 if isinstance(chunks_list, list):
                     for i, chunk_data in enumerate(chunks_list):
@@ -2324,10 +2204,7 @@ class UploadProcessor(BaseProcessor):
                             self.db.add(chunk)
                             chunks_created += 1
 
-            if (
-                "chapters" in processing_result
-                and processing_result["chapters"] is not None
-            ):
+            if "chapters" in processing_result and processing_result["chapters"] is not None:
                 chapters_list = processing_result["chapters"]
                 if isinstance(chapters_list, list):
                     for i, chapter_data in enumerate(chapters_list):
@@ -2335,18 +2212,14 @@ class UploadProcessor(BaseProcessor):
                             chapter = DocumentChapter(
                                 document_id=existing_doc.id,
                                 chapter_title=chapter_data["title"],
-                                chapter_path=chapter_data.get(
-                                    "path", f"chapter_{i + 1}"
-                                ),
+                                chapter_path=chapter_data.get("path", f"chapter_{i + 1}"),
                                 level=chapter_data.get("level", 1),
                                 word_count=chapter_data.get(
                                     "word_count", len(chapter_data["title"].split())
                                 ),
                                 content=chapter_data.get(
                                     "content",
-                                    chapter_data.get(
-                                        "content_preview", chapter_data["title"]
-                                    ),
+                                    chapter_data.get("content_preview", chapter_data["title"]),
                                 ),
                             )
                     self.db.add(chapter)
@@ -2418,9 +2291,7 @@ class UploadProcessor(BaseProcessor):
                         )
                         # Continue with next batch
 
-                logger.info(
-                    f"Completed embedding creation for document {existing_doc.id}"
-                )
+                logger.info(f"Completed embedding creation for document {existing_doc.id}")
 
                 # Commit embeddings to database before indexing
                 self.db.commit()
@@ -2438,9 +2309,7 @@ class UploadProcessor(BaseProcessor):
                         all_embeddings.append(embedding_record.embedding)
 
                 if all_embeddings and len(all_embeddings) == len(chunks):
-                    logger.info(
-                        f"Indexing {len(all_embeddings)} chunks in Elasticsearch"
-                    )
+                    logger.info(f"Indexing {len(all_embeddings)} chunks in Elasticsearch")
                     try:
                         processor = DocumentProcessor()
                         processor._index_document(
@@ -2448,17 +2317,13 @@ class UploadProcessor(BaseProcessor):
                             [
                                 {
                                     "content": chunk.content,
-                                    "metadata": {
-                                        "word_count": len(chunk.content.split())
-                                    },
+                                    "metadata": {"word_count": len(chunk.content.split())},
                                 }
                                 for chunk in chunks
                             ],
                             all_embeddings,
                         )
-                        logger.info(
-                            f"Successfully indexed document {existing_doc.id} in search"
-                        )
+                        logger.info(f"Successfully indexed document {existing_doc.id} in search")
                     except Exception as index_error:
                         logger.error(
                             f"Failed to index document {existing_doc.id} in search: {index_error}"
@@ -2544,9 +2409,7 @@ class UploadProcessor(BaseProcessor):
             # Create embeddings
             if chunks_created > 0:
                 chunks = (
-                    self.db.query(DocumentChunk)
-                    .filter(DocumentChunk.document_id == doc.id)
-                    .all()
+                    self.db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).all()
                 )
                 chunk_texts = [chunk.content for chunk in chunks]
                 embeddings_array, _ = create_embeddings(chunk_texts)
@@ -2572,17 +2435,13 @@ class UploadProcessor(BaseProcessor):
                         all_embeddings.append(embedding_record.embedding)
 
                 if all_embeddings and len(all_embeddings) == len(chunks):
-                    logger.info(
-                        f"Indexing {len(all_embeddings)} chunks in Elasticsearch"
-                    )
+                    logger.info(f"Indexing {len(all_embeddings)} chunks in Elasticsearch")
 
                     # Debug: Check what content we're indexing
                     chunk_list = []
                     for i, chunk in enumerate(chunks[:2]):  # Check first 2 chunks
                         content = chunk.content
-                        logger.info(
-                            f"Indexing chunk {i} content preview: {content[:150]}..."
-                        )
+                        logger.info(f"Indexing chunk {i} content preview: {content[:150]}...")
                         chunk_list.append(
                             {
                                 "content": content,
@@ -2607,9 +2466,7 @@ class UploadProcessor(BaseProcessor):
                         )
                         logger.info(f"Successfully indexed document {doc.id} in search")
                     except Exception as index_error:
-                        logger.error(
-                            f"Failed to index document {doc.id} in search: {index_error}"
-                        )
+                        logger.error(f"Failed to index document {doc.id} in search: {index_error}")
                 else:
                     logger.warning(
                         f"Embeddings mismatch for document {doc.id}: {len(all_embeddings)} embeddings vs {len(chunks)} chunks - skipping search indexing"
@@ -2736,9 +2593,7 @@ class UploadProcessor(BaseProcessor):
                         result = self.process_single_file(file_path)
                         results.append(result)
                     except Exception as e:
-                        results.append(
-                            {"file_path": file_path, "success": False, "error": str(e)}
-                        )
+                        results.append({"file_path": file_path, "success": False, "error": str(e)})
 
             # Aggregate results
             for result in results:

@@ -1,9 +1,10 @@
-import numpy as np
 import hashlib
 import json
-from typing import List, Tuple, Optional, Dict, Any
-from sentence_transformers import SentenceTransformer
 import logging
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -263,9 +264,7 @@ class EmbeddingCache:
 
         return cached_embeddings, uncached_indices
 
-    def set_batch(
-        self, texts: List[str], model_name: str, embeddings: np.ndarray
-    ) -> int:
+    def set_batch(self, texts: List[str], model_name: str, embeddings: np.ndarray) -> int:
         """
         Cache multiple embeddings.
 

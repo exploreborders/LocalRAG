@@ -5,12 +5,13 @@ This module analyzes document content to extract hierarchical structure
 (chapters, sections, subsections) and identify key topics.
 """
 
-import os
-import logging
-from typing import Dict, Any, List, Optional, Tuple
-import re
-import requests
 import json
+import logging
+import os
+import re
+from typing import Any, Dict, List, Optional, Tuple
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -336,9 +337,7 @@ class StructureExtractor:
         # First priority: extract table of contents if it exists
         toc_hierarchy = self._extract_table_of_contents(text)
         if toc_hierarchy:
-            logger.info(
-                f"Successfully extracted {len(toc_hierarchy)} items from table of contents"
-            )
+            logger.info(f"Successfully extracted {len(toc_hierarchy)} items from table of contents")
             return {
                 "hierarchy": toc_hierarchy,
                 "document_type": self._guess_document_type(text, filename),
@@ -406,9 +405,7 @@ class StructureExtractor:
                             logger.info(f"LLM extracted {len(hierarchy)} sections")
                             return {
                                 "hierarchy": hierarchy,
-                                "document_type": self._guess_document_type(
-                                    text, filename
-                                ),
+                                "document_type": self._guess_document_type(text, filename),
                                 "primary_topic": "general",
                                 "secondary_topics": [],
                                 "technical_level": "intermediate",
@@ -537,9 +534,7 @@ class StructureExtractor:
         long_words = sum(1 for word in text.split() if len(word) > 6)
         technical_terms = len(re.findall(r"\b[A-Z]{2,}\b", text))  # Acronyms
 
-        complexity = min(
-            1.0, (avg_word_length * 0.1 + long_words * 0.001 + technical_terms * 0.01)
-        )
+        complexity = min(1.0, (avg_word_length * 0.1 + long_words * 0.001 + technical_terms * 0.01))
         return round(complexity, 2)
 
     def _guess_document_type(self, text: str, filename: str) -> str:

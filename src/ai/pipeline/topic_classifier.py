@@ -6,9 +6,10 @@ relationship mapping across multiple documents for enhanced knowledge synthesis.
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Set, Tuple
-from collections import defaultdict, Counter
 import re
+from collections import Counter, defaultdict
+from typing import Any, Dict, List, Optional, Set, Tuple
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -216,9 +217,7 @@ class TopicClassifier:
 
         existing_str = ""
         if existing_topics:
-            existing_str = (
-                f"Previously identified topics: {', '.join(existing_topics)}\n"
-            )
+            existing_str = f"Previously identified topics: {', '.join(existing_topics)}\n"
 
         prompt = f"""
         Analyze the following document and identify its key topics and themes.
@@ -295,9 +294,7 @@ class TopicClassifier:
             "key_concepts": [],
         }
 
-    def _enhance_with_statistics(
-        self, topics_data: Dict[str, Any], text: str
-    ) -> Dict[str, Any]:
+    def _enhance_with_statistics(self, topics_data: Dict[str, Any], text: str) -> Dict[str, Any]:
         """
         Enhance topic classification with statistical analysis.
         """
@@ -333,9 +330,7 @@ class TopicClassifier:
 
         # Add statistical insights
         topics_data["statistical_keywords"] = top_keywords
-        topics_data["vocabulary_richness"] = (
-            len(filtered_words) / len(words) if words else 0
-        )
+        topics_data["vocabulary_richness"] = len(filtered_words) / len(words) if words else 0
 
         return topics_data
 
@@ -390,9 +385,7 @@ class TopicClassifier:
             "vocabulary_richness": 0.0,
         }
 
-    def _find_topic_clusters(
-        self, doc_topics: Dict[str, Set[str]]
-    ) -> List[Dict[str, Any]]:
+    def _find_topic_clusters(self, doc_topics: Dict[str, Set[str]]) -> List[Dict[str, Any]]:
         """
         Find clusters of documents that share similar topics.
         """
@@ -459,9 +452,7 @@ class TopicClassifier:
 
         return relationships
 
-    def _calculate_topic_distribution(
-        self, doc_topics: Dict[str, Set[str]]
-    ) -> Dict[str, int]:
+    def _calculate_topic_distribution(self, doc_topics: Dict[str, Set[str]]) -> Dict[str, int]:
         """Calculate the distribution of topics across documents."""
         all_topics = []
         for topics in doc_topics.values():
@@ -469,9 +460,7 @@ class TopicClassifier:
 
         return dict(Counter(all_topics))
 
-    def _get_most_common_topics(
-        self, doc_topics: Dict[str, Set[str]]
-    ) -> List[Tuple[str, int]]:
+    def _get_most_common_topics(self, doc_topics: Dict[str, Set[str]]) -> List[Tuple[str, int]]:
         """Get the most common topics across all documents."""
         distribution = self._calculate_topic_distribution(doc_topics)
         return sorted(distribution.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -511,9 +500,7 @@ class TopicClassifier:
                     {
                         "document": doc,
                         "similarity_score": similarity_score,
-                        "shared_topics": list(
-                            target_doc_topics.intersection(doc_topics)
-                        ),
+                        "shared_topics": list(target_doc_topics.intersection(doc_topics)),
                         "overlap_count": overlap,
                     }
                 )

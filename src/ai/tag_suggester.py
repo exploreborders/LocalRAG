@@ -5,12 +5,13 @@ This module provides intelligent tag recommendations based on document content a
 using LLM to extract relevant keywords, topics, and entities for automated tagging.
 """
 
+import json
 import logging
 import re
-import requests
-from typing import List, Dict, Any, Optional, Tuple
 from collections import Counter
-import json
+from typing import Any, Dict, List, Optional, Tuple
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -61,17 +62,13 @@ class AITagSuggester:
                 },
             }
 
-            response = requests.post(
-                f"{self.base_url}/api/generate", json=payload, timeout=30
-            )
+            response = requests.post(f"{self.base_url}/api/generate", json=payload, timeout=30)
 
             if response.status_code == 200:
                 result = response.json()
                 return result.get("response", "").strip()
             else:
-                logger.error(
-                    f"LLM call failed: {response.status_code} - {response.text}"
-                )
+                logger.error(f"LLM call failed: {response.status_code} - {response.text}")
                 return ""
 
         except Exception as e:
@@ -104,9 +101,7 @@ class AITagSuggester:
         analysis_content = self._prepare_content(document_content)
 
         # Generate tag suggestions
-        raw_suggestions = self._generate_tag_suggestions(
-            analysis_content, document_title
-        )
+        raw_suggestions = self._generate_tag_suggestions(analysis_content, document_title)
 
         # Parse and clean suggestions
         parsed_tags = self._parse_tag_response(raw_suggestions)
@@ -220,9 +215,7 @@ class AITagSuggester:
 
         return unique_tags
 
-    def _filter_existing_tags(
-        self, suggestions: List[str], existing_tags: List[str]
-    ) -> List[str]:
+    def _filter_existing_tags(self, suggestions: List[str], existing_tags: List[str]) -> List[str]:
         """
         Filter out tags that already exist.
 
@@ -353,9 +346,7 @@ class AITagSuggester:
             title = doc.get("title", "")
             existing_tags = doc.get("existing_tags", [])
 
-            suggestions = self.suggest_tags(
-                content, title, existing_tags, max_per_document
-            )
+            suggestions = self.suggest_tags(content, title, existing_tags, max_per_document)
 
             if suggestions:
                 results[doc_id] = suggestions

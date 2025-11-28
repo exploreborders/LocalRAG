@@ -2,16 +2,17 @@
 Unit tests for error handling utilities.
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
+import pytest
+
 from src.utils.error_handler import (
-    safe_execute,
-    ValidationError,
-    ProcessingError,
     DatabaseError,
-    handle_errors,
+    ProcessingError,
+    ValidationError,
     error_context,
+    handle_errors,
+    safe_execute,
     validate_and_handle,
 )
 
@@ -35,9 +36,7 @@ class TestSafeExecute:
         def failing_func():
             raise ValidationError("test")
 
-        result = safe_execute(
-            failing_func, error_types=ValidationError, default_return="caught"
-        )
+        result = safe_execute(failing_func, error_types=ValidationError, default_return="caught")
         assert result == "caught"
 
     def test_multiple_exception_types(self):

@@ -10,16 +10,18 @@ This module provides async batch processing for embedding queries, supporting:
 """
 
 import asyncio
+import platform
 import time
 import uuid
-import platform
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
 try:
     import torch
     from sentence_transformers import SentenceTransformer
+
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
@@ -29,6 +31,7 @@ except ImportError:
 @dataclass
 class QueryRequest:
     """Represents a single query embedding request"""
+
     id: str
     query: str
     timestamp: float
@@ -46,7 +49,9 @@ class BatchEmbeddingService:
     - Performance monitoring and optimization
     """
 
-    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", max_batch_size: int = 16):
+    def __init__(
+        self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", max_batch_size: int = 16
+    ):
         self.model_name = model_name
         self.max_batch_size = max_batch_size
         self.model = None
@@ -55,11 +60,11 @@ class BatchEmbeddingService:
         self.results: Dict[str, np.ndarray] = {}
         self.is_running = False
         self.stats = {
-            'total_queries': 0,
-            'batch_count': 0,
-            'avg_batch_size': 0,
-            'avg_processing_time': 0,
-            'gpu_utilization': 0
+            "total_queries": 0,
+            "batch_count": 0,
+            "avg_batch_size": 0,
+            "avg_processing_time": 0,
+            "gpu_utilization": 0,
         }
 
         # Initialize model
@@ -97,15 +102,15 @@ class BatchEmbeddingService:
 
         try:
             self.model = SentenceTransformer(
-                self.model_name,
-                device=self.device,
-                trust_remote_code=True
+                self.model_name, device=self.device, trust_remote_code=True
             )
 
             # Device-specific optimizations
             if self.device == "mps":
                 # Metal-specific optimizations for Apple Silicon
-                self.max_batch_size = min(self.max_batch_size, 8)  # Smaller batches for unified memory
+                self.max_batch_size = min(
+                    self.max_batch_size, 8
+                )  # Smaller batches for unified memory
                 torch.mps.set_per_process_memory_fraction(0.8)  # Reserve 20% for system
                 print("🔧 Applied Metal optimizations for Apple Silicon")
             elif self.device == "cuda":
@@ -147,11 +152,7 @@ class BatchEmbeddingService:
         Returns when the embedding is ready.
         """
         request_id = str(uuid.uuid4())
-        request = QueryRequest(
-            id=request_id,
-            query=query,
-            timestamp=time.time()
-        )
+        request = QueryRequest(id=request_id, query=query, timestamp=time.time())
 
         # Create a future for the result
         future = asyncio.Future()
@@ -224,8 +225,7 @@ class BatchEmbeddingService:
                 # Wait for first query with timeout
                 if not batch:
                     request = await asyncio.wait_for(
-                        self.queue.get(),
-                        timeout=0.05  # 50ms max wait for first query
+                        self.queue.get(), timeout=0.05  # 50ms max wait for first query
                     )
                     batch.append(request)
                 else:
@@ -260,7 +260,7 @@ class BatchEmbeddingService:
                 batch_size=len(queries),  # Process as one batch
                 show_progress_bar=False,
                 convert_to_numpy=True,
-                normalize_embeddings=True
+                normalize_embeddings=True,
             )
             return embeddings
 
@@ -292,29 +292,33 @@ class BatchEmbeddingService:
 
     def _update_stats(self, batch_size: int, processing_time: float):
         """Update performance statistics"""
-        self.stats['total_queries'] += batch_size
-        self.stats['batch_count'] += 1
+        self.stats["total_queries"] += batch_size
+        self.stats["batch_count"] += 1
 
         # Rolling average for batch size
-        current_avg = self.stats['avg_batch_size']
-        self.stats['avg_batch_size'] = (current_avg * (self.stats['batch_count'] - 1) + batch_size) / self.stats['batch_count']
+        current_avg = self.stats["avg_batch_size"]
+        self.stats["avg_batch_size"] = (
+            current_avg * (self.stats["batch_count"] - 1) + batch_size
+        ) / self.stats["batch_count"]
 
         # Rolling average for processing time
-        current_avg_time = self.stats['avg_processing_time']
-        self.stats['avg_processing_time'] = (current_avg_time * (self.stats['batch_count'] - 1) + processing_time) / self.stats['batch_count']
+        current_avg_time = self.stats["avg_processing_time"]
+        self.stats["avg_processing_time"] = (
+            current_avg_time * (self.stats["batch_count"] - 1) + processing_time
+        ) / self.stats["batch_count"]
 
         # Estimate GPU utilization (rough approximation)
-        if self.device in ['cuda', 'mps']:
-            self.stats['gpu_utilization'] = min(0.9, batch_size / self.max_batch_size)
+        if self.device in ["cuda", "mps"]:
+            self.stats["gpu_utilization"] = min(0.9, batch_size / self.max_batch_size)
 
     def get_stats(self) -> Dict[str, Any]:
         """Get current performance statistics"""
         return {
             **self.stats,
-            'device': self.device,
-            'max_batch_size': self.max_batch_size,
-            'queue_size': self.queue.qsize(),
-            'is_running': self.is_running
+            "device": self.device,
+            "max_batch_size": self.max_batch_size,
+            "queue_size": self.queue.qsize(),
+            "is_running": self.is_running,
         }
 
     async def health_check(self) -> bool:

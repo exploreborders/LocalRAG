@@ -2,16 +2,17 @@
 Unit tests for configuration management utilities.
 """
 
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from src.utils.config_manager import (
+    CacheConfig,
     ConfigManager,
     DatabaseConfig,
+    OllamaConfig,
     OpenSearchConfig,
     RedisConfig,
-    OllamaConfig,
-    CacheConfig,
 )
 
 
@@ -221,9 +222,7 @@ class TestConfigClasses:
 
     def test_opensearch_config_creation(self):
         """Test OpenSearchConfig creation."""
-        config = OpenSearchConfig(
-            host="es-host", port=9200, user="es-user", password="es-pass"
-        )
+        config = OpenSearchConfig(host="es-host", port=9200, user="es-user", password="es-pass")
         assert config.host == "es-host"
         assert config.port == 9200
         assert config.user == "es-user"

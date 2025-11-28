@@ -2,11 +2,11 @@
 Progress tracking utilities for long-running operations.
 """
 
-import time
 import logging
-from typing import Callable, Optional, Dict, Any
-from dataclasses import dataclass
+import time
 from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +65,7 @@ class ProgressTracker:
         """Add a progress callback."""
         self.callbacks.append(callback)
 
-    def update(
-        self, step: Optional[int] = None, message: str = "", increment: bool = True
-    ) -> None:
+    def update(self, step: Optional[int] = None, message: str = "", increment: bool = True) -> None:
         """
         Update progress.
 
@@ -109,9 +107,7 @@ class ProgressTracker:
             except Exception as e:
                 logger.warning(f"Progress callback failed: {e}")
 
-    def start_sub_operation(
-        self, name: str, total_steps: int = 100
-    ) -> "ProgressTracker":
+    def start_sub_operation(self, name: str, total_steps: int = 100) -> "ProgressTracker":
         """
         Start tracking a sub-operation.
 
@@ -150,9 +146,7 @@ class ProgressTracker:
 
 
 @contextmanager
-def track_progress(
-    operation: str, total_steps: int = 100, callback: Optional[Callable] = None
-):
+def track_progress(operation: str, total_steps: int = 100, callback: Optional[Callable] = None):
     """
     Context manager for progress tracking.
 
@@ -243,9 +237,7 @@ class BatchProgressTracker:
         else:
             eta = None
 
-        default_message = (
-            f"Processed {self.completed_items}/{self.total_items} {self.item_name}s"
-        )
+        default_message = f"Processed {self.completed_items}/{self.total_items} {self.item_name}s"
         if message:
             default_message += f" - {message}"
 
@@ -267,11 +259,7 @@ class BatchProgressTracker:
 
     def get_progress_info(self) -> ProgressInfo:
         """Get current progress information."""
-        progress = (
-            (self.completed_items / self.total_items) * 100
-            if self.total_items > 0
-            else 100
-        )
+        progress = (self.completed_items / self.total_items) * 100 if self.total_items > 0 else 100
         elapsed = time.time() - self.start_time
 
         if self.completed_items > 0:

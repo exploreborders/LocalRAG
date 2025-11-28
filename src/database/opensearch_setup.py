@@ -4,9 +4,10 @@ OpenSearch setup script for RAG system.
 Run this after starting OpenSearch.
 """
 
-from elasticsearch import Elasticsearch
 import json
 import os
+
+from elasticsearch import Elasticsearch
 
 
 def get_elasticsearch_client():

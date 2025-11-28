@@ -5,8 +5,9 @@ This file provides common mocking fixtures for external dependencies
 to enable isolated unit testing.
 """
 
+from unittest.mock import MagicMock, Mock
+
 import pytest
-from unittest.mock import Mock, MagicMock
 from sqlalchemy.orm import Session
 
 

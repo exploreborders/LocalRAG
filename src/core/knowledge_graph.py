@@ -6,18 +6,19 @@ and documents through various relationship types, enabling rich contextual retri
 and enhanced LLM understanding.
 """
 
-from typing import List, Dict, Any, Optional, Set, Tuple
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
-from collections import defaultdict, deque
 import logging
+from collections import defaultdict, deque
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import Session
 
 from src.database.models import (
-    DocumentTag,
-    DocumentCategory,
     Document,
-    DocumentTagAssignment,
+    DocumentCategory,
     DocumentCategoryAssignment,
+    DocumentTag,
+    DocumentTagAssignment,
     SessionLocal,
 )
 
@@ -53,9 +54,7 @@ class KnowledgeGraph:
 
         # Get all tag assignments with document counts
         tag_assignments = (
-            self.db.query(
-                DocumentTagAssignment.document_id, DocumentTag.name.label("tag_name")
-            )
+            self.db.query(DocumentTagAssignment.document_id, DocumentTag.name.label("tag_name"))
             .join(DocumentTag)
             .all()
         )
@@ -175,9 +174,7 @@ class KnowledgeGraph:
         doc_assign_alias = aliased(DocumentTagAssignment)
 
         tag_data = (
-            self.db.query(
-                tag_alias.name.label("tag_name"), cat_alias.name.label("category_name")
-            )
+            self.db.query(tag_alias.name.label("tag_name"), cat_alias.name.label("category_name"))
             .select_from(tag_alias)
             .join(doc_assign_alias, tag_alias.id == doc_assign_alias.tag_id)
             .join(
@@ -303,9 +300,7 @@ class KnowledgeGraph:
         # Remove original tags from results
         return visited - set(tag_names)
 
-    def get_related_categories(
-        self, category_names: List[str], depth: int = 1
-    ) -> Set[str]:
+    def get_related_categories(self, category_names: List[str], depth: int = 1) -> Set[str]:
         """
         Get related categories through hierarchical relationships.
 
@@ -327,9 +322,7 @@ class KnowledgeGraph:
 
             # Get parent categories
             parent = (
-                self.db.query(DocumentCategory)
-                .filter(DocumentCategory.name == current_cat)
-                .first()
+                self.db.query(DocumentCategory).filter(DocumentCategory.name == current_cat).first()
             )
 
             if parent and parent.parent_category_id:
@@ -375,9 +368,7 @@ class KnowledgeGraph:
             Dict with expanded context information
         """
         expanded_tags = self.get_related_tags(tag_names, depth=context_depth)
-        expanded_categories = self.get_related_categories(
-            category_names, depth=context_depth
-        )
+        expanded_categories = self.get_related_categories(category_names, depth=context_depth)
 
         # Get tag-category relationships for additional context
         tag_category_rels = self.infer_tag_category_relationships()
@@ -423,9 +414,7 @@ class KnowledgeGraph:
             from sqlalchemy import select
 
             tag_ids = select(DocumentTag.id).where(DocumentTag.name.in_(tag_names))
-            cat_ids = select(DocumentCategory.id).where(
-                DocumentCategory.name.in_(category_names)
-            )
+            cat_ids = select(DocumentCategory.id).where(DocumentCategory.name.in_(category_names))
 
             base_query = (
                 self.db.query(Document)
@@ -463,9 +452,7 @@ class KnowledgeGraph:
             # Categories only
             from sqlalchemy import select
 
-            cat_ids = select(DocumentCategory.id).where(
-                DocumentCategory.name.in_(category_names)
-            )
+            cat_ids = select(DocumentCategory.id).where(DocumentCategory.name.in_(category_names))
             base_query = (
                 self.db.query(Document)
                 .select_from(Document)
@@ -486,13 +473,9 @@ class KnowledgeGraph:
         results = []
         for doc in direct_docs:
             # Get actual tag and category names through relationships
-            doc_tags = [
-                assignment.tag.name for assignment in doc.tags if assignment.tag
-            ]
+            doc_tags = [assignment.tag.name for assignment in doc.tags if assignment.tag]
             doc_categories = [
-                assignment.category.name
-                for assignment in doc.categories
-                if assignment.category
+                assignment.category.name for assignment in doc.categories if assignment.category
             ]
 
             results.append(
@@ -535,17 +518,13 @@ class KnowledgeGraph:
                         .where(DocumentCategory.name.in_(related_categories))
                         .scalar_subquery()
                     )
-                    related_query = related_query.join(
-                        DocumentCategoryAssignment
-                    ).filter(
+                    related_query = related_query.join(DocumentCategoryAssignment).filter(
                         DocumentCategoryAssignment.category_id.in_(related_cat_ids)
                     )
 
                 # Exclude already found documents
                 direct_doc_ids = {doc.id for doc in direct_docs}
-                related_docs = related_query.filter(
-                    Document.id.notin_(direct_doc_ids)
-                ).all()
+                related_docs = related_query.filter(Document.id.notin_(direct_doc_ids)).all()
 
                 for doc in related_docs:
                     doc_tags = [tag.name for tag in doc.tags]
@@ -575,20 +554,14 @@ class KnowledgeGraph:
         """
         # Tag statistics
         tag_count = self.db.query(func.count(DocumentTag.id)).scalar()
-        tag_relationships = (
-            len(self._relationship_cache) if self._relationship_cache else 0
-        )
+        tag_relationships = len(self._relationship_cache) if self._relationship_cache else 0
 
         # Category statistics
         category_count = self.db.query(func.count(DocumentCategory.id)).scalar()
 
         # Document relationships
-        doc_tag_assignments = self.db.query(
-            func.count(DocumentTagAssignment.id)
-        ).scalar()
-        doc_cat_assignments = self.db.query(
-            func.count(DocumentCategoryAssignment.id)
-        ).scalar()
+        doc_tag_assignments = self.db.query(func.count(DocumentTagAssignment.id)).scalar()
+        doc_cat_assignments = self.db.query(func.count(DocumentCategoryAssignment.id)).scalar()
 
         return {
             "tags": {"total": tag_count, "with_relationships": tag_relationships},
@@ -597,9 +570,7 @@ class KnowledgeGraph:
                 "tag_assignments": doc_tag_assignments,
                 "category_assignments": doc_cat_assignments,
             },
-            "relationships": {
-                "tag_relationships_cached": len(self._relationship_cache)
-            },
+            "relationships": {"tag_relationships_cached": len(self._relationship_cache)},
         }
 
     def clear_cache(self):

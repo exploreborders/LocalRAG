@@ -2,11 +2,12 @@
 Unit tests for file security validation utilities.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
 
-from src.utils.file_security import FileUploadValidator, FileSecurityError
+import pytest
+
+from src.utils.file_security import FileSecurityError, FileUploadValidator
 
 
 class TestFileUploadValidator:

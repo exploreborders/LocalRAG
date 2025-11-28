@@ -2,10 +2,10 @@
 max-line-length = 100
 max-complexity = 10
 ignore =
-    E203,  # whitespace before ':' (conflicts with black)
-    E501,  # line too long (handled by black)
-    W503,  # line break before binary operator (handled by black)
-    F821,  # undefined name (handled by mypy)
+    E203,
+    E501,
+    W503,
+    F821
 exclude =
     .git,
     __pycache__,

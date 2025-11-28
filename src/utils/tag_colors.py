@@ -7,7 +7,7 @@ for tag display and management.
 
 import hashlib
 import random
-from typing import List, Dict, Any, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 
 class TagColorManager:
@@ -20,52 +20,52 @@ class TagColorManager:
 
     # Professional color palette with good contrast and accessibility
     PROFESSIONAL_PALETTE = [
-        '#007bff',  # Blue
-        '#28a745',  # Green
-        '#dc3545',  # Red
-        '#ffc107',  # Yellow/Amber
-        '#6f42c1',  # Purple
-        '#e83e8c',  # Pink
-        '#fd7e14',  # Orange
-        '#20c997',  # Teal
-        '#17a2b8',  # Cyan
-        '#6c757d',  # Gray
-        '#343a40',  # Dark Gray
-        '#f8f9fa',  # Light Gray
-        '#6610f2',  # Indigo
-        '#d63384',  # Magenta
-        '#fd7e14',  # Orange (duplicate for variety)
-        '#198754',  # Dark Green
-        '#0d6efd',  # Primary Blue
-        '#6f42c1',  # Bootstrap Purple
-        '#e3f2fd',  # Light Blue background
-        '#f3e5f5',  # Light Purple background
+        "#007bff",  # Blue
+        "#28a745",  # Green
+        "#dc3545",  # Red
+        "#ffc107",  # Yellow/Amber
+        "#6f42c1",  # Purple
+        "#e83e8c",  # Pink
+        "#fd7e14",  # Orange
+        "#20c997",  # Teal
+        "#17a2b8",  # Cyan
+        "#6c757d",  # Gray
+        "#343a40",  # Dark Gray
+        "#f8f9fa",  # Light Gray
+        "#6610f2",  # Indigo
+        "#d63384",  # Magenta
+        "#fd7e14",  # Orange (duplicate for variety)
+        "#198754",  # Dark Green
+        "#0d6efd",  # Primary Blue
+        "#6f42c1",  # Bootstrap Purple
+        "#e3f2fd",  # Light Blue background
+        "#f3e5f5",  # Light Purple background
     ]
 
     # Semantic color mappings for common tag categories
     SEMANTIC_COLORS = {
-        'academic': '#007bff',      # Blue for academic/research
-        'technical': '#28a745',     # Green for technical
-        'business': '#ffc107',      # Yellow for business
-        'personal': '#e83e8c',      # Pink for personal
-        'medical': '#dc3545',       # Red for medical/health
-        'legal': '#6c757d',         # Gray for legal
-        'finance': '#20c997',       # Teal for finance
-        'science': '#6610f2',       # Indigo for science
-        'education': '#fd7e14',     # Orange for education
-        'technology': '#17a2b8',    # Cyan for technology
-        'creative': '#d63384',      # Magenta for creative
-        'general': '#6c757d',       # Gray for general
+        "academic": "#007bff",  # Blue for academic/research
+        "technical": "#28a745",  # Green for technical
+        "business": "#ffc107",  # Yellow for business
+        "personal": "#e83e8c",  # Pink for personal
+        "medical": "#dc3545",  # Red for medical/health
+        "legal": "#6c757d",  # Gray for legal
+        "finance": "#20c997",  # Teal for finance
+        "science": "#6610f2",  # Indigo for science
+        "education": "#fd7e14",  # Orange for education
+        "technology": "#17a2b8",  # Cyan for technology
+        "creative": "#d63384",  # Magenta for creative
+        "general": "#6c757d",  # Gray for general
     }
 
     # Reserved colors for system tags
     RESERVED_COLORS = {
-        'important': '#dc3545',     # Red for important
-        'urgent': '#dc3545',        # Red for urgent
-        'review': '#ffc107',        # Yellow for review
-        'draft': '#6c757d',         # Gray for draft
-        'final': '#28a745',         # Green for final
-        'archive': '#343a40',       # Dark gray for archive
+        "important": "#dc3545",  # Red for important
+        "urgent": "#dc3545",  # Red for urgent
+        "review": "#ffc107",  # Yellow for review
+        "draft": "#6c757d",  # Gray for draft
+        "final": "#28a745",  # Green for final
+        "archive": "#343a40",  # Dark gray for archive
     }
 
     def __init__(self):
@@ -158,7 +158,7 @@ class TagColorManager:
         # For simplicity, return white for dark colors, black for light
         try:
             # Convert hex to RGB
-            hex_color = background_color.lstrip('#')
+            hex_color = background_color.lstrip("#")
             r = int(hex_color[0:2], 16)
             g = int(hex_color[2:4], 16)
             b = int(hex_color[4:6], 16)
@@ -166,9 +166,9 @@ class TagColorManager:
             # Calculate luminance
             luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
 
-            return '#ffffff' if luminance < 0.5 else '#000000'
+            return "#ffffff" if luminance < 0.5 else "#000000"
         except (ValueError, IndexError):
-            return '#000000'  # Default to black
+            return "#000000"  # Default to black
 
     def get_color_palette(self, include_backgrounds: bool = False) -> List[str]:
         """
@@ -185,11 +185,11 @@ class TagColorManager:
         if include_backgrounds:
             # Add light background variants
             backgrounds = [
-                '#e3f2fd',  # Light blue
-                '#f3e5f5',  # Light purple
-                '#e8f5e8',  # Light green
-                '#fff3cd',  # Light yellow
-                '#f8d7da',  # Light red
+                "#e3f2fd",  # Light blue
+                "#f3e5f5",  # Light purple
+                "#e8f5e8",  # Light green
+                "#fff3cd",  # Light yellow
+                "#f8d7da",  # Light red
             ]
             palette.extend(backgrounds)
 
@@ -205,7 +205,7 @@ class TagColorManager:
         Returns:
             True if valid hex color
         """
-        if not color.startswith('#'):
+        if not color.startswith("#"):
             return False
 
         hex_part = color[1:]
@@ -263,7 +263,7 @@ class TagColorManager:
         """
         try:
             # Convert hex to RGB
-            hex_color = hex_color.lstrip('#')
+            hex_color = hex_color.lstrip("#")
             r = int(hex_color[0:2], 16) / 255.0
             g = int(hex_color[2:4], 16) / 255.0
             b = int(hex_color[4:6], 16) / 255.0
@@ -298,9 +298,9 @@ class TagColorManager:
             Dict with color information
         """
         return {
-            'hex': color,
-            'contrast_text': self.get_contrast_color(color),
-            'hue': self._hex_to_hue(color),
-            'is_reserved': color in self.RESERVED_COLORS.values(),
-            'category': None  # Could be enhanced to detect category
+            "hex": color,
+            "contrast_text": self.get_contrast_color(color),
+            "hue": self._hex_to_hue(color),
+            "is_reserved": color in self.RESERVED_COLORS.values(),
+            "category": None,  # Could be enhanced to detect category
         }

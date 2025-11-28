@@ -5,9 +5,9 @@ This module provides validation functions to ensure extracted document content
 is meaningful and not corrupted by OCR artifacts or processing errors.
 """
 
-import re
-from typing import List, Dict, Any, Optional
 import logging
+import re
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +66,7 @@ class ContentValidator:
                 "is_valid": False,
                 "quality_score": 0.0,
                 "issues": ["Empty content"],
-                "recommendations": [
-                    "Reprocess document with different extraction method"
-                ],
+                "recommendations": ["Reprocess document with different extraction method"],
             }
 
         issues = []
@@ -96,10 +94,7 @@ class ContentValidator:
         if chunks:
             # Ensure chunks is a list of strings
             if isinstance(chunks, list):
-                chunks = [
-                    str(chunk) if not isinstance(chunk, str) else chunk
-                    for chunk in chunks
-                ]
+                chunks = [str(chunk) if not isinstance(chunk, str) else chunk for chunk in chunks]
             else:
                 chunks = [str(chunks)] if chunks else []
 
@@ -179,17 +174,13 @@ class ContentValidator:
         # Check sentence structure (periods followed by capital letters)
         sentences = re.findall(r"\. [A-Z]", content)
         if len(sentences) > 0:
-            structure_score += min(
-                len(sentences) / 50, 0.3
-            )  # Up to 0.3 for sentence structure
+            structure_score += min(len(sentences) / 50, 0.3)  # Up to 0.3 for sentence structure
 
         # Check paragraph structure (multiple lines)
         lines = content.split("\n")
         long_lines = [line for line in lines if len(line.strip()) > 50]
         if len(long_lines) > 0:
-            structure_score += min(
-                len(long_lines) / 20, 0.3
-            )  # Up to 0.3 for paragraphs
+            structure_score += min(len(long_lines) / 20, 0.3)  # Up to 0.3 for paragraphs
 
         # Check word distribution (not too many very short/long words)
         words = re.findall(r"\b\w+\b", content)

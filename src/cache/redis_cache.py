@@ -1,16 +1,23 @@
-import redis
-import json
 import hashlib
-import redis
-from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+import json
 import logging
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
+import redis
 
 logger = logging.getLogger(__name__)
 
+
 class RedisCache:
-    def __init__(self, host: str = "localhost", port: int = 6379,
-                 password: Optional[str] = None, db: int = 0, ttl_hours: int = 24):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 6379,
+        password: Optional[str] = None,
+        db: int = 0,
+        ttl_hours: int = 24,
+    ):
         self.ttl_seconds = int(timedelta(hours=ttl_hours).total_seconds())
 
         try:
@@ -23,7 +30,7 @@ class RedisCache:
                 socket_connect_timeout=5,
                 socket_timeout=5,
                 retry_on_timeout=True,
-                max_connections=20
+                max_connections=20,
             )
             self.redis.ping()  # Test connection
             logger.info("Redis cache connected successfully")
@@ -47,8 +54,8 @@ class RedisCache:
         """Store response with TTL"""
         try:
             # Add metadata
-            response['cached_at'] = datetime.now().isoformat()
-            response['cache_hits'] = response.get('cache_hits', 0)
+            response["cached_at"] = datetime.now().isoformat()
+            response["cache_hits"] = response.get("cache_hits", 0)
 
             data = json.dumps(response)
             return bool(self.redis.setex(key, self.ttl_seconds, data))
@@ -82,11 +89,12 @@ class RedisCache:
             keys = len(self.redis.keys("llm:*"))  # Assuming llm: prefix
 
             return {
-                'total_keys': keys,
-                'memory_used': info.get('used_memory_human', 'unknown'),
-                'hit_rate': info.get('keyspace_hits', 0) / max(info.get('keyspace_misses', 0) + info.get('keyspace_hits', 0), 1),
-                'connected_clients': info.get('connected_clients', 0),
-                'uptime_days': info.get('uptime_in_days', 0)
+                "total_keys": keys,
+                "memory_used": info.get("used_memory_human", "unknown"),
+                "hit_rate": info.get("keyspace_hits", 0)
+                / max(info.get("keyspace_misses", 0) + info.get("keyspace_hits", 0), 1),
+                "connected_clients": info.get("connected_clients", 0),
+                "uptime_days": info.get("uptime_in_days", 0),
             }
         except Exception as e:
             logger.error(f"Cache stats error: {e}")

@@ -10,8 +10,8 @@ from pathlib import Path
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.database.models import SessionLocal, Document
 from src.core.document_manager import UploadProcessor
+from src.database.models import Document, SessionLocal
 
 
 def reprocess_documents():
@@ -28,9 +28,7 @@ def reprocess_documents():
         print(f"Found {len(documents)} documents to reprocess")
 
         for i, doc in enumerate(documents, 1):
-            print(
-                f"\n📄 Reprocessing document {i}/{len(documents)}: {doc.filename[:50]}..."
-            )
+            print(f"\n📄 Reprocessing document {i}/{len(documents)}: {doc.filename[:50]}...")
 
             # Check if document file exists
             if not Path(doc.filepath).exists():
@@ -48,9 +46,7 @@ def reprocess_documents():
                         f"  ✅ Successfully reprocessed: {result.get('chunks_created', 0)} chunks"
                     )
                 else:
-                    print(
-                        f"  ❌ Failed to reprocess: {result.get('error', 'Unknown error')}"
-                    )
+                    print(f"  ❌ Failed to reprocess: {result.get('error', 'Unknown error')}")
 
             except Exception as e:
                 print(f"  ❌ Error reprocessing: {e}")

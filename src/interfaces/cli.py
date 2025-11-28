@@ -4,21 +4,24 @@ Enhanced CLI for the Local RAG System
 Modern, user-friendly command-line interface with rich features
 """
 
+import os
 import sys
 import time
-import os
 from pathlib import Path
 from typing import Optional
 
+from .document_processor import DocumentProcessor
+from .rag_pipeline_db import RAGPipelineDB, format_answer_db, format_results_db
+from .retrieval_db import DatabaseRetriever
+
 # Note: This script must be run as a module: python -m src.app
 
-from .retrieval_db import DatabaseRetriever
-from .rag_pipeline_db import RAGPipelineDB, format_results_db, format_answer_db
-from .document_processor import DocumentProcessor
+
 try:
     from .cache.redis_cache import RedisCache
 except ImportError:
     RedisCache = None
+
 
 class RAGCLI:
     """Enhanced CLI for Local RAG System"""
@@ -31,20 +34,29 @@ class RAGCLI:
 
         # Language display names
         self.lang_names = {
-            'en': '🇺🇸 English', 'de': '🇩🇪 German', 'fr': '🇫🇷 French', 'es': '🇪🇸 Spanish',
-            'it': '🇮🇹 Italian', 'pt': '🇵🇹 Portuguese', 'nl': '🇳🇱 Dutch', 'sv': '🇸🇪 Swedish',
-            'pl': '🇵🇱 Polish', 'zh': '🇨🇳 Chinese', 'ja': '🇯🇵 Japanese', 'ko': '🇰🇷 Korean'
+            "en": "🇺🇸 English",
+            "de": "🇩🇪 German",
+            "fr": "🇫🇷 French",
+            "es": "🇪🇸 Spanish",
+            "it": "🇮🇹 Italian",
+            "pt": "🇵🇹 Portuguese",
+            "nl": "🇳🇱 Dutch",
+            "sv": "🇸🇪 Swedish",
+            "pl": "🇵🇱 Polish",
+            "zh": "🇨🇳 Chinese",
+            "ja": "🇯🇵 Japanese",
+            "ko": "🇰🇷 Korean",
         }
 
     def print_header(self):
         """Print application header"""
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("🤖 LOCAL RAG SYSTEM - Command Line Interface")
-        print("="*70)
+        print("=" * 70)
         print("🔍 Intelligent document search and AI-powered Q&A")
         print("🌍 12-language multilingual support with smart detection")
         print("⚡ Redis caching for lightning-fast responses")
-        print("="*70)
+        print("=" * 70)
 
     def print_menu(self):
         """Print main menu"""
@@ -88,22 +100,22 @@ class RAGCLI:
         if not self.initialize_components():
             return
 
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("🎯 SMART SEARCH MODE")
-        print("="*50)
+        print("=" * 50)
         print("Intelligent search that boosts results based on document topic relevance")
         print("Documents with matching topics get higher relevance scores")
         print("Type 'quit' or 'exit' to return to main menu")
         print("Type 'help' for commands")
-        print("-"*50)
+        print("-" * 50)
 
         while True:
             try:
                 query = input("\n🎯 Query: ").strip()
 
-                if query.lower() in ['quit', 'exit', 'q']:
+                if query.lower() in ["quit", "exit", "q"]:
                     break
-                elif query.lower() == 'help':
+                elif query.lower() == "help":
                     self.show_topic_aware_help()
                     continue
                 elif not query:
@@ -124,7 +136,7 @@ class RAGCLI:
                 if results:
                     print(f"\n📊 Found {len(results)} relevant document chunks")
                     # Show topic boost information
-                    boosted_count = sum(1 for r in results if r.get('topic_boost', 0) > 0)
+                    boosted_count = sum(1 for r in results if r.get("topic_boost", 0) > 0)
                     if boosted_count > 0:
                         print(f"🎯 {boosted_count} results boosted by topic relevance")
 
@@ -136,9 +148,9 @@ class RAGCLI:
 
     def rag_mode(self):
         """Interactive RAG mode with AI generation"""
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("🤖 RAG MODE - AI-Powered Answers")
-        print("="*50)
+        print("=" * 50)
 
         # Initialize RAG pipeline
         if not self.rag_pipeline:
@@ -155,15 +167,15 @@ class RAGCLI:
         print("Ask questions in any language - AI will respond accordingly")
         print("Type 'quit' or 'exit' to return to main menu")
         print("Type 'help' for commands")
-        print("-"*50)
+        print("-" * 50)
 
         while True:
             try:
                 question = input("\n❓ Question: ").strip()
 
-                if question.lower() in ['quit', 'exit', 'q']:
+                if question.lower() in ["quit", "exit", "q"]:
                     break
-                elif question.lower() == 'help':
+                elif question.lower() == "help":
                     self.show_rag_help()
                     continue
                 elif not question:
@@ -176,28 +188,32 @@ class RAGCLI:
                 response_time = time.time() - start_time
 
                 # Show language detection
-                query_lang = result.get('query_language', 'unknown')
-                if query_lang != 'unknown':
+                query_lang = result.get("query_language", "unknown")
+                if query_lang != "unknown":
                     lang_display = self.lang_names.get(query_lang, f"🌍 {query_lang.upper()}")
                     print(f"   {lang_display}")
 
                 print(".2f")
-                print(format_answer_db(result['answer']))
+                print(format_answer_db(result["answer"]))
 
                 # Show source documents
-                if 'retrieved_documents' in result and result['retrieved_documents']:
+                if "retrieved_documents" in result and result["retrieved_documents"]:
                     print("\n📚 Source Documents Used:")
                     doc_sources = {}
-                    for doc in result['retrieved_documents']:
-                        doc_info = doc.get('document', {})
-                        filename = doc_info.get('filename', 'Unknown')
+                    for doc in result["retrieved_documents"]:
+                        doc_info = doc.get("document", {})
+                        filename = doc_info.get("filename", "Unknown")
                         if filename not in doc_sources:
-                            doc_sources[filename] = {'count': 0, 'score': 0}
-                        doc_sources[filename]['count'] += 1
-                        doc_sources[filename]['score'] = max(doc_sources[filename]['score'], doc.get('score', 0))
+                            doc_sources[filename] = {"count": 0, "score": 0}
+                        doc_sources[filename]["count"] += 1
+                        doc_sources[filename]["score"] = max(
+                            doc_sources[filename]["score"], doc.get("score", 0)
+                        )
 
                     for i, (filename, info) in enumerate(doc_sources.items(), 1):
-                        print(f"  {i}. 📄 {filename} (chunks: {info['count']}, relevance: {info['score']:.3f})")
+                        print(
+                            f"  {i}. 📄 {filename} (chunks: {info['count']}, relevance: {info['score']:.3f})"
+                        )
 
             except KeyboardInterrupt:
                 print("\n👋 Returning to main menu...")
@@ -210,9 +226,9 @@ class RAGCLI:
         if not self.initialize_components():
             return
 
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("📁 DOCUMENT PROCESSING")
-        print("="*50)
+        print("=" * 50)
 
         try:
             print("🔄 Processing existing documents...")
@@ -232,25 +248,31 @@ class RAGCLI:
 
     def show_system_status(self):
         """Show system health and metrics"""
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("📊 SYSTEM STATUS")
-        print("="*50)
+        print("=" * 50)
 
         # Initialize components if not already done
-        if not hasattr(self, 'cache') or self.cache is None:
+        if not hasattr(self, "cache") or self.cache is None:
             self.initialize_components()
 
         # Database status
         try:
-            from .database.models import SessionLocal, Document, DocumentChunk
             from sqlalchemy import func
+
+            from .database.models import Document, DocumentChunk, SessionLocal
+
             db = SessionLocal()
 
             # Get counts with optimized query
-            result = db.query(
-                func.count(Document.id).label('doc_count'),
-                func.count(DocumentChunk.id).label('chunk_count')
-            ).outerjoin(DocumentChunk).first()
+            result = (
+                db.query(
+                    func.count(Document.id).label("doc_count"),
+                    func.count(DocumentChunk.id).label("chunk_count"),
+                )
+                .outerjoin(DocumentChunk)
+                .first()
+            )
 
             doc_count = result.doc_count if result else 0
             chunk_count = result.chunk_count if result else 0
@@ -266,7 +288,10 @@ class RAGCLI:
         # Elasticsearch status
         try:
             from elasticsearch import Elasticsearch
-            es = Elasticsearch(hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}], verify_certs=False)
+
+            es = Elasticsearch(
+                hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}], verify_certs=False
+            )
             if es.ping():
                 print("🔍 Elasticsearch: ✅ Connected")
             else:
@@ -291,22 +316,23 @@ class RAGCLI:
         # Batch processing status
         try:
             from .retrieval_db import DatabaseRetriever
+
             temp_retriever = DatabaseRetriever()
             batch_stats = temp_retriever.get_batch_stats()
             if batch_stats:
-                device = batch_stats.get('device', 'unknown').upper()
-                if device == 'MPS':
-                    device_icon = '🍎'
-                elif device == 'CUDA':
-                    device_icon = '🖥️'
+                device = batch_stats.get("device", "unknown").upper()
+                if device == "MPS":
+                    device_icon = "🍎"
+                elif device == "CUDA":
+                    device_icon = "🖥️"
                 else:
-                    device_icon = '💻'
+                    device_icon = "💻"
 
                 print(f"🚀 Batch Processing: ✅ Active ({device_icon} {device})")
-                total_queries = batch_stats.get('total_queries', 0)
+                total_queries = batch_stats.get("total_queries", 0)
                 if total_queries > 0:
-                    avg_time = batch_stats.get('avg_processing_time', 0)
-                    gpu_util = batch_stats.get('gpu_utilization', 0)
+                    avg_time = batch_stats.get("avg_processing_time", 0)
+                    gpu_util = batch_stats.get("gpu_utilization", 0)
                     print(f"   📊 Processed: {total_queries} queries")
                     print(f"   ⏱️  Avg time: {avg_time:.3f}s")
                     print(f"   🎯 GPU util: {gpu_util:.1%}")
@@ -320,12 +346,15 @@ class RAGCLI:
         # Ollama status
         try:
             import requests
+
             response = requests.get("http://localhost:11434/api/tags", timeout=2)
             if response.status_code == 200:
-                models = response.json().get('models', [])
-                model_names = [m['name'] for m in models]
+                models = response.json().get("models", [])
+                model_names = [m["name"] for m in models]
                 print("🤖 Ollama Status:")
-                print(f"   📋 Available models: {', '.join(model_names) if model_names else 'None'}")
+                print(
+                    f"   📋 Available models: {', '.join(model_names) if model_names else 'None'}"
+                )
                 print("   ✅ Connected")
             else:
                 print("🤖 Ollama: ❌ Not responding")
@@ -336,9 +365,9 @@ class RAGCLI:
 
     def show_settings(self):
         """Show and allow configuration of system settings"""
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("⚙️  SYSTEM SETTINGS")
-        print("="*50)
+        print("=" * 50)
 
         print("Current configuration:")
         print("📊 Retrieval Settings:")
@@ -360,11 +389,12 @@ class RAGCLI:
 
     def show_help(self):
         """Show detailed help information"""
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("🆘 HELP - Local RAG System CLI")
-        print("="*70)
+        print("=" * 70)
 
-        print("""
+        print(
+            """
 MODES:
    1. Smart Search        - Intelligent search with topic relevance boosting
    2. RAG Mode            - AI-powered answers with source citations
@@ -401,11 +431,13 @@ TROUBLESHOOTING:
   • Ollama errors: Run 'ollama serve' and pull models
   • Slow responses: Reduce chunk size or k-value in settings
   • Memory issues: Use smaller models or reduce batch size
-        """)
+        """
+        )
 
     def show_topic_aware_help(self):
         """Show help for smart search mode"""
-        print("""
+        print(
+            """
 🎯 SMART SEARCH COMMANDS:
    • Type any question to search with intelligent topic relevance boosting
    • 'quit' or 'exit' - Return to main menu
@@ -420,11 +452,13 @@ TROUBLESHOOTING:
    • Works best with AI-enriched documents (processed with topic extraction)
    • Try specific topic-related queries for best results
    • Results show topic boost indicators for enhanced relevance
-        """)
+        """
+        )
 
     def show_rag_help(self):
         """Show help for RAG mode"""
-        print("""
+        print(
+            """
 🤖 RAG MODE COMMANDS:
    • Type any question for AI-powered answers
    • 'quit' or 'exit' - Return to main menu
@@ -439,7 +473,8 @@ TROUBLESHOOTING:
    • Documents used are listed with relevance scores
    • Multiple chunks from same document are grouped
    • Higher scores = more relevant information
-        """)
+        """
+        )
 
     def run(self):
         """Main application loop"""
@@ -475,6 +510,7 @@ TROUBLESHOOTING:
             except Exception as e:
                 print(f"❌ Unexpected error: {e}")
 
+
 def main():
     """Main entry point"""
     try:
@@ -485,6 +521,7 @@ def main():
     except Exception as e:
         print(f"❌ Fatal error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
