@@ -172,8 +172,26 @@ jobs:
         echo "✅ Security scans completed"
         echo "✅ Documentation validated"
 
-  # CodeQL Analysis (existing)
+  # Security Analysis - CodeQL
   codeql:
-    name: CodeQL Analysis
-    uses: exploreborders/ci_templates/.github/workflows/codeql-analysis.yml@main
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
     needs: validate
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: python
+        queries: security-and-quality
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:python"

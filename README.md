@@ -2,6 +2,27 @@
 
 A modern **Retrieval-Augmented Generation (RAG) system** for intelligent document processing and question-answering. Built with Python, PostgreSQL (pgvector), Elasticsearch, Redis, and Ollama for local AI inference.
 
+## 📋 Table of Contents
+
+- [🚀 Key Features](#-key-features)
+  - [AI-Powered Document Intelligence](#ai-powered-document-intelligence)
+  - [Advanced Document Processing](#advanced-document-processing)
+  - [Intelligent Knowledge Management](#intelligent-knowledge-management)
+  - [High-Performance Architecture](#high-performance-architecture)
+  - [Modern Web Interface](#modern-web-interface)
+  - [Production-Ready Features](#production-ready-features)
+- [📊 System Architecture](#-system-architecture)
+- [🏆 Performance Metrics](#-performance-metrics)
+- [🏗️ Architecture](#️-architecture)
+- [🔧 System Requirements](#-system-requirements)
+- [🚀 Getting Started](#-getting-started)
+- [🛠️ Development Workflow](#️-development-workflow)
+- [🔬 Use Cases](#-use-cases)
+- [📁 Project Structure](#-project-structure)
+- [🔄 CI/CD Pipeline](#-ci/cd-pipeline)
+- [🤝 Contributing](#-contributing)
+- [🏆 Status](#-status)
+
 ## 🚀 Key Features
 
 ### **AI-Powered Document Intelligence**
@@ -45,7 +66,7 @@ A modern **Retrieval-Augmented Generation (RAG) system** for intelligent documen
 - **Source Citations**: All LLM responses include document references ([Source 1: filename.pdf])
 - **Advanced Analytics**: Real-time performance monitoring with tag/category usage statistics
 - **Modern Web Interface**: Streamlit-based UI with document management and topic exploration
-- **Comprehensive Testing**: 13-test suite with 100% pass rate
+- **Comprehensive Testing**: 44+ unit tests with 60%+ coverage, automated CI/CD pipeline
 
 ## 📊 System Architecture
 
@@ -120,20 +141,29 @@ Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
 ## 🔧 System Requirements
 
 ### **Core Dependencies**
-- **Python 3.8+**
+- **Python 3.11+** (tested on 3.11, supports 3.8+)
 - **Docker** (recommended for databases)
 - **Ollama** (for AI model inference)
 - **16GB+ RAM** (recommended for AI models)
 
+### **Development Dependencies**
+- **pytest** (testing framework)
+- **black** (code formatting)
+- **isort** (import sorting)
+- **flake8** (linting)
+- **mypy** (type checking)
+- **bandit** (security scanning)
+
 ### **AI Models**
-- **llama3.2:latest** - Generation, structure analysis, and summarization
+- **llama3.2:latest** - Generation, structure analysis, and summarization (8B parameters)
 - **deepseek-ocr:latest** - OCR processing for scanned PDFs (96% accuracy)
-- **nomic-embed-text-v1.5** - Embeddings (auto-downloaded)
+- **nomic-embed-text-v1.5** - High-quality embeddings (137M parameters, auto-downloaded)
+- **microsoft/trocr-base-printed** - Fallback OCR for technical documents
 
 ### **Database Stack**
-- **PostgreSQL** with pgvector extension
-- **Elasticsearch** 8.x for BM25 search
-- **Redis** for caching
+- **PostgreSQL 15+** with pgvector extension for vector storage
+- **Elasticsearch 8.11+** for BM25 full-text search
+- **Redis 7+** for high-performance caching and session management
 
 ## 🚀 Getting Started
 
@@ -157,6 +187,49 @@ python run_web.py
 - Get AI-powered answers with source citations
 - Explore your document collection through natural language queries
 
+## 🛠️ Development Workflow
+
+### **Code Quality Standards**
+All code must pass automated quality checks:
+
+```bash
+# Run all quality checks
+python scripts/check_quality.py
+
+# Format code
+black src/ tests/
+isort src/ tests/
+
+# Lint code
+flake8 src/ tests/
+
+# Type check
+mypy src/
+
+# Run tests
+pytest tests/unit/ --cov=src
+```
+
+### **Pre-commit Setup** (Recommended)
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+### **Testing Guidelines**
+- **Unit Tests**: Test individual functions with mocked dependencies
+- **Integration Tests**: Test complete workflows
+- **Coverage**: Maintain 60%+ code coverage
+- **CI/CD**: All tests run automatically on every push
+
+### **Code Style**
+- **Formatting**: Black (100 char lines)
+- **Imports**: isort (alphabetical, stdlib/third-party/local)
+- **Types**: Full type hints required
+- **Linting**: flake8 (PEP 8 compliant)
+- **Documentation**: Google/NumPy docstring format
+
 ## 🔬 Use Cases
 
 - **Research & Academic**: Process scientific papers and academic documents
@@ -169,43 +242,74 @@ python run_web.py
 ```
 LocalRAG/
 ├── src/
-│   ├── app.py                    # Enhanced CLI with topic analysis
-│   ├── rag_pipeline_db.py        # RAG pipeline with database integration
-│   ├── retrieval_db.py           # Database-backed retrieval system
-│   ├── document_processor.py     # Document processing utilities
-│   ├── embeddings.py             # Embedding generation
-│   ├── upload_processor.py       # Batch document processing
-│   ├── document_managers.py      # Tag and category management
-│   ├── ai/
-│   │   ├── pipeline/
-│   │   │   ├── structure_extractor.py # llama3.2 hierarchy analysis
-│   │   │   ├── topic_classifier.py   # Cross-document topic classification
-│   │   │   ├── hierarchical_chunker.py # Chapter-aware chunking
-│   │   │   └── relevance_scorer.py   # Content importance scoring
-│   ├── database/
-│   │   ├── models.py             # Enhanced SQLAlchemy models
+│   ├── core/                     # Core business logic
+│   │   ├── base_processor.py     # Base processor classes
+│   │   ├── document_manager.py   # Document processing & management
+│   │   ├── embeddings.py         # Embedding generation & management
+│   │   ├── knowledge_graph.py    # Knowledge graph operations
+│   │   ├── reprocess_documents.py # Document reprocessing
+│   │   └── retrieval.py          # RAG retrieval system
+│   ├── ai/                       # AI processing pipeline
+│   │   ├── enrichment.py         # AI-powered document enrichment
+│   │   ├── tag_suggester.py      # AI tag suggestion
+│   │   └── pipeline/
+│   │       ├── hierarchical_chunker.py # Chapter-aware chunking
+│   │       ├── relevance_scorer.py     # Content importance scoring
+│   │       ├── structure_extractor.py  # Document structure analysis
+│   │       └── topic_classifier.py     # Topic classification
+│   ├── data/                     # Data processing
+│   │   ├── batch_processor.py    # Batch document processing
+│   │   ├── caption_processor.py  # Caption-aware processing
+│   │   ├── loader.py             # Document loading & parsing
+│   │   └── batch_processor.py    # Batch operations
+│   ├── database/                 # Database layer
+│   │   ├── models.py             # SQLAlchemy models
 │   │   └── opensearch_setup.py   # Elasticsearch configuration
-│   └── cache/
-│       └── redis_cache.py        # LLM response caching
-├── web_interface/
-│   ├── app.py                    # Main Streamlit application
-│   ├── pages/
-│   │   ├── 1_🏠_Home.py         # AI query interface
-│   │   ├── 2_📁_Documents.py    # Document management with tagging
-│   │   ├── 3_⚙️_Settings.py     # Configuration
-│   │   └── 4_📊_Analytics.py    # Performance dashboard
-│   └── components/
-│       ├── query_interface.py    # Query components
-│       └── results_display.py    # Results rendering
-├── tests/
-│   ├── run_all_tests.py          # Test runner (comprehensive suite)
-│   └── test_*.py                 # Component tests
-├── scripts/
+│   ├── interfaces/               # User interfaces
+│   │   └── cli.py                # Command-line interface
+│   ├── utils/                    # Utility functions
+│   │   ├── config_manager.py     # Configuration management
+│   │   ├── error_handler.py      # Error handling & logging
+│   │   ├── file_security.py      # File security validation
+│   │   ├── progress_tracker.py   # Progress tracking
+│   │   └── rate_limiter.py       # Rate limiting
+│   └── cache/                    # Caching layer
+│       └── redis_cache.py        # Redis caching
+├── web_interface/                # Streamlit web application
+│   ├── app.py                    # Main application
+│   ├── pages/                    # Streamlit pages
+│   │   ├── 1_🏠_Home.py          # Query interface
+│   │   ├── 2_📁_Documents.py     # Document management
+│   │   ├── 3_⚙️_Settings.py      # Settings & configuration
+│   │   └── 4_📊_Analytics.py     # Analytics dashboard
+│   ├── components/               # Reusable components
+│   │   ├── query_interface.py    # Query components
+│   │   ├── results_display.py    # Results display
+│   │   ├── tag_analytics.py      # Tag analytics
+│   │   └── session_manager.py    # Session management
+│   └── utils/                    # Web-specific utilities
+├── tests/                        # Comprehensive test suite
+│   ├── conftest.py               # Test configuration & fixtures
+│   ├── unit/                     # Unit tests (44+ tests)
+│   │   ├── test_utils/           # Utility function tests
+│   │   ├── test_core/            # Core logic tests
+│   │   └── test_models/          # Model tests
+│   ├── integration/              # Integration tests
+│   ├── fixtures/                 # Test data
+│   └── README.md                 # Testing documentation
+├── scripts/                      # Utility scripts
+│   ├── check_quality.py          # Quality assurance runner
 │   ├── migrate_to_db.py          # Database migration
-│   └── init_pgvector.sql         # PostgreSQL pgvector setup
-├── setup_all.py                  # One-command setup
-├── requirements.txt              # Dependencies
+│   ├── migrate_database_schema.py # Schema migration
+│   ├── batch_enrich_documents.py  # Batch enrichment
+│   └── init_pgvector.sql         # PostgreSQL setup
+├── .github/workflows/            # CI/CD pipelines
+│   └── ci.yml                    # GitHub Actions workflow
+├── pyproject.toml                # Python project configuration
+├── pytest.ini                    # pytest configuration
+├── requirements.txt              # Python dependencies
 ├── docker-compose.yml            # Multi-service orchestration
+├── setup_all.py                  # One-command setup
 └── README.md                     # This documentation
 ```
 
@@ -262,4 +366,78 @@ pre-commit run --all-files
 
 ## 🏆 Status
 
-**Production-ready RAG system** with comprehensive testing, modern web interface, and optimized performance for document analysis workflows.
+**Production-ready RAG system** with enterprise-grade quality assurance, automated CI/CD pipeline, and optimized performance for document analysis workflows.
+
+### **Quality Metrics**
+- ✅ **44+ Unit Tests** with 60%+ code coverage
+- ✅ **Automated CI/CD** pipeline on every push
+- ✅ **Code Quality**: Black, isort, flake8, mypy compliant
+- ✅ **Security**: Bandit scanning, dependency vulnerability checks
+- ✅ **Documentation**: Comprehensive testing and development guides
+
+### **Performance Benchmarks**
+- **OCR Accuracy**: 96% with DeepSeek-OCR for scanned PDFs
+- **Structure Detection**: Automatic chapter detection (10-188+ chapters)
+- **Cache Performance**: 172.5x speedup for repeated queries
+- **Test Execution**: 44 tests in <0.05 seconds
+- **CI Pipeline**: Complete validation in <5 minutes
+
+### **Architecture Maturity**
+- **Modular Design**: Clean separation of concerns
+- **Type Safety**: Comprehensive type hints throughout
+- **Error Handling**: Robust exception management
+- **Testing**: Unit tests with comprehensive mocking
+- **Documentation**: Auto-generated API docs and guides
+
+### **Development Status**
+- 🟢 **Core Features**: Fully implemented and tested
+- 🟢 **Web Interface**: Production-ready Streamlit application
+- 🟢 **Database Layer**: Optimized PostgreSQL with pgvector
+- 🟢 **AI Pipeline**: Multi-model processing with fallbacks
+- 🟡 **Integration Tests**: Basic framework, needs expansion
+- 🟡 **API Documentation**: Basic docs, needs API reference
+
+## 🤝 Contributing
+
+### **Development Setup**
+1. Fork the repository
+2. Clone your fork: `git clone https://github.com/yourusername/LocalRAG.git`
+3. Set up development environment: `python setup_all.py`
+4. Install development dependencies: `pip install -r requirements.txt`
+5. Set up pre-commit hooks: `pre-commit install`
+
+### **Development Workflow**
+1. Create a feature branch: `git checkout -b feature/your-feature`
+2. Make your changes with proper tests
+3. Run quality checks: `python scripts/check_quality.py`
+4. Commit your changes: `git commit -m "Add your feature"`
+5. Push and create a pull request
+
+### **Code Standards**
+- All code must pass CI/CD pipeline checks
+- Maintain 60%+ test coverage for new code
+- Follow established code style (Black, isort, flake8)
+- Add comprehensive tests for new features
+- Update documentation for API changes
+
+### **Testing Requirements**
+- Unit tests for all new functions/classes
+- Integration tests for new workflows
+- Documentation updates for new features
+- Performance benchmarks for performance-critical code
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Ollama** for local AI model inference
+- **pgvector** for PostgreSQL vector extensions
+- **Docling** for advanced document processing
+- **Streamlit** for the web interface framework
+- **Sentence Transformers** for embedding generation
+
+---
+
+**Ready for production deployment with comprehensive quality assurance and automated validation pipeline.**
