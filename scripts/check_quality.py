@@ -40,6 +40,8 @@ def main():
         sys.exit(1)
 
     checks = [
+        # Workflow validation
+        ("python scripts/validate_workflow.py", "CI/CD workflow validation"),
         # Code formatting
         ("black --check --diff src/ tests/", "Code formatting (Black)"),
         ("isort --check-only --diff src/ tests/", "Import sorting (isort)"),
@@ -50,12 +52,12 @@ def main():
         ),
         # Type checking (allow to fail for now)
         (
-            "mypy src/ --ignore-missing-imports --no-strict-optional || echo 'MyPy found issues'",
+            "mypy src/ --ignore-missing-imports --no-strict-optional || echo 'MyPy found type issues'",
             "Type checking (mypy)",
         ),
         # Unit tests
         (
-            "python -m pytest tests/unit/ -v --tb=short --cov=src --cov-report=term-missing",
+            "pytest tests/unit/ -v --tb=short --cov=src --cov-report=term-missing",
             "Unit tests",
         ),
         # Security checks
