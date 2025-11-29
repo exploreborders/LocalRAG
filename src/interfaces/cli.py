@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from .document_processor import DocumentProcessor
+from src.core.processing.document_processor import DocumentProcessor
 from .rag_pipeline_db import RAGPipelineDB, format_answer_db, format_results_db
 from .retrieval_db import DatabaseRetriever
 
@@ -61,7 +61,9 @@ class RAGCLI:
     def print_menu(self):
         """Print main menu"""
         print("\n📋 Available Modes:")
-        print("  1. 🎯 Smart Search      - Intelligent search with topic relevance boosting")
+        print(
+            "  1. 🎯 Smart Search      - Intelligent search with topic relevance boosting"
+        )
         print("  2. 🤖 Full RAG Mode     - AI-powered answers (requires Ollama)")
         print("  3. 📁 Process Documents - Batch process existing files")
         print("  4. 📊 System Status     - Show system health and metrics")
@@ -103,7 +105,9 @@ class RAGCLI:
         print("\n" + "=" * 50)
         print("🎯 SMART SEARCH MODE")
         print("=" * 50)
-        print("Intelligent search that boosts results based on document topic relevance")
+        print(
+            "Intelligent search that boosts results based on document topic relevance"
+        )
         print("Documents with matching topics get higher relevance scores")
         print("Type 'quit' or 'exit' to return to main menu")
         print("Type 'help' for commands")
@@ -136,7 +140,9 @@ class RAGCLI:
                 if results:
                     print(f"\n📊 Found {len(results)} relevant document chunks")
                     # Show topic boost information
-                    boosted_count = sum(1 for r in results if r.get("topic_boost", 0) > 0)
+                    boosted_count = sum(
+                        1 for r in results if r.get("topic_boost", 0) > 0
+                    )
                     if boosted_count > 0:
                         print(f"🎯 {boosted_count} results boosted by topic relevance")
 
@@ -190,7 +196,9 @@ class RAGCLI:
                 # Show language detection
                 query_lang = result.get("query_language", "unknown")
                 if query_lang != "unknown":
-                    lang_display = self.lang_names.get(query_lang, f"🌍 {query_lang.upper()}")
+                    lang_display = self.lang_names.get(
+                        query_lang, f"🌍 {query_lang.upper()}"
+                    )
                     print(f"   {lang_display}")
 
                 print(".2f")
@@ -290,7 +298,8 @@ class RAGCLI:
             from elasticsearch import Elasticsearch
 
             es = Elasticsearch(
-                hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}], verify_certs=False
+                hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}],
+                verify_certs=False,
             )
             if es.ping():
                 print("🔍 Elasticsearch: ✅ Connected")
