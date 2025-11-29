@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from src.core.base_processor import BaseProcessor
+from src.core.embeddings import create_embeddings
 from src.core.processing.document_processor import DocumentProcessor
 from src.database.models import (
     Document,
@@ -25,7 +26,6 @@ from src.database.models import (
     DocumentTagAssignment,
     SessionLocal,
 )
-from src.core.embeddings import create_embeddings
 from src.utils.content_validator import ContentValidator
 
 logger = logging.getLogger(__name__)
@@ -80,15 +80,11 @@ class UploadProcessor(BaseProcessor):
 
                     if progress_callback:
                         progress = (i + 1) / total_files * 100
-                        progress_callback(
-                            progress, f"Processed {i + 1}/{total_files} files"
-                        )
+                        progress_callback(progress, f"Processed {i + 1}/{total_files} files")
 
                 except Exception as e:
                     logger.error(f"Failed to process {file_path}: {e}")
-                    results.append(
-                        {"file_path": file_path, "success": False, "error": str(e)}
-                    )
+                    results.append({"file_path": file_path, "success": False, "error": str(e)})
 
         # Summarize results
         successful = sum(1 for r in results if r.get("success", False))
@@ -137,9 +133,7 @@ class UploadProcessor(BaseProcessor):
             if filename and file_hash:
                 existing_doc = (
                     self.db.query(Document)
-                    .filter(
-                        Document.filename == filename, Document.file_hash == file_hash
-                    )
+                    .filter(Document.filename == filename, Document.file_hash == file_hash)
                     .first()
                 )
 
@@ -160,9 +154,7 @@ class UploadProcessor(BaseProcessor):
                 from src.data.loader import AdvancedDocumentProcessor
 
                 advanced_processor = AdvancedDocumentProcessor()
-                processing_result = advanced_processor.process_document_comprehensive(
-                    file_path
-                )
+                processing_result = advanced_processor.process_document_comprehensive(file_path)
 
                 # Check if processing was successful
                 if processing_result is None:
@@ -206,9 +198,7 @@ class UploadProcessor(BaseProcessor):
             if result.get("success"):
                 # DocumentProcessor already stored the document, just format the result
                 result["chunks_created"] = result.get("chunks_count", 0)
-                result["chapters_created"] = (
-                    0  # DocumentProcessor doesn't create chapters yet
-                )
+                result["chapters_created"] = 0  # DocumentProcessor doesn't create chapters yet
                 result["filename"] = filename
 
             return result
@@ -239,9 +229,7 @@ class UploadProcessor(BaseProcessor):
         """
         # Validate processing_result
         if processing_result is None:
-            logger.error(
-                f"Cannot reprocess document {existing_doc.id} - processing_result is None"
-            )
+            logger.error(f"Cannot reprocess document {existing_doc.id} - processing_result is None")
             return {
                 "success": False,
                 "filename": existing_doc.filename,
@@ -269,9 +257,7 @@ class UploadProcessor(BaseProcessor):
             extracted_content = processing_result.get("extracted_content", "")
             chunks = processing_result.get("chunks", [])
 
-            validation_result = ContentValidator.validate_content_quality(
-                extracted_content, chunks
-            )
+            validation_result = ContentValidator.validate_content_quality(extracted_content, chunks)
 
             # Log validation results and handle quality issues
             if not validation_result["is_valid"]:
@@ -284,9 +270,7 @@ class UploadProcessor(BaseProcessor):
                 # Add quality issues to processing result for user feedback
                 processing_result["quality_issues"] = validation_result["issues"]
                 processing_result["quality_score"] = validation_result["quality_score"]
-                processing_result["quality_recommendations"] = validation_result[
-                    "recommendations"
-                ]
+                processing_result["quality_recommendations"] = validation_result["recommendations"]
 
             # Update document metadata
             existing_doc.last_modified = datetime.now()
@@ -345,9 +329,7 @@ class UploadProcessor(BaseProcessor):
                         tag = doc_processor.tag_manager.get_tag_by_name(tag_name)
                         if not tag:
                             tag = doc_processor.tag_manager.create_tag(tag_name)
-                        doc_processor.tag_manager.add_tag_to_document(
-                            existing_doc.id, tag.id
-                        )
+                        doc_processor.tag_manager.add_tag_to_document(existing_doc.id, tag.id)
 
                 # Add new categories
                 for category_name in suggested_categories:
@@ -356,18 +338,14 @@ class UploadProcessor(BaseProcessor):
                             category_name
                         )
                         if not category:
-                            category = doc_processor.category_manager.create_category(
-                                category_name
-                            )
+                            category = doc_processor.category_manager.create_category(category_name)
                         doc_processor.category_manager.add_category_to_document(
                             existing_doc.id, category.id
                         )
 
             # Update other fields if available
             if "reading_time_minutes" in processing_result:
-                existing_doc.reading_time_minutes = processing_result[
-                    "reading_time_minutes"
-                ]
+                existing_doc.reading_time_minutes = processing_result["reading_time_minutes"]
             if "author" in processing_result:
                 existing_doc.author = processing_result["author"]
             if "publication_date" in processing_result:
@@ -402,10 +380,7 @@ class UploadProcessor(BaseProcessor):
             chunks_created = 0
             chapters_created = 0
 
-            if (
-                "chunks" in processing_result
-                and processing_result["chunks"] is not None
-            ):
+            if "chunks" in processing_result and processing_result["chunks"] is not None:
                 chunks_list = processing_result["chunks"]
                 if isinstance(chunks_list, list):
                     for i, chunk_data in enumerate(chunks_list):
@@ -431,10 +406,7 @@ class UploadProcessor(BaseProcessor):
                             self.db.add(chunk)
                             chunks_created += 1
 
-            if (
-                "chapters" in processing_result
-                and processing_result["chapters"] is not None
-            ):
+            if "chapters" in processing_result and processing_result["chapters"] is not None:
                 chapters_list = processing_result["chapters"]
                 if isinstance(chapters_list, list):
                     for i, chapter_data in enumerate(chapters_list):
@@ -442,18 +414,14 @@ class UploadProcessor(BaseProcessor):
                             chapter = DocumentChapter(
                                 document_id=existing_doc.id,
                                 chapter_title=chapter_data["title"],
-                                chapter_path=chapter_data.get(
-                                    "path", f"chapter_{i + 1}"
-                                ),
+                                chapter_path=chapter_data.get("path", f"chapter_{i + 1}"),
                                 level=chapter_data.get("level", 1),
                                 word_count=chapter_data.get(
                                     "word_count", len(chapter_data["title"].split())
                                 ),
                                 content=chapter_data.get(
                                     "content",
-                                    chapter_data.get(
-                                        "content_preview", chapter_data["title"]
-                                    ),
+                                    chapter_data.get("content_preview", chapter_data["title"]),
                                 ),
                             )
                             self.db.add(chapter)
@@ -525,9 +493,7 @@ class UploadProcessor(BaseProcessor):
                         )
                         # Continue with next batch
 
-                logger.info(
-                    f"Completed embedding creation for document {existing_doc.id}"
-                )
+                logger.info(f"Completed embedding creation for document {existing_doc.id}")
 
                 # Commit embeddings to database before indexing
                 self.db.commit()
@@ -545,9 +511,7 @@ class UploadProcessor(BaseProcessor):
                         all_embeddings.append(embedding_record.embedding)
 
                 if all_embeddings and len(all_embeddings) == len(chunks):
-                    logger.info(
-                        f"Indexing {len(all_embeddings)} chunks in Elasticsearch"
-                    )
+                    logger.info(f"Indexing {len(all_embeddings)} chunks in Elasticsearch")
                     try:
                         processor = DocumentProcessor()
                         processor._index_document(
@@ -555,17 +519,13 @@ class UploadProcessor(BaseProcessor):
                             [
                                 {
                                     "content": chunk.content,
-                                    "metadata": {
-                                        "word_count": len(chunk.content.split())
-                                    },
+                                    "metadata": {"word_count": len(chunk.content.split())},
                                 }
                                 for chunk in chunks
                             ],
                             all_embeddings,
                         )
-                        logger.info(
-                            f"Successfully indexed document {existing_doc.id} in search"
-                        )
+                        logger.info(f"Successfully indexed document {existing_doc.id} in search")
                     except Exception as index_error:
                         logger.error(
                             f"Failed to index document {existing_doc.id} in search: {index_error}"
