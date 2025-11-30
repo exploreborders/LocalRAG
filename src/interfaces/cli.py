@@ -12,14 +12,18 @@ from typing import Optional
 
 from src.core.processing.document_processor import DocumentProcessor
 
-from .rag_pipeline_db import RAGPipelineDB, format_answer_db, format_results_db
-from .retrieval_db import DatabaseRetriever
+from src.core.retrieval import (
+    RAGPipelineDB,
+    format_answer_db,
+    format_results_db,
+    DatabaseRetriever,
+)
 
 # Note: This script must be run as a module: python -m src.app
 
 
 try:
-    from .cache.redis_cache import RedisCache
+    from src.cache.redis_cache import RedisCache
 except ImportError:
     RedisCache = None
 
@@ -261,7 +265,7 @@ class RAGCLI:
         try:
             from sqlalchemy import func
 
-            from .database.models import Document, DocumentChunk, SessionLocal
+            from src.database.models import Document, DocumentChunk, SessionLocal
 
             db = SessionLocal()
 
@@ -317,7 +321,7 @@ class RAGCLI:
 
         # Batch processing status
         try:
-            from .retrieval_db import DatabaseRetriever
+            from src.core.retrieval import DatabaseRetriever
 
             temp_retriever = DatabaseRetriever()
             batch_stats = temp_retriever.get_batch_stats()

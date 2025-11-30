@@ -42,51 +42,65 @@ class CategoryManager:
         name: str,
         description: Optional[str] = None,
         parent_id: Optional[int] = None,
-    ) -> DocumentCategory:
+    ) -> Optional[DocumentCategory]:
         """Create a new category."""
-        category = DocumentCategory(
-            name=name, description=description, parent_category_id=parent_id
-        )
-        self.db.add(category)
-        self.db.commit()
-        return category
+        try:
+            category = DocumentCategory(
+                name=name, description=description, parent_category_id=parent_id
+            )
+            self.db.add(category)
+            self.db.commit()
+            return category
+        except Exception as e:
+            self.db.rollback()
+            return None
 
     def add_category_to_document(self, document_id: int, category_id: int) -> bool:
         """Add a category to a document."""
-        # Check if assignment already exists
-        existing = (
-            self.db.query(DocumentCategoryAssignment)
-            .filter(
-                DocumentCategoryAssignment.document_id == document_id,
-                DocumentCategoryAssignment.category_id == category_id,
+        try:
+            # Check if assignment already exists
+            existing = (
+                self.db.query(DocumentCategoryAssignment)
+                .filter(
+                    DocumentCategoryAssignment.document_id == document_id,
+                    DocumentCategoryAssignment.category_id == category_id,
+                )
+                .first()
             )
-            .first()
-        )
 
-        if existing:
+            if existing:
+                return True
+
+            assignment = DocumentCategoryAssignment(
+                document_id=document_id, category_id=category_id
+            )
+            self.db.add(assignment)
+            self.db.commit()
             return True
-
-        assignment = DocumentCategoryAssignment(document_id=document_id, category_id=category_id)
-        self.db.add(assignment)
-        self.db.commit()
-        return True
+        except Exception as e:
+            self.db.rollback()
+            return False
 
     def remove_category_from_document(self, document_id: int, category_id: int) -> bool:
         """Remove a category from a document."""
-        assignment = (
-            self.db.query(DocumentCategoryAssignment)
-            .filter(
-                DocumentCategoryAssignment.document_id == document_id,
-                DocumentCategoryAssignment.category_id == category_id,
+        try:
+            assignment = (
+                self.db.query(DocumentCategoryAssignment)
+                .filter(
+                    DocumentCategoryAssignment.document_id == document_id,
+                    DocumentCategoryAssignment.category_id == category_id,
+                )
+                .first()
             )
-            .first()
-        )
 
-        if assignment:
-            self.db.delete(assignment)
-            self.db.commit()
-            return True
-        return False
+            if assignment:
+                self.db.delete(assignment)
+                self.db.commit()
+                return True
+            return False
+        except Exception as e:
+            self.db.rollback()
+            return False
 
     def get_document_categories(self, document_id: int) -> List[DocumentCategory]:
         """Get all categories for a document."""
@@ -191,6 +205,14 @@ class CategoryManager:
         """Delete a category and all its subcategories."""
 
         try:
+            # Check if the category exists
+            root_category = (
+                self.db.query(DocumentCategory).filter(DocumentCategory.id == category_id).first()
+            )
+
+            if not root_category:
+                return False
+
             # First, get all descendant categories (recursive deletion)
             def get_descendants(cat_id):
                 descendants = [cat_id]

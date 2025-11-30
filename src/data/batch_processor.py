@@ -101,9 +101,7 @@ class BatchEmbeddingService:
     def _initialize_model(self):
         """Initialize the embedding model with optimal settings"""
         if not TORCH_AVAILABLE:
-            raise ImportError(
-                "torch and sentence-transformers required for batch embedding"
-            )
+            raise ImportError("torch and sentence-transformers required for batch embedding")
 
         try:
             self.model = SentenceTransformer(
@@ -122,9 +120,7 @@ class BatchEmbeddingService:
                 # CUDA optimizations
                 self.max_batch_size = 16  # Larger batches for GPU memory
                 if torch.cuda.is_available():
-                    torch.cuda.set_per_process_memory_fraction(
-                        0.9
-                    )  # Use 90% of GPU memory
+                    torch.cuda.set_per_process_memory_fraction(0.9)  # Use 90% of GPU memory
                 print("🔧 Applied CUDA optimizations for NVIDIA GPU")
 
             print(f"✅ Batch embedding service initialized on {self.device.upper()}")
@@ -287,9 +283,7 @@ class BatchEmbeddingService:
 
             return np.array(embeddings)
 
-    async def _distribute_results(
-        self, batch: List[QueryRequest], embeddings: np.ndarray
-    ):
+    async def _distribute_results(self, batch: List[QueryRequest], embeddings: np.ndarray):
         """Distribute batch results to individual requesters"""
         for i, request in enumerate(batch):
             if i < len(embeddings):
