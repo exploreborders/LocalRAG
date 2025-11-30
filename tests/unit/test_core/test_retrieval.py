@@ -140,9 +140,7 @@ class TestRAGPipelineDB:
             mock_generate.return_value = "Generated answer"
 
             with patch.object(pipeline, "_format_sources") as mock_format:
-                mock_format.return_value = [
-                    {"title": "test", "content": "test content"}
-                ]
+                mock_format.return_value = [{"title": "test", "content": "test content"}]
 
                 result = pipeline.query("test question")
 

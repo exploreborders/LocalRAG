@@ -161,9 +161,7 @@ class TestReprocessDocuments:
         # Mock processors to raise errors
         mock_processor = MagicMock()
         mock_upload_processor_class.return_value = mock_processor
-        mock_processor.reprocess_existing_document.side_effect = Exception(
-            "Processing failed"
-        )
+        mock_processor.reprocess_existing_document.side_effect = Exception("Processing failed")
 
         mock_doc_processor = MagicMock()
         mock_doc_processor_class.return_value = mock_doc_processor

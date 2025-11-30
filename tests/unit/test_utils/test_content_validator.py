@@ -73,7 +73,9 @@ class TestContentValidator:
 
     def test_validate_content_quality_poor_structure(self):
         """Test validation of content with poor structure."""
-        poor_content = "word word word word word word word word word word"  # No sentences, just words
+        poor_content = (
+            "word word word word word word word word word word"  # No sentences, just words
+        )
 
         result = ContentValidator.validate_content_quality(poor_content)
 
@@ -119,9 +121,7 @@ class TestContentValidator:
 
     def test_check_ocr_artifacts_special_characters(self):
         """Test OCR artifact detection with excessive special characters."""
-        content_with_specials = (
-            "Normal text with @#$%^&*() excessive special characters!"
-        )
+        content_with_specials = "Normal text with @#$%^&*() excessive special characters!"
 
         score = ContentValidator._check_ocr_artifacts(content_with_specials)
         assert score < 1.0  # Should be reduced due to special chars
@@ -141,7 +141,9 @@ class TestContentValidator:
 
     def test_check_text_structure_poor_structure(self):
         """Test text structure analysis on poorly structured content."""
-        poor_content = "word word word word word word word word word word word word word word word word"
+        poor_content = (
+            "word word word word word word word word word word word word word word word word"
+        )
 
         score = ContentValidator._check_text_structure(poor_content)
         assert score < 0.5  # Should have poor structure score
@@ -282,9 +284,7 @@ class TestContentValidator:
 
     def test_check_ocr_artifacts_mixed_content(self):
         """Test OCR artifact detection with mixed clean and artifact content."""
-        mixed_content = (
-            "This is clean text with tesseract artifacts and some andrew corruption."
-        )
+        mixed_content = "This is clean text with tesseract artifacts and some andrew corruption."
 
         score = ContentValidator._check_ocr_artifacts(mixed_content)
         assert 0 < score < 1.0  # Should be reduced but not zero

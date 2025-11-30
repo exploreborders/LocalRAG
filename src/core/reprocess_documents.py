@@ -30,9 +30,7 @@ def reprocess_documents():
         print(f"Found {len(documents)} documents to reprocess")
 
         for i, doc in enumerate(documents, 1):
-            print(
-                f"\n📄 Reprocessing document {i}/{len(documents)}: {doc.filename[:50]}..."
-            )
+            print(f"\n📄 Reprocessing document {i}/{len(documents)}: {doc.filename[:50]}...")
 
             try:
                 # Check if we have stored content to reprocess with
@@ -70,18 +68,14 @@ def reprocess_documents():
                 }
 
                 # Reprocess with the new chunking
-                result = processor.reprocess_existing_document(
-                    doc, processing_result, doc.filepath
-                )
+                result = processor.reprocess_existing_document(doc, processing_result, doc.filepath)
 
                 if result["success"]:
                     print(
                         f"  ✅ Successfully reprocessed: {result.get('chunks_created', 0)} chunks, {len(all_chapters)} chapters"
                     )
                 else:
-                    print(
-                        f"  ❌ Failed to reprocess: {result.get('error', 'Unknown error')}"
-                    )
+                    print(f"  ❌ Failed to reprocess: {result.get('error', 'Unknown error')}")
 
             except Exception as e:
                 print(f"  ❌ Error reprocessing: {e}")
