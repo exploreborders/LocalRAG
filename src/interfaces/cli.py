@@ -11,12 +11,11 @@ from pathlib import Path
 from typing import Optional
 
 from src.core.processing.document_processor import DocumentProcessor
-
 from src.core.retrieval import (
+    DatabaseRetriever,
     RAGPipelineDB,
     format_answer_db,
     format_results_db,
-    DatabaseRetriever,
 )
 
 # Note: This script must be run as a module: python -m src.app

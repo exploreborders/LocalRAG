@@ -4,8 +4,8 @@ Unit tests for RateLimiter classes.
 Tests token bucket rate limiting, adaptive rate limiting, and circuit breaker functionality.
 """
 
-import time
 import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,8 +16,8 @@ from src.utils.rate_limiter import (
     CircuitBreakerOpen,
     RateLimiter,
     RateLimitInfo,
-    rate_limited,
     rate_limit_context,
+    rate_limited,
 )
 
 

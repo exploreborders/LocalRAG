@@ -184,7 +184,9 @@ class TestRAGCLI:
     def test_show_system_status(self, capsys):
         """Test system status display."""
         cli = RAGCLI()
-        cli.show_system_status()
+        # Mock the initialization to avoid database connection attempts
+        with patch.object(cli, "initialize_components"):
+            cli.show_system_status()
 
         captured = capsys.readouterr()
         assert "📊 SYSTEM STATUS" in captured.out
