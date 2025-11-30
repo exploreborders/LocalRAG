@@ -85,7 +85,7 @@ Hierarchical Chunking (chapter-aware, token-based)
      ↓
 Relevance Scoring (semantic + topic-aware)
      ↓
-Embedding Generation (nomic-embed-text-v1.5)
+Embedding Generation (embeddinggemma:latest via Ollama)
      ↓
 Storage: PostgreSQL + JSONB structures + AI metadata
      ↓
@@ -157,7 +157,7 @@ Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
 ### **AI Models**
 - **llama3.2:latest** - Generation, structure analysis, and summarization (8B parameters)
 - **deepseek-ocr:latest** - OCR processing for scanned PDFs (96% accuracy)
-- **nomic-embed-text-v1.5** - High-quality embeddings (137M parameters, auto-downloaded)
+- **embeddinggemma:latest** - High-quality embeddings via Ollama (300M parameters)
 - **microsoft/trocr-base-printed** - Fallback OCR for technical documents
 
 ### **Database Stack**

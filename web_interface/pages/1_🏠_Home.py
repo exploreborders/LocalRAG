@@ -123,20 +123,23 @@ def _do_initialization():
 
     settings = load_settings()
     embedding_model = settings.get("retrieval", {}).get(
-        "embedding_model", "nomic-ai/nomic-embed-text-v1.5"
+        "embedding_model", "embeddinggemma:latest"
     )
+    embedding_backend = "ollama"  # Fixed backend
+    embedding_backend = settings.get("retrieval", {}).get("embedding_backend", "ollama")
     llm_model = settings.get("generation", {}).get("model", "llama2")
     cache_enabled = settings.get("cache", {}).get("enabled", True)
     cache_settings = settings.get("cache", {})
 
     # Initialize retriever with configured embedding model
-    st.session_state.retriever = DatabaseRetriever(embedding_model)
+    st.session_state.retriever = DatabaseRetriever(embedding_model, embedding_backend)
 
     # Try to initialize RAG pipeline with configured LLM (may fail if Ollama not running)
     rag_error = None
     try:
         st.session_state.rag_pipeline = RAGPipelineDB(
             embedding_model,
+            embedding_backend,
             llm_model,
             cache_enabled=cache_enabled,
             cache_settings=cache_settings,

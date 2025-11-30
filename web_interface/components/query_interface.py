@@ -177,7 +177,7 @@ def render_submit_button(query, mode):
         "system_initialized", False
     )
 
-    if st.button("🔎 Search", type="primary", width="stretch", disabled=disabled):
+    if st.button("🔎 Search", type="primary", disabled=disabled):
         if not query.strip():
             st.warning("⚠️ Please enter a question")
             return False

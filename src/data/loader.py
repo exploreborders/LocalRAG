@@ -23,7 +23,9 @@ try:
     TESSERACT_AVAILABLE = True
 except ImportError:
     TESSERACT_AVAILABLE = False
-    logger.warning("Tesseract OCR not available. Install with: pip install pytesseract tesseract")
+    logger.warning(
+        "Tesseract OCR not available. Install with: pip install pytesseract tesseract"
+    )
 
 # Vision model setup for advanced image analysis
 try:
@@ -47,7 +49,9 @@ except ImportError:
     except ImportError:
         VISION_MODEL_AVAILABLE = False
         VISION_BACKEND = None
-        logger.warning("No vision model dependencies available. Install ollama or transformers")
+        logger.warning(
+            "No vision model dependencies available. Install ollama or transformers"
+        )
 
 
 def extract_text_with_ocr(pdf_path: str) -> str:
@@ -86,7 +90,9 @@ def extract_text_with_ocr(pdf_path: str) -> str:
                 existing_text = page.get_text().strip()
 
                 # Always attempt OCR for better extraction
-                pix = page.get_pixmap(matrix=fitz.Matrix(2.5, 2.5))  # Higher scaling for better OCR
+                pix = page.get_pixmap(
+                    matrix=fitz.Matrix(2.5, 2.5)
+                )  # Higher scaling for better OCR
                 img_data = pix.tobytes("png")
                 img = Image.open(io.BytesIO(img_data))
 
@@ -106,7 +112,9 @@ def extract_text_with_ocr(pdf_path: str) -> str:
 
                 # Enhanced character whitelist for technical German documents
                 char_whitelist = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜßabcdefghijklmnopqrstuvwxyzäöüß.,:;!?()-+*/=><[]{}@#$%&\\|_~`"
-                enhanced_config = f"--psm 4 --oem 3 -c tessedit_char_whitelist={char_whitelist}"
+                enhanced_config = (
+                    f"--psm 4 --oem 3 -c tessedit_char_whitelist={char_whitelist}"
+                )
 
                 best_ocr_text = ""
                 max_length = 0
@@ -125,12 +133,16 @@ def extract_text_with_ocr(pdf_path: str) -> str:
                 # Try multiple configurations if enhanced didn't work well
                 for lang, config in ocr_configs:
                     try:
-                        page_text = pytesseract.image_to_string(img, lang=lang, config=config)
+                        page_text = pytesseract.image_to_string(
+                            img, lang=lang, config=config
+                        )
                         if len(page_text.strip()) > max_length:
                             max_length = len(page_text.strip())
                             best_ocr_text = page_text
                     except Exception as config_error:
-                        logger.debug(f"OCR config {lang} {config} failed: {config_error}")
+                        logger.debug(
+                            f"OCR config {lang} {config} failed: {config_error}"
+                        )
                         continue
 
                 # Combine existing text and OCR text
@@ -142,8 +154,12 @@ def extract_text_with_ocr(pdf_path: str) -> str:
 
                 # Only add pages with substantial content
                 if len(combined_text.strip()) > 20:  # Minimum content threshold
-                    text_content.append(f"=== PAGE {page_num + 1} ===\n{combined_text}\n")
-                    logger.debug(f"Processed page {page_num + 1}: {len(combined_text)} chars")
+                    text_content.append(
+                        f"=== PAGE {page_num + 1} ===\n{combined_text}\n"
+                    )
+                    logger.debug(
+                        f"Processed page {page_num + 1}: {len(combined_text)} chars"
+                    )
 
             except Exception as page_error:
                 logger.warning(f"Failed to process page {page_num + 1}: {page_error}")
@@ -228,7 +244,9 @@ def _post_process_ocr_text(text: str) -> str:
             f"OCR processing {len(priority_pages)} pages out of {len(doc)} total for scanned PDF"
         )
 
-        logger.info(f"OCR processing {len(priority_pages)} priority pages out of {len(doc)} total")
+        logger.info(
+            f"OCR processing {len(priority_pages)} priority pages out of {len(doc)} total"
+        )
 
         for page_num in priority_pages:
             try:
@@ -236,21 +254,31 @@ def _post_process_ocr_text(text: str) -> str:
 
                 # Skip pages with too much text (likely already OCR'd by Docling)
                 existing_text = page.get_text()
-                if len(existing_text.strip()) > 500:  # Page already has substantial text
-                    text_content.append(f"Page {page_num + 1} (existing text):\n{existing_text}\n")
+                if (
+                    len(existing_text.strip()) > 500
+                ):  # Page already has substantial text
+                    text_content.append(
+                        f"Page {page_num + 1} (existing text):\n{existing_text}\n"
+                    )
                     continue
 
                 # Get page as image for OCR
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x scaling for better OCR
+                pix = page.get_pixmap(
+                    matrix=fitz.Matrix(2, 2)
+                )  # 2x scaling for better OCR
                 img_data = pix.tobytes("png")
                 img = Image.open(io.BytesIO(img_data))
 
                 # Extract text with OCR
-                page_text = pytesseract.image_to_string(img, lang="deu+eng")  # German + English
+                page_text = pytesseract.image_to_string(
+                    img, lang="deu+eng"
+                )  # German + English
 
                 if page_text.strip():  # Only add if OCR found text
                     text_content.append(f"Page {page_num + 1} (OCR):\n{page_text}\n")
-                    logger.debug(f"OCR extracted {len(page_text)} chars from page {page_num + 1}")
+                    logger.debug(
+                        f"OCR extracted {len(page_text)} chars from page {page_num + 1}"
+                    )
 
             except Exception as page_error:
                 logger.warning(f"OCR failed on page {page_num + 1}: {page_error}")
@@ -259,7 +287,9 @@ def _post_process_ocr_text(text: str) -> str:
         doc.close()
 
         full_text = "\n".join(text_content)
-        logger.info(f"OCR completed: {len(full_text)} characters from {len(priority_pages)} pages")
+        logger.info(
+            f"OCR completed: {len(full_text)} characters from {len(priority_pages)} pages"
+        )
         return full_text
 
     except Exception as e:
@@ -285,7 +315,9 @@ def _post_process_ocr_text(text: str) -> str:
             img = Image.open(io.BytesIO(img_data))
 
             # Extract text with OCR
-            page_text = pytesseract.image_to_string(img, lang="deu+eng")  # German + English
+            page_text = pytesseract.image_to_string(
+                img, lang="deu+eng"
+            )  # German + English
             text_content.append(f"Page {page_num + 1}:\n{page_text}\n")
 
         doc.close()
@@ -321,9 +353,13 @@ def is_scanned_pdf(pdf_path: str) -> bool:
 
         # Check a few more pages distributed throughout
         if total_pages > 1:
-            pages_to_check.append(min(5, total_pages - 1))  # Page 6 or last page if shorter
+            pages_to_check.append(
+                min(5, total_pages - 1)
+            )  # Page 6 or last page if shorter
         if total_pages > 10:
-            pages_to_check.append(min(10, total_pages - 1))  # Page 11 or last page if shorter
+            pages_to_check.append(
+                min(10, total_pages - 1)
+            )  # Page 11 or last page if shorter
 
         pages_checked = len(pages_to_check)
 
@@ -375,7 +411,7 @@ class AdvancedDocumentProcessor:
     5. Topic Classification (multi-strategy approach)
     6. Hierarchical Chunking (chapter-aware, token-based)
     7. Relevance Scoring (semantic + topic-aware)
-    8. Embedding Generation (nomic-embed-text-v1.5)
+    8. Embedding Generation (embeddinggemma:latest via Ollama)
     9. Storage: PostgreSQL + JSONB structures + topic relationships
     10. Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
     """
@@ -437,13 +473,17 @@ class AdvancedDocumentProcessor:
         results["processing_stages"].append("structure_analysis")
 
         # Use Docling structure if available, otherwise analyze content
-        if "docling_structure" in results and results["docling_structure"].get("hierarchy"):
+        if "docling_structure" in results and results["docling_structure"].get(
+            "hierarchy"
+        ):
             structure_info = results["docling_structure"]
             logger.info(
                 f"Using Docling structure: {len(structure_info.get('hierarchy', []))} items"
             )
         else:
-            structure_info = self._analyze_document_structure(results["extracted_content"])
+            structure_info = self._analyze_document_structure(
+                results["extracted_content"]
+            )
             logger.info(
                 f"Using heuristic structure analysis: {len(structure_info.get('hierarchy', []))} items"
             )
@@ -456,7 +496,9 @@ class AdvancedDocumentProcessor:
         try:
             from langdetect import detect
 
-            detected_lang = detect(results["extracted_content"][:1000])  # Sample first 1000 chars
+            detected_lang = detect(
+                results["extracted_content"][:1000]
+            )  # Sample first 1000 chars
             results["language"] = detected_lang
         except Exception as e:
             logger.warning(f"Language detection failed: {e}")
@@ -500,7 +542,9 @@ class AdvancedDocumentProcessor:
         logger.info(f"Comprehensive processing completed for {pdf_path}")
         return results
 
-    def _traverse_docling_tree(self, node, structure: Dict[str, Any], level: int, path: str):
+    def _traverse_docling_tree(
+        self, node, structure: Dict[str, Any], level: int, path: str
+    ):
         """Recursively traverse Docling document tree to extract structure."""
         try:
             if hasattr(node, "children"):
@@ -560,13 +604,18 @@ class AdvancedDocumentProcessor:
 
         # Check for structured elements
         has_headers = "##" in content or "#" in content
-        has_lists = "- " in content or "* " in content or content.count("\n") > content_length * 0.1
+        has_lists = (
+            "- " in content
+            or "* " in content
+            or content.count("\n") > content_length * 0.1
+        )
 
         # Calculate quality score
         quality_score = min(
             1.0,
             (
-                min(1.0, content_length / 10000) * 0.4  # Content length (up to 10k chars = 0.4)
+                min(1.0, content_length / 10000)
+                * 0.4  # Content length (up to 10k chars = 0.4)
                 + min(1.0, avg_words_per_page / 1000) * 0.3  # Words per page
                 + (0.3 if has_headers else 0.0)  # Headers present
                 + (0.2 if has_lists else 0.0)  # Lists/tables present
@@ -591,7 +640,9 @@ class AdvancedDocumentProcessor:
             doc = fitz.open(pdf_path)
             vision_content = []
 
-            logger.info(f"DeepSeek-OCR processing for {len(doc)} pages using {VISION_BACKEND}")
+            logger.info(
+                f"DeepSeek-OCR processing for {len(doc)} pages using {VISION_BACKEND}"
+            )
 
             # Process ALL pages for comprehensive content extraction
             # This ensures complete document coverage instead of selective sampling
@@ -618,7 +669,9 @@ class AdvancedDocumentProcessor:
                 for page_num in batch_pages:
                     try:
                         page = doc.load_page(page_num)
-                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), colorspace=fitz.csRGB)
+                        pix = page.get_pixmap(
+                            matrix=fitz.Matrix(2, 2), colorspace=fitz.csRGB
+                        )
                         img_data = pix.tobytes("png")
                         img = Image.open(io.BytesIO(img_data))
 
@@ -627,7 +680,9 @@ class AdvancedDocumentProcessor:
                             img = img.convert("RGB")
                         jpeg_buffer = io.BytesIO()
                         img.save(jpeg_buffer, format="JPEG", quality=95)
-                        img_base64 = base64.b64encode(jpeg_buffer.getvalue()).decode("utf-8")
+                        img_base64 = base64.b64encode(jpeg_buffer.getvalue()).decode(
+                            "utf-8"
+                        )
 
                         # Process single page with vision model
                         page_content = self._process_single_image_with_vision(
@@ -675,7 +730,9 @@ class AdvancedDocumentProcessor:
 
             elif VISION_BACKEND == "transformers":
                 # Use transformers vision model (fallback)
-                response = self._query_transformers_vision(img_data["image_obj"], page_num)
+                response = self._query_transformers_vision(
+                    img_data["image_obj"], page_num
+                )
                 if response:
                     return f"=== PAGE {page_num} ===\n{response}"
 
@@ -692,7 +749,9 @@ class AdvancedDocumentProcessor:
             if page_text.strip():
                 return f"=== PAGE {page_num} (OCR Fallback) ===\n{page_text}"
         except Exception as ocr_error:
-            logger.warning(f"OCR fallback also failed for page {img_data['page_num']}: {ocr_error}")
+            logger.warning(
+                f"OCR fallback also failed for page {img_data['page_num']}: {ocr_error}"
+            )
 
         return ""
 
@@ -738,7 +797,9 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
 
                     # Enhanced OCR with improved configuration for German technical text
                     char_whitelist = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜßabcdefghijklmnopqrstuvwxyzäöüß.,:;!?()-+*/=><[]{}@#$%&\\|_~`"
-                    custom_config = f"--psm 3 --oem 3 -c tessedit_char_whitelist={char_whitelist}"
+                    custom_config = (
+                        f"--psm 3 --oem 3 -c tessedit_char_whitelist={char_whitelist}"
+                    )
                     text = pytesseract.image_to_string(
                         image_obj,
                         lang="deu+eng",
@@ -750,7 +811,9 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                     text = text.replace("§", "S")  # Common OCR error
 
                     if text.strip():
-                        return f"=== PAGE {page_num} (Tesseract OCR) ===\n{text.strip()}"
+                        return (
+                            f"=== PAGE {page_num} (Tesseract OCR) ===\n{text.strip()}"
+                        )
                     else:
                         return f"=== PAGE {page_num} (No Text Found) ==="
                 except Exception as e:
@@ -768,7 +831,9 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
             logger.error(f"Ollama vision query failed for page {page_num}: {e}")
             return ""
 
-    def _process_page_with_ocr(self, page_num: int, image_obj: Image.Image = None) -> str:
+    def _process_page_with_ocr(
+        self, page_num: int, image_obj: Image.Image = None
+    ) -> str:
         """
         Process a single page using OCR with multiple fallback mechanisms and quality validation.
         """
@@ -788,7 +853,9 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                 result = ocr_function(image_obj, page_num)
 
                 if result and self._validate_ocr_result(result):
-                    logger.info(f"OCR method {method_name} succeeded for page {page_num}")
+                    logger.info(
+                        f"OCR method {method_name} succeeded for page {page_num}"
+                    )
                     return result
                 else:
                     logger.warning(
@@ -796,7 +863,9 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                     )
 
             except Exception as e:
-                logger.warning(f"OCR method {method_name} failed for page {page_num}: {e}")
+                logger.warning(
+                    f"OCR method {method_name} failed for page {page_num}: {e}"
+                )
                 continue
 
         # All OCR methods failed
@@ -838,7 +907,9 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
 
             # Enhanced OCR with improved configuration for German technical text
             char_whitelist = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜßabcdefghijklmnopqrstuvwxyzäöüß.,:;!?()-+*/=><[]{}@#$%&\\|_~`"
-            custom_config = f"--psm 3 --oem 3 -c tessedit_char_whitelist={char_whitelist}"
+            custom_config = (
+                f"--psm 3 --oem 3 -c tessedit_char_whitelist={char_whitelist}"
+            )
             text = pytesseract.image_to_string(
                 image_obj,
                 lang="deu+eng",
@@ -992,7 +1063,9 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
         cleaned = re.sub(r"=== .*? ===", "", cleaned, flags=re.IGNORECASE)
 
         # Remove excessive whitespace and normalize
-        cleaned = re.sub(r"\n\s*\n\s*\n+", "\n\n", cleaned)  # Multiple newlines to double
+        cleaned = re.sub(
+            r"\n\s*\n\s*\n+", "\n\n", cleaned
+        )  # Multiple newlines to double
         cleaned = re.sub(r"\s+", " ", cleaned)  # Multiple spaces to single
 
         # Remove lines that are mostly OCR artifacts
@@ -1053,7 +1126,9 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
         """Query transformers vision model (fallback)."""
         try:
             # Placeholder for transformers implementation
-            logger.info(f"Transformers vision processing for page {page_num} (placeholder)")
+            logger.info(
+                f"Transformers vision processing for page {page_num} (placeholder)"
+            )
             # This would implement the transformers-based vision model
             return f"Transformers vision processing for page {page_num} (not implemented yet)"
 
@@ -1098,10 +1173,15 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                     # Simple check for ## followed by numbers
                     is_header = True
                     level = 2  # Default level for subsections
-                    logger.debug(f"  -> Matched numbered section with prefix (level {level})")
+                    logger.debug(
+                        f"  -> Matched numbered section with prefix (level {level})"
+                    )
 
                 # Check for numbered sections (1.2, 2.3, etc.) - direct start
-                elif line.strip().replace(".", "").replace(" ", "").isdigit() and "." in line:
+                elif (
+                    line.strip().replace(".", "").replace(" ", "").isdigit()
+                    and "." in line
+                ):
                     is_header = True
                     level = 2  # Subsection
                     logger.debug(f"  -> Matched numbered section (level {level})")
@@ -1226,7 +1306,9 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
         if not structure["sections"]:
             # Create synthetic chapters based on content length
             content_length = len(content)
-            num_chapters = max(3, min(12, content_length // 6000))  # 1 chapter per ~6k chars
+            num_chapters = max(
+                3, min(12, content_length // 6000)
+            )  # 1 chapter per ~6k chars
 
             for i in range(num_chapters):
                 start_pos = i * content_length // num_chapters
@@ -1399,7 +1481,9 @@ def load_documents(data_dir="data"):
                     logger.info(f"PDF {file} detected as scanned: {is_scanned}")
 
                     # Vision model will be used if Docling gives poor results
-                    vision_used = False  # Will be set to True if vision model is actually used
+                    vision_used = (
+                        False  # Will be set to True if vision model is actually used
+                    )
 
                     # Try Docling first for all PDFs
                     docling_text = ""
@@ -1407,7 +1491,9 @@ def load_documents(data_dir="data"):
                         result = doc_converter.convert(file_path)
                         docling_text = result.document.export_to_markdown()
                         text_content = docling_text
-                        logger.info(f"Docling extracted {len(docling_text)} characters from {file}")
+                        logger.info(
+                            f"Docling extracted {len(docling_text)} characters from {file}"
+                        )
                     except Exception as e:
                         logger.warning(f"Docling failed for {file}: {e}")
 
@@ -1424,7 +1510,8 @@ def load_documents(data_dir="data"):
                                 [
                                     line
                                     for line in docling_text.split("\n")
-                                    if line.strip() and not line.strip().startswith("<!--")
+                                    if line.strip()
+                                    and not line.strip().startswith("<!--")
                                 ]
                             )
                             / len(docling_text.split("\n"))
@@ -1437,21 +1524,28 @@ def load_documents(data_dir="data"):
                         )
 
                         if (
-                            image_tag_ratio > 0.05 or substantial_text_ratio < 0.2 or is_scanned
+                            image_tag_ratio > 0.05
+                            or substantial_text_ratio < 0.2
+                            or is_scanned
                         ):  # Poor Docling result or scanned PDF
                             logger.info(
                                 f"Triggering vision model for {file}: scanned={is_scanned}, image_ratio={image_tag_ratio:.3f}, text_ratio={substantial_text_ratio:.3f}"
                             )
                             try:
                                 advanced_processor = AdvancedDocumentProcessor()
-                                vision_content = advanced_processor._extract_with_vision_model(
-                                    file_path
+                                vision_content = (
+                                    advanced_processor._extract_with_vision_model(
+                                        file_path
+                                    )
                                 )
                                 logger.info(
                                     f"Vision model extracted {len(vision_content) if vision_content else 0} characters"
                                 )
 
-                                if vision_content and len(vision_content) > len(docling_text) * 1.2:
+                                if (
+                                    vision_content
+                                    and len(vision_content) > len(docling_text) * 1.2
+                                ):
                                     text_content = vision_content
                                     vision_used = True
                                     logger.info(
@@ -1479,8 +1573,12 @@ def load_documents(data_dir="data"):
                                 f"Basic OCR extracted {len(text_content)} characters from {file}"
                             )
                         except Exception as e:
-                            logger.error(f"All extraction methods failed for {file}: {e}")
-                            text_content = "No content could be extracted from this document."
+                            logger.error(
+                                f"All extraction methods failed for {file}: {e}"
+                            )
+                            text_content = (
+                                "No content could be extracted from this document."
+                            )
 
                     documents.append(
                         Document(
@@ -1489,7 +1587,9 @@ def load_documents(data_dir="data"):
                                 "source": file_path,
                                 "file_type": "pdf",
                                 "ocr_used": ocr_used,
-                                "is_scanned": is_scanned_pdf(file_path) if not ocr_used else True,
+                                "is_scanned": is_scanned_pdf(file_path)
+                                if not ocr_used
+                                else True,
                                 "docling_metadata": (
                                     result.document.origin.model_dump()
                                     if "result" in locals()
@@ -1513,7 +1613,8 @@ def load_documents(data_dir="data"):
                                 "file_type": file.split(".")[-1],
                                 "docling_metadata": (
                                     result.document.origin.model_dump()
-                                    if hasattr(result.document, "origin") and result.document.origin
+                                    if hasattr(result.document, "origin")
+                                    and result.document.origin
                                     else {}
                                 ),
                             },
@@ -1524,7 +1625,9 @@ def load_documents(data_dir="data"):
             # Fallback to basic text loading if Docling fails
             try:
                 # Only try text fallback for text-based files, not binaries like PDFs
-                if file_path.lower().endswith((".txt", ".md", ".py", ".json", ".xml", ".html")):
+                if file_path.lower().endswith(
+                    (".txt", ".md", ".py", ".json", ".xml", ".html")
+                ):
                     with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
                     documents.append(
@@ -1603,7 +1706,9 @@ def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap
     from .caption_aware_processor import CaptionAwareProcessor
 
     documents = []
-    processor = CaptionAwareProcessor(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    processor = CaptionAwareProcessor(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    )
 
     # Use Docling with default configuration
     doc_converter = DocumentConverter()
@@ -1630,7 +1735,8 @@ def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap
                         "file_type": file.split(".")[-1],
                         "docling_metadata": (
                             result.document.origin.model_dump()
-                            if hasattr(result.document, "origin") and result.document.origin
+                            if hasattr(result.document, "origin")
+                            and result.document.origin
                             else {}
                         ),
                     },
@@ -1657,7 +1763,9 @@ def load_and_chunk_with_captions(data_dir="data", chunk_size=1000, chunk_overlap
             # Fallback to basic text loading if Docling fails
             try:
                 # Only try text fallback for text-based files, not binaries like PDFs
-                if file_path.lower().endswith((".txt", ".md", ".py", ".json", ".xml", ".html")):
+                if file_path.lower().endswith(
+                    (".txt", ".md", ".py", ".json", ".xml", ".html")
+                ):
                     with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
                     documents.append(

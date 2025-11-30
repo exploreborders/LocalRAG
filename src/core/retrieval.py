@@ -41,7 +41,8 @@ class DatabaseRetriever:
 
     def __init__(
         self,
-        model_name: str = "nomic-ai/nomic-embed-text-v1.5",
+        model_name: str = "embeddinggemma:latest",
+        backend: str = "ollama",
         use_batch_processing: bool = False,
         hybrid_alpha: float = 0.7,
     ):
@@ -49,7 +50,8 @@ class DatabaseRetriever:
         Initialize the retriever with specified embedding model and knowledge graph.
 
         Args:
-            model_name (str): Name of the sentence-transformers model to use
+            model_name (str): Name of the embedding model to use
+            backend (str): Backend for embeddings ('ollama' or 'sentence-transformers')
             use_batch_processing (bool): Whether to use batch embedding for improved performance
             hybrid_alpha (float): Weight for BM25 in the hybrid search (0=vector only, 1=BM25 only)
         """
@@ -57,10 +59,13 @@ class DatabaseRetriever:
         if not isinstance(model_name, str) or not model_name.strip():
             raise ValidationError("model_name must be a non-empty string")
 
-        if not isinstance(hybrid_alpha, (int, float)) or not (0.0 <= hybrid_alpha <= 1.0):
+        if not isinstance(hybrid_alpha, (int, float)) or not (
+            0.0 <= hybrid_alpha <= 1.0
+        ):
             raise ValidationError("hybrid_alpha must be a float between 0.0 and 1.0")
 
         self.model_name = model_name
+        self.backend = backend
         self.use_batch_processing = use_batch_processing
         self.hybrid_alpha = hybrid_alpha
 
@@ -68,7 +73,7 @@ class DatabaseRetriever:
         self.error_handler = ErrorHandler(__name__)
 
         try:
-            self.model = get_embedding_model(model_name)
+            self.model = get_embedding_model(model_name, backend)
         except Exception as e:
             raise ProcessingError(f"Failed to load embedding model '{model_name}': {e}")
 
@@ -111,7 +116,9 @@ class DatabaseRetriever:
 
         return results
 
-    def _build_enhanced_context(self, query: str, filters: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_enhanced_context(
+        self, query: str, filters: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Build enhanced search context using knowledge graph relationships.
 
@@ -235,7 +242,9 @@ class DatabaseRetriever:
                             if cat_assignment.category
                         ],
                         "metadata": source.get("metadata", {}),
-                        "chapter_title": source.get("metadata", {}).get("chapter_title"),
+                        "chapter_title": source.get("metadata", {}).get(
+                            "chapter_title"
+                        ),
                         "chapter_path": source.get("metadata", {}).get("chapter_path"),
                     }
                     results.append(result)
@@ -281,7 +290,9 @@ class DatabaseRetriever:
             filter_clauses.append({"terms": {"categories": list(categories_to_search)}})
 
         if filter_clauses:
-            es_query["query"] = {"bool": {"must": es_query["query"], "filter": filter_clauses}}
+            es_query["query"] = {
+                "bool": {"must": es_query["query"], "filter": filter_clauses}
+            }
 
         return es_query
 
@@ -340,7 +351,8 @@ class RAGPipelineDB:
 
     def __init__(
         self,
-        model_name: str = "nomic-ai/nomic-embed-text-v1.5",
+        model_name: str = "embeddinggemma:latest",
+        backend: str = "ollama",
         llm_model: str = "llama3.2:latest",
         cache_enabled: Optional[bool] = None,
         cache_settings: Optional[Dict[str, Any]] = None,
@@ -350,11 +362,14 @@ class RAGPipelineDB:
 
         Args:
             model_name (str): Embedding model for retrieval
+            backend (str): Backend for embeddings ('ollama' or 'sentence-transformers')
             llm_model (str): Ollama model for generation
             cache_enabled (bool): Whether to enable caching (overrides env var)
             cache_settings (dict): Cache configuration settings
         """
-        self.retriever = DatabaseRetriever(model_name, use_batch_processing=True)
+        self.retriever = DatabaseRetriever(
+            model_name, backend, use_batch_processing=True
+        )
         self.llm = OllamaLLM(model=llm_model)
 
         # Initialize cache if enabled
@@ -404,7 +419,8 @@ class RAGPipelineDB:
             raise ValidationError("question must be a non-empty string")
 
         if hybrid_alpha is not None and (
-            not isinstance(hybrid_alpha, (int, float)) or not (0.0 <= hybrid_alpha <= 1.0)
+            not isinstance(hybrid_alpha, (int, float))
+            or not (0.0 <= hybrid_alpha <= 1.0)
         ):
             raise ValidationError("hybrid_alpha must be a float between 0.0 and 1.0")
 

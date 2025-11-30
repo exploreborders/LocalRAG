@@ -13,7 +13,8 @@ class ModelConfig:
     """Configuration for AI models."""
 
     # Embedding models
-    embedding_model: str = "nomic-ai/nomic-embed-text-v1.5"
+    embedding_model: str = "embeddinggemma:latest"
+    embedding_backend: str = "ollama"  # Fixed to Ollama
 
     # LLM models
     llm_model: str = "llama3.2:latest"

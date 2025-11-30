@@ -339,19 +339,23 @@ def initialize_system_if_needed():
             # Get configured models from settings
             settings = load_settings()
             embedding_model = settings.get("retrieval", {}).get(
-                "embedding_model", "nomic-ai/nomic-embed-text-v1.5"
+                "embedding_model", "embeddinggemma:latest"
             )
+            embedding_backend = "ollama"  # Fixed backend
             llm_model = settings.get("generation", {}).get("model", "llama2")
             cache_enabled = settings.get("cache", {}).get("enabled", True)
             cache_settings = settings.get("cache", {})
 
             # Initialize retriever
-            st.session_state.retriever = DatabaseRetriever(embedding_model)
+            st.session_state.retriever = DatabaseRetriever(
+                embedding_model, embedding_backend
+            )
 
             # Try to initialize RAG pipeline
             try:
                 st.session_state.rag_pipeline = RAGPipelineDB(
                     embedding_model,
+                    embedding_backend,
                     llm_model,
                     cache_enabled=cache_enabled,
                     cache_settings=cache_settings,
@@ -935,7 +939,7 @@ def main():
                     ),
                 )
 
-                st.plotly_chart(fig, width="stretch")
+                st.plotly_chart(fig)
 
                 # Advanced Analytics Section
                 st.markdown("**📊 Advanced Graph Analytics:**")
@@ -1047,7 +1051,7 @@ def main():
                     ),
                 )
 
-                st.plotly_chart(fig, width="stretch")
+                st.plotly_chart(fig)
 
                 # Relationship Details
                 st.markdown("**Top Relationships:**")
@@ -1055,7 +1059,6 @@ def main():
                 if not rel_df.empty:
                     st.dataframe(
                         rel_df[["source", "target", "type", "strength", "evidence"]],
-                        width="stretch",
                         column_config={
                             "strength": st.column_config.NumberColumn(
                                 "Strength", format="%.2f"
@@ -1325,7 +1328,7 @@ def main():
                 }
             )
 
-        st.dataframe(table_data, width="stretch")
+        st.dataframe(table_data)
 
         # Feedback Collection Section
         st.markdown("**💬 Provide Feedback on Recent Queries:**")
@@ -1436,7 +1439,7 @@ def main():
     export_col1, export_col2, export_col3 = st.columns(3)
 
     with export_col1:
-        if st.button("📊 Export Query History", width="stretch"):
+        if st.button("📊 Export Query History"):
             history = st.session_state.get("query_history", [])
             if history:
                 # Convert to DataFrame for export
@@ -1463,7 +1466,7 @@ def main():
                 st.info("📭 No query history to export")
 
     with export_col2:
-        if st.button("📈 Export System Metrics", width="stretch"):
+        if st.button("📈 Export System Metrics"):
             # Create comprehensive metrics export
             export_data = {
                 "export_timestamp": datetime.now().isoformat(),
@@ -1519,7 +1522,7 @@ def main():
             )
 
     with export_col3:
-        if st.button("📋 Generate Report", width="stretch"):
+        if st.button("📋 Generate Report"):
             # Generate a human-readable report
             report_lines = [
                 "# Local RAG System Analytics Report",

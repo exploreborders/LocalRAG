@@ -419,11 +419,9 @@ def clear_all_documents():
 
         col1, col2 = st.columns([1, 1])
         with col1:
-            confirm_clear = st.button(
-                "🗑️ YES, DELETE ALL DOCUMENTS", type="primary", width="stretch"
-            )
+            confirm_clear = st.button("🗑️ YES, DELETE ALL DOCUMENTS", type="primary")
         with col2:
-            cancel_clear = st.button("❌ Cancel", width="stretch")
+            cancel_clear = st.button("❌ Cancel")
 
         if cancel_clear:
             st.session_state.show_clear_dialog = False
@@ -567,7 +565,7 @@ def show_clear_documents_dialog():
         st.session_state.show_clear_dialog = False
 
     # Trigger dialog from button
-    if st.button("🗑️ Clear Documents", type="secondary", width="stretch"):
+    if st.button("🗑️ Clear Documents", type="secondary"):
         st.session_state.show_clear_dialog = True
         st.rerun()
 
@@ -639,7 +637,7 @@ def main():
             with col3:
                 st.write(file.type if file.type else "Unknown")
 
-        if st.button("🚀 Process & Upload Files", type="primary", width="stretch"):
+        if st.button("🚀 Process & Upload Files", type="primary"):
             process_uploaded_files(uploaded_files)
 
     st.markdown("---")
@@ -853,7 +851,6 @@ def main():
                         if st.button(
                             "➕ Add",
                             key=f"add_tag_{doc['id']}",
-                            width="stretch",
                             help="Add new tag",
                         ):
                             if new_tag.strip():
@@ -893,7 +890,6 @@ def main():
                         if current_tags and st.button(
                             "🗑️ Clear All",
                             key=f"remove_tags_{doc['id']}",
-                            width="stretch",
                             help="Remove all tags",
                         ):
                             try:
@@ -974,7 +970,6 @@ def main():
                             if st.button(
                                 "📂 Add Category",
                                 key=f"add_cat_{doc['id']}",
-                                width="stretch",
                             ):
                                 try:
                                     db = SessionLocal()
@@ -1006,7 +1001,6 @@ def main():
                             st.button(
                                 "📂 Add Category",
                                 key=f"add_cat_{doc['id']}",
-                                width="stretch",
                                 disabled=True,
                             )
 
@@ -1015,7 +1009,6 @@ def main():
                             if st.button(
                                 "🗑️ Remove All",
                                 key=f"remove_cats_{doc['id']}",
-                                width="stretch",
                             ):
                                 try:
                                     db = SessionLocal()
@@ -1040,7 +1033,6 @@ def main():
                             st.button(
                                 "🗑️ Remove All",
                                 key=f"remove_cats_{doc['id']}",
-                                width="stretch",
                                 disabled=True,
                             )
 
@@ -1080,9 +1072,7 @@ def main():
                         help="Choose documents to tag",
                     )
 
-                    if st.button(
-                        "🏷️ Apply Tag to Selected", key="bulk_apply_tag", width="stretch"
-                    ):
+                    if st.button("🏷️ Apply Tag to Selected", key="bulk_apply_tag"):
                         if bulk_tag and selected_docs:
                             try:
                                 db = SessionLocal()
@@ -1147,7 +1137,6 @@ def main():
                     if st.button(
                         "📂 Apply Category to Selected",
                         key="bulk_apply_cat",
-                        width="stretch",
                     ):
                         if bulk_category and selected_docs_for_cat:
                             try:
@@ -1204,7 +1193,7 @@ def main():
             help="Choose documents to reprocess with enhanced structure extraction",
         )
 
-        if st.button("🔄 Reprocess Selected", key="bulk_reprocess", width="stretch"):
+        if st.button("🔄 Reprocess Selected", key="bulk_reprocess"):
             if selected_for_reprocess:
                 st.info(f"🔄 Reprocessing {len(selected_for_reprocess)} document(s)...")
 
@@ -1381,7 +1370,7 @@ def main():
                     help="Select parent for subcategory, or leave as root",
                 )
 
-            if st.button("➕ Create Category", key="create_category", width="stretch"):
+            if st.button("➕ Create Category", key="create_category"):
                 if new_cat_name.strip():
                     try:
                         parent_id = None
@@ -1426,7 +1415,6 @@ def main():
                     "🗑️ Delete Category",
                     key="delete_category",
                     type="secondary",
-                    width="stretch",
                 ):
                     try:
                         cat_name = cat_to_delete.split(" (")[
@@ -1496,7 +1484,7 @@ def main():
                     import pandas as pd
 
                     df = pd.DataFrame(stat_data)
-                    st.dataframe(df, width="stretch")
+                    st.dataframe(df)
 
                     # Visual chart
                     if len(usage_stats) > 1:

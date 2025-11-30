@@ -89,7 +89,7 @@ A modern Streamlit-based web interface for the Local RAG document intelligence s
 
 - **Python 3.8+** with virtual environment
 - **Ollama** installed and running locally
-- **AI Models**: llama3.2:latest and nomic-embed-text-v1.5
+- **AI Models**: llama3.2:latest and embeddinggemma:latest (via Ollama)
 - **Web Browser**: Modern browser for Streamlit interface
 - **RAM**: 16GB+ recommended for AI processing
 

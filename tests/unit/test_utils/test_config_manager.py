@@ -186,7 +186,7 @@ class TestConfigManager:
         """Test embedding model uses correct default."""
         config = ConfigManager()
         model = config.get_embedding_model()
-        assert model == "nomic-ai/nomic-embed-text-v1.5"
+        assert model == "embeddinggemma:latest"
 
     @patch.dict("os.environ", {"LLM_MODEL": "custom-llm-model"})
     def test_llm_model_from_env(self):
@@ -222,7 +222,9 @@ class TestConfigClasses:
 
     def test_opensearch_config_creation(self):
         """Test OpenSearchConfig creation."""
-        config = OpenSearchConfig(host="es-host", port=9200, user="es-user", password="es-pass")
+        config = OpenSearchConfig(
+            host="es-host", port=9200, user="es-user", password="es-pass"
+        )
         assert config.host == "es-host"
         assert config.port == 9200
         assert config.user == "es-user"
