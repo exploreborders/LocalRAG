@@ -82,13 +82,17 @@ class CaptionAwareProcessor:
             for pattern in caption_patterns:
                 match = re.match(pattern, line, re.IGNORECASE)
                 if match:
-                    caption_text = match.group(1).strip() if match.groups() else line.strip()
-                    # Clean up markdown formatting
-                    caption_text = re.sub(r"[\*_`]", "", caption_text)
+                    # Store the full line as text for complete caption information
+                    caption_text = line.strip()
+                    # Also store the extracted content for processing
+                    extracted_text = match.group(1).strip() if match.groups() else line.strip()
+                    # Clean up markdown formatting from extracted text
+                    extracted_text = re.sub(r"[\*_`]", "", extracted_text)
 
                     captions.append(
                         {
                             "text": caption_text,
+                            "extracted_text": extracted_text,
                             "line_number": i,
                             "type": "caption",
                             "pattern": pattern,
@@ -126,7 +130,9 @@ class CaptionAwareProcessor:
         return " ".join(context_lines)
 
     def create_caption_centric_chunks(
-        self, docling_document: DoclingDocument, metadata: Optional[Dict[str, Any]] = None
+        self,
+        docling_document: DoclingDocument,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> List[LangchainDocument]:
         """
         Create caption-centric chunks from a Docling document.

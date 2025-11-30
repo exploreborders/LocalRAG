@@ -98,14 +98,14 @@ class TestRateLimiter:
 
     def test_window_reset(self):
         """Test window reset functionality."""
-        limiter = RateLimiter(requests_per_minute=5, burst_window_seconds=1)
+        limiter = RateLimiter(requests_per_minute=10, burst_window_seconds=0.1)
 
         # Use some tokens
         assert limiter.acquire(3) is True
         assert limiter.minute_count == 3
         assert limiter.burst_count == 3
 
-        # Wait for burst window to reset
+        # Wait for burst window to reset (0.1s)
         time.sleep(0.15)
 
         # Burst count should reset, but minute count should remain

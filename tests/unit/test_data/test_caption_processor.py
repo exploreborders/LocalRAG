@@ -210,8 +210,13 @@ class TestCaptionAwareProcessor:
         """Test the internal chunk creation method."""
         processor = CaptionAwareProcessor()
 
+        # Create longer content to exceed the 100 character minimum
+        long_content = (
+            "Line 1\nFigure 1: Caption\nLine 3\nLine 4\nLine 5\n" + "Additional content line. " * 10
+        )
+
         structure = {
-            "full_text": "Line 1\nFigure 1: Caption\nLine 3\nLine 4\nLine 5",
+            "full_text": long_content,
             "captions": [
                 {
                     "text": "Figure 1: Caption",

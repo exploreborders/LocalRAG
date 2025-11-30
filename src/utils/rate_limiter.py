@@ -41,7 +41,7 @@ class RateLimiter:
         requests_per_minute: int = 60,
         requests_per_hour: int = 1000,
         burst_limit: int = 10,
-        burst_window_seconds: int = 1,
+        burst_window_seconds: float = 1.0,
     ):
         """
         Initialize rate limiter.
