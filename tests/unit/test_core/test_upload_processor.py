@@ -21,9 +21,7 @@ class TestUploadProcessor:
     @pytest.fixture
     def upload_processor(self, mock_db_session):
         """Create UploadProcessor instance with mocked database."""
-        return UploadProcessor(
-            db=mock_db_session, embedding_model="embeddinggemma:latest"
-        )
+        return UploadProcessor(db=mock_db_session, embedding_model="embeddinggemma:latest")
 
     @pytest.fixture
     def mock_document(self):
@@ -37,9 +35,7 @@ class TestUploadProcessor:
 
     def test_init(self, mock_db_session):
         """Test UploadProcessor initialization."""
-        processor = UploadProcessor(
-            db=mock_db_session, embedding_model="embeddinggemma:latest"
-        )
+        processor = UploadProcessor(db=mock_db_session, embedding_model="embeddinggemma:latest")
         assert processor.db == mock_db_session
         assert processor.max_workers >= 1
         assert processor.embedding_model == "embeddinggemma:latest"
@@ -47,9 +43,7 @@ class TestUploadProcessor:
     def test_init_default_workers(self):
         """Test UploadProcessor initialization with default workers."""
         with patch("multiprocessing.cpu_count", return_value=8):
-            with patch(
-                "src.core.processing.upload_processor.SessionLocal"
-            ) as mock_session:
+            with patch("src.core.processing.upload_processor.SessionLocal") as mock_session:
                 mock_session.return_value = MagicMock()
                 processor = UploadProcessor(embedding_model="embeddinggemma:latest")
                 assert processor.max_workers == 4  # min(8, 4)
@@ -106,7 +100,7 @@ class TestUploadProcessor:
             mock_hashlib.sha256.return_value = mock_hash
 
             # Mock document not existing
-            mock_db_session.query.return_value.filter.return_value.filter.return_value.first.return_value = None
+            mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
             # Mock document processor
             with patch(
@@ -144,7 +138,9 @@ class TestUploadProcessor:
 
             # Mock document existing
             mock_document.configure_mock(id=1)
-            mock_db_session.query.return_value.filter.return_value.filter.return_value.first.return_value = mock_document
+            mock_db_session.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+                mock_document
+            )
 
             result = upload_processor._process_single_file("/tmp/test.pdf")
 
@@ -170,31 +166,20 @@ class TestUploadProcessor:
             mock_hashlib.sha256.return_value = mock_hash
 
             # Mock document existing
-            mock_db_session.query.return_value.filter.return_value.filter.return_value.first.return_value = mock_document
+            mock_db_session.query.return_value.filter.return_value.first.return_value = (
+                mock_document
+            )
 
-            # Mock advanced processor
-            with patch(
-                "src.data.loader.AdvancedDocumentProcessor"
-            ) as mock_advanced_class:
-                mock_advanced = MagicMock()
-                mock_advanced_class.return_value = mock_advanced
-                mock_advanced.process_document_comprehensive.return_value = {
-                    "extracted_content": "test content",
-                    "chapters_detected": 2,
-                }
+            # Mock reprocess method
+            with patch.object(upload_processor, "reprocess_existing_document") as mock_reprocess:
+                mock_reprocess.return_value = {"success": True, "document_id": 1}
 
-                # Mock reprocess method
-                with patch.object(
-                    upload_processor, "reprocess_existing_document"
-                ) as mock_reprocess:
-                    mock_reprocess.return_value = {"success": True, "document_id": 1}
+                result = upload_processor.process_single_file(
+                    "/tmp/test.pdf", force_enrichment=True
+                )
 
-                    result = upload_processor.process_single_file(
-                        "/tmp/test.pdf", force_enrichment=True
-                    )
-
-                    mock_reprocess.assert_called_once()
-                    assert result["success"] is True
+                mock_reprocess.assert_called_once()
+                assert result["success"] is True
 
     def test_process_single_file_advanced_processing_auto_detect(
         self, upload_processor, mock_db_session
@@ -213,10 +198,12 @@ class TestUploadProcessor:
             mock_hashlib.sha256.return_value = mock_hash
 
             # Mock document not existing
-            mock_db_session.query.return_value.filter.return_value.filter.return_value.first.return_value = None
+            mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
             # Mock scanned PDF detection
-            with patch("src.data.loader.is_scanned_pdf", return_value=True):
+            mock_loader = MagicMock()
+            mock_loader.is_scanned_pdf.return_value = True
+            with patch.dict("sys.modules", {"src.data.loader": mock_loader}):
                 with patch(
                     "src.core.processing.upload_processor.DocumentProcessor"
                 ) as mock_doc_processor_class:
@@ -234,6 +221,11 @@ class TestUploadProcessor:
                     assert result["success"] is True
                     assert result["chunks_created"] == 3
                     mock_doc_processor.process_document.assert_called_once()
+
+    def test_reprocess_existing_document_success(
+        self, upload_processor, mock_db_session, mock_document
+    ):
+        """Test successful reprocessing of existing document."""
         processing_result = {
             "extracted_content": "Updated content for reprocessing",
             "chunks": [{"content": "chunk1"}, {"content": "chunk2"}],
@@ -252,17 +244,11 @@ class TestUploadProcessor:
             }
 
             # Mock DocumentProcessor for AI regeneration
-            with patch(
-                "src.core.processing.upload_processor.DocumentProcessor"
-            ) as mock_doc_class:
+            with patch("src.core.processing.upload_processor.DocumentProcessor") as mock_doc_class:
                 mock_doc_instance = MagicMock()
                 mock_doc_class.return_value = mock_doc_instance
-                mock_doc_instance._generate_document_summary.return_value = (
-                    "Updated summary"
-                )
-                mock_doc_instance._suggest_categories_ai.return_value = [
-                    "test_category"
-                ]
+                mock_doc_instance._generate_document_summary.return_value = "Updated summary"
+                mock_doc_instance._suggest_categories_ai.return_value = ["test_category"]
 
                 result = upload_processor.reprocess_existing_document(
                     mock_document, processing_result, "/tmp/test.pdf"
@@ -299,9 +285,7 @@ class TestUploadProcessor:
         self, upload_processor, mock_db_session, mock_document
     ):
         """Test reprocessing with processing result being None."""
-        result = upload_processor.reprocess_existing_document(
-            mock_document, None, "/tmp/test.pdf"
-        )
+        result = upload_processor.reprocess_existing_document(mock_document, None, "/tmp/test.pdf")
 
         assert result["success"] is False
         assert "Processing result is None" in result["error"]
@@ -323,16 +307,16 @@ class TestUploadProcessor:
         # Should not raise exception
         assert True
 
-    def test_process_single_file_error_handling(self, upload_processor):
+    def test_process_single_file_error_handling(self, upload_processor, mock_db_session):
         """Test error handling in single file processing."""
         with (
-            patch("builtins.open", mock_open(read_data=b"fake content")),
+            patch("builtins.open", side_effect=Exception("File read error")),
             patch(
-                "src.core.processing.upload_processor.hashlib",
-                side_effect=Exception("Hash error"),
+                "src.core.processing.upload_processor.SessionLocal",
+                return_value=mock_db_session,
             ),
         ):
             result = upload_processor._process_single_file("/tmp/test.pdf")
 
             assert result["success"] is False
-            assert "Hash error" in result["error"]
+            assert "File read error" in result["error"]

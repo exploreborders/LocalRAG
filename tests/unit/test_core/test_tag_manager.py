@@ -53,9 +53,7 @@ class TestTagManager:
 
     def test_get_tag_by_name_found(self, tag_manager, mock_db_session, mock_tag):
         """Test getting existing tag by name."""
-        mock_db_session.query.return_value.filter.return_value.first.return_value = (
-            mock_tag
-        )
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_tag
 
         result = tag_manager.get_tag_by_name("test_tag")
 
@@ -95,17 +93,13 @@ class TestTagManager:
         mock_db_session.commit.return_value = None
 
         # Mock color generation
-        with patch.object(
-            tag_manager.color_manager, "generate_color", return_value="#FF5733"
-        ):
+        with patch.object(tag_manager.color_manager, "generate_color", return_value="#FF5733"):
             with patch("src.core.tagging.tag_manager.DocumentTag") as mock_tag_class:
                 mock_tag_class.return_value = mock_tag
 
                 result = tag_manager.create_tag("test_tag")
 
-                tag_manager.color_manager.generate_color.assert_called_once_with(
-                    "test_tag"
-                )
+                tag_manager.color_manager.generate_color.assert_called_once_with("test_tag")
                 mock_tag_class.assert_called_once_with(name="test_tag", color="#FF5733")
                 assert result == mock_tag
 
@@ -118,9 +112,7 @@ class TestTagManager:
         # Mock the existing check query to return None (no existing assignment)
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
-        with patch(
-            "src.core.tagging.tag_manager.DocumentTagAssignment"
-        ) as mock_assignment_class:
+        with patch("src.core.tagging.tag_manager.DocumentTagAssignment") as mock_assignment_class:
             mock_assignment_class.return_value = mock_assignment
 
             result = tag_manager.add_tag_to_document(1, 2)
@@ -139,11 +131,11 @@ class TestTagManager:
             with pytest.raises(Exception, match="Database error"):
                 tag_manager.add_tag_to_document(1, 2)
 
-    def test_remove_tag_from_document_success(
-        self, tag_manager, mock_db_session, mock_assignment
-    ):
+    def test_remove_tag_from_document_success(self, tag_manager, mock_db_session, mock_assignment):
         """Test successfully removing tag from document."""
-        mock_db_session.query.return_value.filter.return_value.filter.return_value.first.return_value = mock_assignment
+        mock_db_session.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_assignment
+        )
         mock_db_session.delete.return_value = None
         mock_db_session.commit.return_value = None
 
@@ -170,9 +162,7 @@ class TestTagManager:
         """Test getting all tags for a document."""
         mock_assignment = MagicMock()
         mock_assignment.tag = mock_tag
-        mock_db_session.query.return_value.filter.return_value.all.return_value = [
-            mock_assignment
-        ]
+        mock_db_session.query.return_value.filter.return_value.all.return_value = [mock_assignment]
 
         result = tag_manager.get_document_tags(1)
 
@@ -181,37 +171,43 @@ class TestTagManager:
 
     def test_suggest_tags_for_document(self, tag_manager, mock_db_session):
         """Test AI-powered tag suggestions."""
-        # Mock AI suggester
+        # Mock AI suggester to return list of dictionaries as expected
         tag_manager.ai_suggester.suggest_tags = MagicMock(
-            return_value=["ai_tag1", "ai_tag2"]
+            return_value=[
+                {
+                    "tag": "ai_tag1",
+                    "confidence": 0.9,
+                    "relevance_score": 0.8,
+                    "source": "ai_generated",
+                },
+                {
+                    "tag": "ai_tag2",
+                    "confidence": 0.7,
+                    "relevance_score": 0.6,
+                    "source": "ai_generated",
+                },
+            ]
         )
 
-        # Mock the database calls using patch
-        with (
-            patch("src.core.tagging.tag_manager.Document") as mock_doc_class,
-            patch("src.core.tagging.tag_manager.DocumentChunk") as mock_chunk_class,
-        ):
-            # Mock document query
-            mock_document = MagicMock()
-            mock_doc_class.query.filter.return_value.first.return_value = mock_document
+        # Mock the database calls
+        mock_document = MagicMock()
+        mock_document.filename = "test.pdf"
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_document
 
-            # Mock chunk query
-            mock_chunk = MagicMock()
-            mock_chunk.content = "Test content"
-            mock_chunk_class.query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
-                mock_chunk
-            ]
+        mock_chunk = MagicMock()
+        mock_chunk.content = "Test content"
+        mock_db_session.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+            mock_chunk
+        ]
 
-            result = tag_manager.suggest_tags_for_document(1, 3)
+        result = tag_manager.suggest_tags_for_document(1, 3)
 
-            assert result == ["ai_tag1", "ai_tag2"]
-            tag_manager.ai_suggester.suggest_tags.assert_called_once()
+        assert result == ["ai_tag1", "ai_tag2"]
+        tag_manager.ai_suggester.suggest_tags.assert_called_once()
 
     def test_delete_tag_success(self, tag_manager, mock_db_session, mock_tag):
         """Test successfully deleting a tag."""
-        mock_db_session.query.return_value.filter.return_value.first.return_value = (
-            mock_tag
-        )
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_tag
         mock_db_session.delete.return_value = None
         mock_db_session.commit.return_value = None
 
@@ -272,9 +268,7 @@ class TestTagManager:
         # Mock document IDs query
         mock_assignment = MagicMock()
         mock_assignment.document_id = 1
-        mock_db_session.query.return_value.filter.return_value.all.return_value = [
-            mock_assignment
-        ]
+        mock_db_session.query.return_value.filter.return_value.all.return_value = [mock_assignment]
 
         # Mock the related tags query result
         mock_result = MagicMock()

@@ -27,6 +27,8 @@ except ImportError:
     TORCH_AVAILABLE = False
     SentenceTransformer = None
 
+from src.core.embeddings import create_embeddings, get_embedding_model
+
 
 @dataclass
 class QueryRequest:
@@ -56,6 +58,7 @@ class BatchEmbeddingService:
         max_batch_size: int = 16,
     ):
         self.model_name = model_name
+        self.backend = backend
         self.max_batch_size = max_batch_size
         self.model = None
         self.device = self._detect_optimal_device()
@@ -65,9 +68,9 @@ class BatchEmbeddingService:
         self.stats = {
             "total_queries": 0,
             "batch_count": 0,
-            "avg_batch_size": 0,
-            "avg_processing_time": 0,
-            "gpu_utilization": 0,
+            "avg_batch_size": 0.0,
+            "avg_processing_time": 0.0,
+            "gpu_utilization": 0.0,
         }
 
         # Initialize model
@@ -100,30 +103,29 @@ class BatchEmbeddingService:
 
     def _initialize_model(self):
         """Initialize the embedding model with optimal settings"""
-        if not TORCH_AVAILABLE:
-            raise ImportError("torch and sentence-transformers required for batch embedding")
-
         try:
-            self.model = SentenceTransformer(
-                self.model_name, device=self.device, trust_remote_code=True
+            # Use the embedding backend system
+            self.model = get_embedding_model(self.model_name, self.backend)
+
+            # Device-specific optimizations (only for sentence-transformers backend)
+            if self.backend == "sentence-transformers" and TORCH_AVAILABLE:
+                if self.device == "mps":
+                    # Metal-specific optimizations for Apple Silicon
+                    self.max_batch_size = min(
+                        self.max_batch_size, 8
+                    )  # Smaller batches for unified memory
+                    torch.mps.set_per_process_memory_fraction(0.8)  # Reserve 20% for system
+                    print("🔧 Applied Metal optimizations for Apple Silicon")
+                elif self.device == "cuda":
+                    # CUDA optimizations
+                    self.max_batch_size = 16  # Larger batches for GPU memory
+                    if torch.cuda.is_available():
+                        torch.cuda.set_per_process_memory_fraction(0.9)  # Use 90% of GPU memory
+                    print("🔧 Applied CUDA optimizations for NVIDIA GPU")
+
+            print(
+                f"✅ Batch embedding service initialized on {self.device.upper()} with {self.backend} backend"
             )
-
-            # Device-specific optimizations
-            if self.device == "mps":
-                # Metal-specific optimizations for Apple Silicon
-                self.max_batch_size = min(
-                    self.max_batch_size, 8
-                )  # Smaller batches for unified memory
-                torch.mps.set_per_process_memory_fraction(0.8)  # Reserve 20% for system
-                print("🔧 Applied Metal optimizations for Apple Silicon")
-            elif self.device == "cuda":
-                # CUDA optimizations
-                self.max_batch_size = 16  # Larger batches for GPU memory
-                if torch.cuda.is_available():
-                    torch.cuda.set_per_process_memory_fraction(0.9)  # Use 90% of GPU memory
-                print("🔧 Applied CUDA optimizations for NVIDIA GPU")
-
-            print(f"✅ Batch embedding service initialized on {self.device.upper()}")
 
         except Exception as e:
             print(f"❌ Failed to initialize embedding model: {e}")
@@ -147,6 +149,7 @@ class BatchEmbeddingService:
                 await self.processor_task
             except asyncio.CancelledError:
                 pass
+            self.processor_task = None
         print("🛑 Batch embedding processor stopped")
 
     async def embed_query_async(self, query: str) -> np.ndarray:
@@ -187,7 +190,18 @@ class BatchEmbeddingService:
 
     def _embed_single_query(self, query: str) -> np.ndarray:
         """Direct embedding for fallback cases"""
-        return self.model.encode([query], convert_to_numpy=True)[0]
+        embeddings, _ = create_embeddings(
+            [query],
+            model_name=self.model_name,
+            backend=self.backend,
+            batch_size=1,
+            show_progress=False,
+            use_cache=False,
+        )
+        if embeddings is not None:
+            return embeddings[0]
+        else:
+            return np.zeros(768)  # fallback
 
     async def _process_batches(self):
         """Main batch processing loop"""
@@ -258,14 +272,17 @@ class BatchEmbeddingService:
         queries = [req.query for req in batch]
 
         try:
-            # Use the model's batch processing
-            embeddings = self.model.encode(
+            # Use the embedding backend system
+            embeddings, _ = create_embeddings(
                 queries,
-                batch_size=len(queries),  # Process as one batch
-                show_progress_bar=False,
-                convert_to_numpy=True,
-                normalize_embeddings=True,
+                model_name=self.model_name,
+                backend=self.backend,
+                batch_size=len(queries),
+                show_progress=False,
+                use_cache=False,
             )
+            if embeddings is None:
+                raise ValueError("Embedding creation returned None")
             return embeddings
 
         except Exception as e:
@@ -274,8 +291,18 @@ class BatchEmbeddingService:
             embeddings = []
             for query in queries:
                 try:
-                    embedding = self.model.encode([query], convert_to_numpy=True)[0]
-                    embeddings.append(embedding)
+                    single_embeddings, _ = create_embeddings(
+                        [query],
+                        model_name=self.model_name,
+                        backend=self.backend,
+                        batch_size=1,
+                        show_progress=False,
+                        use_cache=False,
+                    )
+                    if single_embeddings is not None:
+                        embeddings.append(single_embeddings[0])
+                    else:
+                        embeddings.append(np.zeros(768))
                 except Exception as e2:
                     print(f"❌ Individual embedding failed for query: {e2}")
                     # Return zero vector as fallback
