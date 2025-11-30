@@ -139,15 +139,15 @@ def get_system_metrics():
             .count()
         )
 
-        # File size calculation (from database if available, fallback to filesystem)
+        # File size calculation (from stored content length in database)
         total_size_bytes = 0
-        docs_with_paths = db.query(Document).filter(Document.filepath.isnot(None)).all()
-        for doc in docs_with_paths:
-            if doc.filepath and os.path.exists(doc.filepath):
-                try:
-                    total_size_bytes += os.path.getsize(doc.filepath)
-                except:
-                    pass
+        docs_with_content = (
+            db.query(Document).filter(Document.full_content.isnot(None)).all()
+        )
+        for doc in docs_with_content:
+            # Estimate file size from content length (rough approximation)
+            content_size = len(doc.full_content or "")
+            total_size_bytes += content_size
 
         metrics.update(
             {
@@ -231,8 +231,8 @@ def get_system_metrics():
         metrics["search_connected"] = False
         metrics["total_vectors"] = 0
 
-    # Set embeddings_exist based on total_vectors (after Elasticsearch check)
-    metrics["embeddings_exist"] = metrics.get("total_vectors", 0) > 0
+    # Set embeddings_exist based on total_embeddings
+    metrics["embeddings_exist"] = metrics.get("total_embeddings", 0) > 0
 
     # Redis cache metrics
     try:
@@ -422,13 +422,13 @@ def main():
         )
 
     with col3:
-        total_vectors = metrics.get("total_vectors", 0)
+        total_embeddings = metrics.get("total_embeddings", 0)
         st.markdown(
             f"""
         <div class="metric-card">
-            <div class="metric-value">{total_vectors:,}</div>
+            <div class="metric-value">{total_embeddings:,}</div>
             <div class="metric-label">Vector Embeddings</div>
-            <div style="font-size: 0.8rem; color: #666;">Search index</div>
+            <div style="font-size: 0.8rem; color: #666;">Database stored</div>
         </div>
         """,
             unsafe_allow_html=True,
@@ -1070,7 +1070,7 @@ def main():
         else:
             # No relationships to visualize
             st.info(
-                "📊 No tag relationships found. Add more documents with tags to see the knowledge graph visualization."
+                "📊 No tag relationships found. Relationships are shown for tags that appear together in documents. Add more documents or ensure tags co-occur within documents."
             )
 
     except ImportError:
@@ -1128,9 +1128,9 @@ def main():
         )
 
     with status_col4:
-        embeddings_exist = metrics.get("embeddings_exist", False)
-        total_vectors = metrics.get("total_vectors", 0)
-        status = f"✅ {total_vectors:,}" if embeddings_exist else "❌ Empty"
+        total_embeddings = metrics.get("total_embeddings", 0)
+        embeddings_exist = total_embeddings > 0
+        status = f"✅ {total_embeddings:,}" if embeddings_exist else "❌ Empty"
         color = "#28a745" if embeddings_exist else "#dc3545"
         st.markdown(
             f"""
@@ -1500,7 +1500,7 @@ def main():
                         "database_connected": metrics.get("database_connected", False),
                         "search_connected": metrics.get("search_connected", False),
                         "cache_connected": metrics.get("cache_connected", False),
-                        "total_vectors": metrics.get("total_vectors", 0),
+                        "total_embeddings": metrics.get("total_embeddings", 0),
                     },
                     "cache_performance": {
                         "cached_responses": metrics.get("cached_responses", 0),
@@ -1533,7 +1533,7 @@ def main():
                 f"- Processed Documents: {metrics.get('processed_documents', 0)}",
                 f"- Content Chunks: {metrics.get('total_chunks', 0):,}",
                 f"- Chapters: {metrics.get('total_chapters', 0)}",
-                f"- Vector Embeddings: {metrics.get('total_vectors', 0):,}",
+                f"- Vector Embeddings: {metrics.get('total_embeddings', 0):,}",
                 f"- Total Size: {format_file_size(metrics.get('total_doc_size', 0))}",
                 "",
                 "## 🤖 AI Enrichment",

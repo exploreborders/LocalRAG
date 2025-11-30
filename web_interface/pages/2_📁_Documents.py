@@ -242,8 +242,16 @@ def process_uploaded_files(uploaded_files):
         status_text.text(f"Processing {filename}: {message}")
         progress_bar.progress(int(progress))
 
+    # Get embedding model from settings
+    from utils.session_manager import load_settings
+
+    settings = load_settings()
+    embedding_model = settings.get("retrieval", {}).get(
+        "embedding_model", "embeddinggemma:latest"
+    )
+
     # Initialize upload processor
-    processor = UploadProcessor()
+    processor = UploadProcessor(embedding_model=embedding_model)
 
     try:
         status_text.text("Starting upload process...")
@@ -326,7 +334,7 @@ def reprocess_documents():
             progress_bar.progress(int(progress))
 
         # Use UploadProcessor for reprocessing
-        processor = UploadProcessor()
+        processor = UploadProcessor(embedding_model=embedding_model)
 
         status_text.text(
             "🔄 Starting reprocessing with enhanced structure extraction..."
@@ -1206,8 +1214,14 @@ def main():
                     status_text.text(f"Reprocessing {filename}: {message}")
                     progress_bar.progress(int(progress))
 
+                # Get embedding model from settings
+                settings = load_settings()
+                embedding_model = settings.get("retrieval", {}).get(
+                    "embedding_model", "embeddinggemma:latest"
+                )
+
                 # Perform batch reprocessing
-                processor = UploadProcessor()
+                processor = UploadProcessor(embedding_model=embedding_model)
                 successful_reprocess = 0
                 total_chunks = 0
                 total_chapters = 0

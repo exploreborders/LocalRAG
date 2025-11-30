@@ -44,10 +44,15 @@ class DocumentProcessor(BaseProcessor):
     - Automatic language detection and preprocessing
     """
 
-    def __init__(self, db: Optional[Session] = None):
+    def __init__(
+        self,
+        db: Optional[Session] = None,
+        embedding_model: str = "embeddinggemma:latest",
+    ):
         super().__init__(db or SessionLocal())
         self.tag_manager = TagManager(self.db)
         self.category_manager = CategoryManager(self.db)
+        self.embedding_model = embedding_model
         self.tag_suggester = AITagSuggester()
 
     def _suggest_categories_ai(
@@ -208,6 +213,7 @@ class DocumentProcessor(BaseProcessor):
         filename: Optional[str] = None,
         use_advanced_processing: bool = False,
         progress_callback: Optional[Callable[[str, int, str], None]] = None,
+        content: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Process a document with optional advanced AI-powered pipeline.
@@ -217,6 +223,7 @@ class DocumentProcessor(BaseProcessor):
             filename: Optional filename override
             use_advanced_processing: Whether to use comprehensive AI pipeline
             progress_callback: Optional progress callback
+            content: Optional pre-extracted content (if provided, skips file reading)
 
         Returns:
             Processing results
@@ -226,14 +233,14 @@ class DocumentProcessor(BaseProcessor):
                 f"Using ADVANCED processing for {filename or os.path.basename(file_path)}"
             )
             return self._process_document_advanced(
-                file_path, filename, progress_callback
+                file_path, filename, progress_callback, content
             )
         else:
             logger.info(
                 f"Using STANDARD processing for {filename or os.path.basename(file_path)}"
             )
             return self._process_document_standard(
-                file_path, filename, progress_callback
+                file_path, filename, progress_callback, content
             )
 
     def _process_document_advanced(
@@ -241,6 +248,7 @@ class DocumentProcessor(BaseProcessor):
         file_path: str,
         filename: Optional[str] = None,
         progress_callback: Optional[Callable[[str, int, str], None]] = None,
+        content: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Process document using comprehensive AI-powered pipeline.
@@ -374,7 +382,7 @@ class DocumentProcessor(BaseProcessor):
                     content=chunk_data["content"],
                     chunk_index=i,
                     chapter_title=chunk_data.get("chapter", "auto"),
-                    embedding_model="sentence-transformers",  # Default embedding model
+                    embedding_model=self.embedding_model,  # Use configured model
                 )
                 self.db.add(chunk)
 
@@ -409,6 +417,7 @@ class DocumentProcessor(BaseProcessor):
         file_path: str,
         filename: Optional[str] = None,
         progress_callback: Optional[Callable[[str, int, str], None]] = None,
+        content: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Process a single document with enhanced structure extraction.
@@ -428,21 +437,32 @@ class DocumentProcessor(BaseProcessor):
             progress_callback(filename, 0, f"Starting processing of {filename}")
 
         try:
-            # Detect language
-            language = self._detect_language_from_file(file_path)
-            if progress_callback:
-                progress_callback(filename, 10, f"Detected language: {language}")
+            # Use provided content or extract from file
+            if content is not None:
+                doc_content = content
+                language = self._detect_language_from_content(doc_content)
+                if progress_callback:
+                    progress_callback(
+                        filename,
+                        10,
+                        f"Using provided content, detected language: {language}",
+                    )
+            else:
+                # Detect language
+                language = self._detect_language_from_file(file_path)
+                if progress_callback:
+                    progress_callback(filename, 10, f"Detected language: {language}")
 
-            # Lazy import to avoid dependency issues during testing
-            from src.data.loader import split_documents
+                # Lazy import to avoid dependency issues during testing
+                from src.data.loader import split_documents
 
-            # Load document content
-            doc_content = split_documents([file_path])
-            if not doc_content:
-                return {"success": False, "error": "Failed to load document"}
+                # Load document content
+                doc_content = split_documents([file_path])
+                if not doc_content:
+                    return {"success": False, "error": "Failed to load document"}
 
-            # Detect language from extracted content
-            language = self._detect_language_from_content(doc_content)
+                # Detect language from extracted content
+                language = self._detect_language_from_content(doc_content)
 
             # Create document record
             with open(file_path, "rb") as f:
@@ -621,25 +641,48 @@ class DocumentProcessor(BaseProcessor):
         """Detect all chapters from the full document content."""
         chapters = []
 
-        # Look for ## headers (markdown)
+        # Look for ## headers (markdown) and extract content between headers
         lines = content.split("\n")
+        current_chapter = None
+        chapter_content_lines = []
+
         for i, line in enumerate(lines):
             if line.strip().startswith("##"):
+                # Save previous chapter if it exists
+                if current_chapter and chapter_content_lines:
+                    current_chapter["content"] = "\n".join(
+                        chapter_content_lines
+                    ).strip()
+                    chapters.append(current_chapter)
+
+                # Start new chapter
                 header_text = line.strip()[2:].strip()  # Remove ##
                 if header_text and len(header_text) > 3:
                     # Extract just the title (first line, truncated to 255 chars)
                     title_lines = header_text.split("\n")
                     short_title = title_lines[0].strip()[:255]  # Limit to 255 chars
 
-                    chapters.append(
-                        {
-                            "title": short_title,
-                            "content": header_text,  # Store full content separately
-                            "path": f"section_{len(chapters) + 1}",
-                            "start_line": i,
-                            "level": 2,
-                        }
-                    )
+                    current_chapter = {
+                        "title": short_title,
+                        "content": "",  # Will be filled with content between headers
+                        "path": f"section_{len(chapters) + 1}",
+                        "start_line": i,
+                        "level": 2,
+                    }
+                    chapter_content_lines = [
+                        header_text
+                    ]  # Include the header in content
+                else:
+                    current_chapter = None
+                    chapter_content_lines = []
+            elif current_chapter:
+                # Add line to current chapter content
+                chapter_content_lines.append(line)
+
+        # Save the last chapter
+        if current_chapter and chapter_content_lines:
+            current_chapter["content"] = "\n".join(chapter_content_lines).strip()
+            chapters.append(current_chapter)
 
         # Look for table format | number | title | (markdown tables)
         table_matches = re.findall(
@@ -893,8 +936,8 @@ class DocumentProcessor(BaseProcessor):
                     "key_topics": document.key_topics,
                     "reading_time_minutes": document.reading_time_minutes,
                     "status": document.status,
-                    "created_at": document.created_at.isoformat()
-                    if document.created_at
+                    "created_at": document.upload_date.isoformat()
+                    if document.upload_date
                     else None,
                 }
 

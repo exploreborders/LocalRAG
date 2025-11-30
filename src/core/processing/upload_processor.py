@@ -40,9 +40,15 @@ class UploadProcessor(BaseProcessor):
     and comprehensive upload workflows.
     """
 
-    def __init__(self, max_workers: Optional[int] = None, db: Optional[Session] = None):
+    def __init__(
+        self,
+        max_workers: Optional[int] = None,
+        db: Optional[Session] = None,
+        embedding_model: str = "embeddinggemma:latest",
+    ):
         super().__init__(db or SessionLocal())
         self.max_workers = max_workers or min(mp.cpu_count(), 4)
+        self.embedding_model = embedding_model
 
     def __del__(self):
         """Clean up database connections."""
@@ -50,14 +56,18 @@ class UploadProcessor(BaseProcessor):
             self.db.close()
 
     def process_files(
-        self, file_paths: List[str], progress_callback: Optional[Callable] = None
+        self,
+        file_paths: List[str],
+        progress_callback: Optional[Callable] = None,
+        use_parallel: bool = True,
     ) -> Dict[str, Any]:
         """
-        Process multiple files in parallel.
+        Process multiple files, optionally in parallel.
 
         Args:
             file_paths: List of file paths to process
             progress_callback: Optional callback for overall progress
+            use_parallel: Whether to use parallel processing
 
         Returns:
             Dict with batch processing results
@@ -65,18 +75,37 @@ class UploadProcessor(BaseProcessor):
         results = []
         total_files = len(file_paths)
 
-        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit all tasks
-            future_to_file = {
-                executor.submit(self._process_single_file, file_path): file_path
-                for file_path in file_paths
-            }
+        if use_parallel and len(file_paths) > 1:
+            with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+                # Submit all tasks
+                future_to_file = {
+                    executor.submit(self._process_single_file, file_path): file_path
+                    for file_path in file_paths
+                }
 
-            # Collect results as they complete
-            for i, future in enumerate(as_completed(future_to_file)):
-                file_path = future_to_file[future]
+                # Collect results as they complete
+                for i, future in enumerate(as_completed(future_to_file)):
+                    file_path = future_to_file[future]
+                    try:
+                        result = future.result()
+                        results.append(result)
+
+                        if progress_callback:
+                            progress = (i + 1) / total_files * 100
+                            progress_callback(
+                                progress, f"Processed {i + 1}/{total_files} files"
+                            )
+
+                    except Exception as e:
+                        logger.error(f"Failed to process {file_path}: {e}")
+                        results.append(
+                            {"file_path": file_path, "success": False, "error": str(e)}
+                        )
+        else:
+            # Sequential processing
+            for i, file_path in enumerate(file_paths):
                 try:
-                    result = future.result()
+                    result = self._process_single_file(file_path)
                     results.append(result)
 
                     if progress_callback:
@@ -95,11 +124,32 @@ class UploadProcessor(BaseProcessor):
         successful = sum(1 for r in results if r.get("success", False))
         failed = total_files - successful
 
+        # Calculate totals for compatibility with web interface
+        total_chunks = sum(
+            r.get("chunks_created", 0) for r in results if r.get("success", False)
+        )
+        total_chapters = sum(
+            r.get("chapters_created", 0) for r in results if r.get("success", False)
+        )
+
+        # Extract errors for compatibility
+        errors = [
+            r.get("error", "Unknown error")
+            for r in results
+            if not r.get("success", False)
+        ]
+
         return {
             "total_files": total_files,
             "successful": successful,
+            "successful_uploads": successful,  # For backward compatibility
             "failed": failed,
+            "failed_uploads": failed,  # For backward compatibility
+            "total_chunks": total_chunks,
+            "total_chapters": total_chapters,
             "results": results,
+            "file_results": results,  # For backward compatibility
+            "errors": errors,  # For backward compatibility
         }
 
     def process_single_file(
@@ -603,19 +653,69 @@ class UploadProcessor(BaseProcessor):
             }
 
     def upload_files(
-        self, file_paths: List[str], progress_callback: Optional[Callable] = None
+        self,
+        files,
+        progress_callback: Optional[Callable] = None,
+        data_dir: Optional[str] = None,
+        use_parallel: bool = True,
+        max_workers: Optional[int] = None,
+        enable_streaming: bool = False,
+        memory_limit_mb: int = 512,
     ) -> Dict[str, Any]:
         """
         Upload and process multiple files.
 
         Args:
-            file_paths: List of file paths to upload and process
+            files: List of file paths (str) or Streamlit UploadedFile objects
             progress_callback: Optional callback for progress updates
+            data_dir: Optional data directory for saving uploaded files
+            use_parallel: Whether to use parallel processing
+            max_workers: Maximum number of worker threads
+            enable_streaming: Whether to use streaming for large files
+            memory_limit_mb: Memory limit in MB
 
         Returns:
             Dict with upload results
         """
-        return self.process_files(file_paths, progress_callback)
+        import tempfile
+        import os
+
+        # Store processing options (could be used in future enhancements)
+        self.enable_streaming = enable_streaming
+        self.memory_limit_mb = memory_limit_mb
+
+        if max_workers:
+            self.max_workers = max_workers
+
+        # Handle both file paths and UploadedFile objects
+        processed_files = []
+        temp_files = []
+
+        for file_obj in files:
+            if hasattr(file_obj, "getvalue"):  # Streamlit UploadedFile
+                # Save UploadedFile to temporary location
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=f"_{file_obj.name}"
+                ) as tmp_file:
+                    tmp_file.write(file_obj.getvalue())
+                    temp_file_path = tmp_file.name
+
+                temp_files.append(temp_file_path)
+                processed_files.append(temp_file_path)
+            else:  # Assume it's a file path (string)
+                processed_files.append(str(file_obj))
+
+        # Process files
+        result = self.process_files(processed_files, progress_callback, use_parallel)
+
+        # Clean up temporary files after processing
+        for temp_file in temp_files:
+            try:
+                os.unlink(temp_file)
+            except Exception:
+                pass  # Ignore cleanup errors
+
+        return result
 
     def _process_single_file(self, file_path: str) -> Dict[str, Any]:
         """
@@ -651,17 +751,27 @@ class UploadProcessor(BaseProcessor):
                     "message": "Document already exists",
                     "document_id": existing_doc.id,
                     "file_path": file_path,
+                    "chunks_created": 0,  # Not creating new chunks
+                    "chapters_created": 0,  # Not creating new chapters
                 }
 
             # Process the document
-            processor = DocumentProcessor(db)
+            processor = DocumentProcessor(db, embedding_model=self.embedding_model)
             result = processor.process_document(file_path, filename)
 
             db.close()
 
             if result.get("success"):
-                result["file_path"] = file_path
-                result["filename"] = filename
+                # Format result for compatibility with web interface expectations
+                return {
+                    "success": True,
+                    "filename": filename,
+                    "file_path": file_path,
+                    "document_id": result.get("document_id"),
+                    "chunks_created": result.get("chunks_count", 0),
+                    "chapters_created": 0,  # DocumentProcessor doesn't create chapters directly
+                    "message": f"Successfully processed document with {result.get('chunks_count', 0)} chunks",
+                }
 
             return result
 
@@ -672,4 +782,6 @@ class UploadProcessor(BaseProcessor):
                 "filename": Path(file_path).name if file_path else "unknown",
                 "error": str(e),
                 "file_path": file_path,
+                "chunks_created": 0,
+                "chapters_created": 0,
             }

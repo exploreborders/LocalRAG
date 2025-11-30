@@ -193,8 +193,15 @@ class DatabaseRetriever:
         Returns:
             List of retrieved document chunks with scores
         """
-        # Generate query embedding
-        query_embedding = self.model.encode([query])[0]
+        # Generate query embedding using the appropriate backend
+        from src.core.embeddings import create_embeddings
+
+        embeddings_array, _ = create_embeddings(
+            [query], model_name=self.model_name, backend=self.backend
+        )
+        if embeddings_array is None or len(embeddings_array) == 0:
+            raise ProcessingError(f"Failed to generate embedding for query: {query}")
+        query_embedding = embeddings_array[0]
 
         # Build Elasticsearch query
         es_query = self._build_es_query(
@@ -209,7 +216,7 @@ class DatabaseRetriever:
         try:
             es_client = self._get_es_client()
             response = es_client.search(
-                index="documents",
+                index="chunks",
                 body=es_query,
                 size=top_k * 2,  # Get more results for reranking
             )

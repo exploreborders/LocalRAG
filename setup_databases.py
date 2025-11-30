@@ -38,14 +38,15 @@ def setup_docker_databases():
 
     # Start databases
     if not run_command(
-        "docker-compose up -d postgres elasticsearch",
-        "Starting PostgreSQL and Elasticsearch containers",
+        "docker-compose up -d postgres elasticsearch redis",
+        "Starting PostgreSQL, Elasticsearch, and Redis containers",
     ):
         return False
 
     print("\n⏳ Waiting for databases to be ready...")
     print("PostgreSQL will be available at: localhost:5432")
     print("Elasticsearch will be available at: localhost:9200")
+    print("Redis will be available at: localhost:6379")
 
     # Check if databases are ready
     import time
@@ -84,10 +85,27 @@ def setup_docker_databases():
     except Exception as e:
         print(f"⚠️ Elasticsearch connection check failed: {e}")
 
+    # Test Redis connection
+    try:
+        import redis
+
+        r = redis.Redis(host="localhost", port=6379, db=0)
+        if r.ping():
+            print("✅ Redis connection successful")
+        else:
+            print("⚠️ Redis ping failed")
+    except ImportError:
+        print("⚠️ redis not available, skipping Redis check")
+    except Exception as e:
+        print(f"⚠️ Redis connection check failed: {e}")
+
     print("\n🎉 Databases are ready!")
     print("Run the following commands to complete setup:")
-    print("  python scripts/migrate_to_db.py")
-    print("  python src/database/opensearch_setup.py")
+    print("  python run_schema.py                    # Create database tables")
+    print("  python scripts/migrate_to_db.py         # Migrate document data")
+    print("  python scripts/migrate_database_schema.py  # Apply schema updates")
+    print("  python src/database/opensearch_setup.py    # Set up search indexes")
+    print("\nRedis caching is now available for improved performance!")
 
     return True
 
@@ -117,9 +135,14 @@ def setup_local_databases():
         '   docker run -d -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" elasticsearch:8.11.0'
     )
     print()
-    print("6. Update .env file with your local settings")
-    print("7. Run: python scripts/migrate_to_db.py")
-    print("8. Run: python src/database/opensearch_setup.py")
+    print("6. Install Redis:")
+    print("   docker run -d -p 6379:6379 redis:7-alpine")
+    print()
+    print("7. Update .env file with your local settings")
+    print("8. Run: python run_schema.py                    # Create database tables")
+    print("9. Run: python scripts/migrate_to_db.py         # Migrate document data")
+    print("10. Run: python scripts/migrate_database_schema.py  # Apply schema updates")
+    print("11. Run: python src/database/opensearch_setup.py   # Set up search indexes")
 
 
 def stop_docker_databases():

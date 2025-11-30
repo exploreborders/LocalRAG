@@ -88,6 +88,13 @@ def initialize_databases():
     ):
         return False
 
+    # Create database schema first
+    if not run_command(
+        "source rag_env/bin/activate && python run_schema.py",
+        "Creating database schema",
+    ):
+        return False
+
     # Run migrations
     if not run_command(
         "source rag_env/bin/activate && python scripts/migrate_to_db.py",
@@ -125,35 +132,6 @@ def start_app_service():
             "⚠️ App service failed to start, but databases are ready. You can start it manually with: docker-compose up -d rag_app"
         )
         return False
-
-    return True
-
-
-def download_spacy_models():
-    """Download required spaCy language models."""
-    print("\n📥 Downloading spaCy language models...")
-
-    models = [
-        "de_core_news_sm",
-        "fr_core_news_sm",
-        "es_core_news_sm",
-        "it_core_news_sm",
-        "pt_core_news_sm",
-        "nl_core_news_sm",
-        "sv_core_news_sm",
-        "pl_core_news_sm",
-        "zh_core_web_sm",
-        "ja_core_news_sm",
-        "ko_core_news_sm",
-    ]
-
-    for model in models:
-        if not run_command(
-            f"source rag_env/bin/activate && python -m spacy download {model}",
-            f"Downloading {model}",
-            timeout=120,
-        ):
-            print(f"⚠️ Failed to download {model}, continuing...")
 
     return True
 
@@ -230,10 +208,6 @@ def main():
     print(
         "ℹ️ Databases are ready! Start the app manually with: docker-compose up -d rag_app"
     )
-
-    # Note: spaCy model downloads are skipped in automated setup due to long download times
-    # Download them manually later if needed
-    print("ℹ️ spaCy models not downloaded automatically. Download manually if needed.")
 
     # Run tests
     if not run_tests():
