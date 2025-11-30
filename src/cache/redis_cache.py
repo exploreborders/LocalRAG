@@ -65,7 +65,7 @@ class RedisCache:
     def delete(self, key: str) -> bool:
         """Delete specific cache entry"""
         try:
-            result = self.redis.delete(key)
+            self.redis.delete(key)
             return True  # Redis delete succeeds even if key doesn't exist
         except Exception as e:
             logger.error(f"Cache delete error for key {key}: {e}")
@@ -100,7 +100,9 @@ class RedisCache:
             logger.error(f"Cache stats error: {e}")
             return {}
 
-    def get_document_metadata(self, doc_ids: list) -> Optional[Dict[int, Dict[str, Any]]]:
+    def get_document_metadata(
+        self, doc_ids: list
+    ) -> Optional[Dict[int, Dict[str, Any]]]:
         """Retrieve cached document metadata for multiple documents"""
         if not doc_ids:
             return {}

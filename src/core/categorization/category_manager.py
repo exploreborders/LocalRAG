@@ -51,7 +51,7 @@ class CategoryManager:
             self.db.add(category)
             self.db.commit()
             return category
-        except Exception as e:
+        except Exception as _e:
             self.db.rollback()
             return None
 
@@ -77,7 +77,7 @@ class CategoryManager:
             self.db.add(assignment)
             self.db.commit()
             return True
-        except Exception as e:
+        except Exception as _e:
             self.db.rollback()
             return False
 
@@ -98,7 +98,7 @@ class CategoryManager:
                 self.db.commit()
                 return True
             return False
-        except Exception as e:
+        except Exception as _e:
             self.db.rollback()
             return False
 
@@ -109,12 +109,18 @@ class CategoryManager:
             .filter(DocumentCategoryAssignment.document_id == document_id)
             .all()
         )
-        return [assignment.category for assignment in assignments if assignment.category]
+        return [
+            assignment.category for assignment in assignments if assignment.category
+        ]
 
     def get_category_hierarchy(self, category_id: int) -> List[DocumentCategory]:
         """Get the full hierarchy path for a category."""
         hierarchy = []
-        current = self.db.query(DocumentCategory).filter(DocumentCategory.id == category_id).first()
+        current = (
+            self.db.query(DocumentCategory)
+            .filter(DocumentCategory.id == category_id)
+            .first()
+        )
 
         while current:
             hierarchy.insert(0, current)
@@ -151,7 +157,9 @@ class CategoryManager:
             self.db.query(
                 DocumentCategory.name,
                 DocumentCategory.description,
-                func.count(DocumentCategoryAssignment.document_id).label("document_count"),
+                func.count(DocumentCategoryAssignment.document_id).label(
+                    "document_count"
+                ),
             )
             .outerjoin(DocumentCategoryAssignment)
             .group_by(DocumentCategory.id)
@@ -207,7 +215,9 @@ class CategoryManager:
         try:
             # Check if the category exists
             root_category = (
-                self.db.query(DocumentCategory).filter(DocumentCategory.id == category_id).first()
+                self.db.query(DocumentCategory)
+                .filter(DocumentCategory.id == category_id)
+                .first()
             )
 
             if not root_category:
@@ -235,7 +245,9 @@ class CategoryManager:
             # Delete the categories themselves (in reverse order to handle foreign keys)
             for cat_id in reversed(all_category_ids):
                 category = (
-                    self.db.query(DocumentCategory).filter(DocumentCategory.id == cat_id).first()
+                    self.db.query(DocumentCategory)
+                    .filter(DocumentCategory.id == cat_id)
+                    .first()
                 )
                 if category:
                     self.db.delete(category)

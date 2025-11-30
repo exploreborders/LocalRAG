@@ -4,9 +4,6 @@ OpenSearch setup script for RAG system.
 Run this after starting OpenSearch.
 """
 
-import json
-import os
-
 from elasticsearch import Elasticsearch
 
 
