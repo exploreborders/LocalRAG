@@ -95,9 +95,7 @@ class TestDatabaseRetriever:
             mock_document.filename = "test.pdf"
             mock_document.tags = []
             mock_document.categories = []
-            mock_session.query.return_value.filter.return_value.first.return_value = (
-                mock_document
-            )
+            mock_session.query.return_value.filter.return_value.first.return_value = mock_document
 
             with patch.object(retriever, "_get_es_client", return_value=mock_es_client):
                 with patch.object(retriever, "_rerank_results") as mock_rerank:
@@ -150,9 +148,7 @@ class TestRAGPipelineDB:
             mock_generate.return_value = "Generated answer"
 
             with patch.object(pipeline, "_format_sources") as mock_format:
-                mock_format.return_value = [
-                    {"title": "test", "content": "test content"}
-                ]
+                mock_format.return_value = [{"title": "test", "content": "test content"}]
 
                 result = pipeline.query("test question")
 
