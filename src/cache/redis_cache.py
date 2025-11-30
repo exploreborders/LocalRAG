@@ -34,7 +34,7 @@ class RedisCache:
             )
             self.redis.ping()  # Test connection
             logger.info("Redis cache connected successfully")
-        except redis.ConnectionError as e:
+        except Exception as e:
             logger.error(f"Redis connection failed: {e}")
             raise
 
@@ -66,7 +66,8 @@ class RedisCache:
     def delete(self, key: str) -> bool:
         """Delete specific cache entry"""
         try:
-            return bool(self.redis.delete(key))
+            result = self.redis.delete(key)
+            return True  # Redis delete succeeds even if key doesn't exist
         except Exception as e:
             logger.error(f"Cache delete error for key {key}: {e}")
             return False
@@ -90,7 +91,7 @@ class RedisCache:
 
             return {
                 "total_keys": keys,
-                "memory_used": info.get("used_memory_human", "unknown"),
+                "used_memory": info.get("used_memory_human", "unknown"),
                 "hit_rate": info.get("keyspace_hits", 0)
                 / max(info.get("keyspace_misses", 0) + info.get("keyspace_hits", 0), 1),
                 "connected_clients": info.get("connected_clients", 0),
@@ -100,7 +101,9 @@ class RedisCache:
             logger.error(f"Cache stats error: {e}")
             return {}
 
-    def get_document_metadata(self, doc_ids: list) -> Optional[Dict[int, Dict[str, Any]]]:
+    def get_document_metadata(
+        self, doc_ids: list
+    ) -> Optional[Dict[int, Dict[str, Any]]]:
         """Retrieve cached document metadata for multiple documents"""
         if not doc_ids:
             return {}
@@ -108,7 +111,7 @@ class RedisCache:
         try:
             # Create pipeline for batch get
             pipeline = self.redis.pipeline()
-            keys = [f"doc_meta:{doc_id}" for doc_id in doc_ids]
+            keys = [f"doc_metadata:{doc_id}" for doc_id in doc_ids]
             for key in keys:
                 pipeline.get(key)
             results = pipeline.execute()
@@ -125,7 +128,7 @@ class RedisCache:
     def set_document_metadata(self, doc_id: int, metadata: Dict[str, Any]) -> bool:
         """Cache document metadata"""
         try:
-            key = f"doc_meta:{doc_id}"
+            key = f"doc_metadata:{doc_id}"
             data = json.dumps(metadata)
             return bool(self.redis.setex(key, self.ttl_seconds, data))
         except Exception as e:
