@@ -22,9 +22,7 @@ class TestRedisCache:
         mock_redis.Redis.return_value = mock_redis_instance
         mock_redis_instance.ping.return_value = True
 
-        cache = RedisCache(
-            host="localhost", port=6379, password="test", db=1, ttl_hours=48
-        )
+        cache = RedisCache(host="localhost", port=6379, password="test", db=1, ttl_hours=48)
 
         assert cache.redis == mock_redis_instance
         assert cache.ttl_seconds == 48 * 3600  # 48 hours in seconds
@@ -247,9 +245,7 @@ class TestRedisCache:
         result = cache.health_check()
 
         assert result is True
-        assert (
-            mock_redis_instance.ping.call_count == 2
-        )  # Once in __init__, once in health_check
+        assert mock_redis_instance.ping.call_count == 2  # Once in __init__, once in health_check
 
     @patch("src.cache.redis_cache.redis")
     def test_health_check_failure(self, mock_redis):

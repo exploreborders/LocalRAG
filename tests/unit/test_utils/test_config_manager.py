@@ -247,3 +247,112 @@ class TestConfigClasses:
         assert config.enabled == True
         assert config.cache_type == "redis"
         assert config.ttl_hours == 24
+
+    @patch.dict(
+        "os.environ",
+        {
+            "EMBEDDING_MODEL": "custom-embedding",
+            "LLM_MODEL": "custom-llm",
+            "LLM_SMALL_MODEL": "custom-small-llm",
+            "VISION_MODEL": "custom-vision",
+            "VISION_SMALL_MODEL": "custom-small-vision",
+            "STRUCTURE_MODEL": "custom-structure",
+            "TOPIC_MODEL": "custom-topic",
+        },
+    )
+    def test_load_model_overrides(self):
+        """Test loading model overrides from environment."""
+        config = ConfigManager()
+        # _load_model_overrides is called in __init__
+
+        assert config.models.embedding_model == "custom-embedding"
+        assert config.models.llm_model == "custom-llm"
+        assert config.models.llm_small_model == "custom-small-llm"
+        assert config.models.vision_model == "custom-vision"
+        assert config.models.vision_small_model == "custom-small-vision"
+        assert config.models.structure_model == "custom-structure"
+        assert config.models.topic_model == "custom-topic"
+
+    def test_get_vision_model(self):
+        """Test getting vision model."""
+        config = ConfigManager()
+        model = config.get_vision_model()
+        assert isinstance(model, str)
+        assert len(model) > 0
+
+    def test_get_vision_model_small(self):
+        """Test getting small vision model."""
+        config = ConfigManager()
+        model = config.get_vision_model("small")
+        assert isinstance(model, str)
+        assert len(model) > 0
+
+    def test_get_structure_model(self):
+        """Test getting structure model."""
+        config = ConfigManager()
+        model = config.get_structure_model()
+        assert isinstance(model, str)
+        assert len(model) > 0
+
+    def test_get_topic_model(self):
+        """Test getting topic model."""
+        config = ConfigManager()
+        model = config.get_topic_model()
+        assert isinstance(model, str)
+        assert len(model) > 0
+
+    def test_get_database_url(self):
+        """Test getting database URL."""
+        config = ConfigManager()
+        url = config.get_database_url()
+        assert isinstance(url, str)
+        assert "postgresql" in url or "postgres" in url
+
+    def test_get_opensearch_url(self):
+        """Test getting OpenSearch URL."""
+        config = ConfigManager()
+        url = config.get_opensearch_url()
+        assert isinstance(url, str)
+        assert "http" in url
+
+    def test_get_redis_url(self):
+        """Test getting Redis URL."""
+        config = ConfigManager()
+        url = config.get_redis_url()
+        assert isinstance(url, str)
+        assert "redis" in url
+
+    def test_validate_config(self):
+        """Test configuration validation."""
+        config = ConfigManager()
+        result = config.validate_config()
+        assert isinstance(result, dict)
+        assert "valid" in result
+
+    def test_to_dict(self):
+        """Test converting config to dictionary."""
+        config = ConfigManager()
+        result = config.to_dict()
+        assert isinstance(result, dict)
+        assert "database" in result
+        assert "opensearch" in result
+        assert "redis" in result
+        assert "ollama" in result
+        assert "cache" in result
+        assert "models" in result
+
+
+def test_get_config():
+    """Test getting global config instance."""
+    from src.utils.config_manager import get_config
+
+    config = get_config()
+    assert isinstance(config, ConfigManager)
+
+
+def test_reload_config():
+    """Test reloading configuration."""
+    from src.utils.config_manager import reload_config
+
+    config = reload_config()
+    assert isinstance(config, ConfigManager)

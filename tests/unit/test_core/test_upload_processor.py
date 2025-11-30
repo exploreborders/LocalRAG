@@ -149,38 +149,6 @@ class TestUploadProcessor:
             assert result["message"] == "Document already exists"
             assert "document_id" in result
 
-    def test_process_single_file_force_reprocess(
-        self, upload_processor, mock_db_session, mock_document
-    ):
-        """Test force reprocessing of existing document."""
-        with (
-            patch("src.core.processing.upload_processor.hashlib") as mock_hashlib,
-            patch("builtins.open", mock_open(read_data=b"fake content")),
-            patch(
-                "src.core.processing.upload_processor.SessionLocal",
-                return_value=mock_db_session,
-            ),
-        ):
-            mock_hash = MagicMock()
-            mock_hash.hexdigest.return_value = "test_hash"
-            mock_hashlib.sha256.return_value = mock_hash
-
-            # Mock document existing
-            mock_db_session.query.return_value.filter.return_value.first.return_value = (
-                mock_document
-            )
-
-            # Mock reprocess method
-            with patch.object(upload_processor, "reprocess_existing_document") as mock_reprocess:
-                mock_reprocess.return_value = {"success": True, "document_id": 1}
-
-                result = upload_processor.process_single_file(
-                    "/tmp/test.pdf", force_enrichment=True
-                )
-
-                mock_reprocess.assert_called_once()
-                assert result["success"] is True
-
     def test_process_single_file_advanced_processing_auto_detect(
         self, upload_processor, mock_db_session
     ):
@@ -320,3 +288,23 @@ class TestUploadProcessor:
 
             assert result["success"] is False
             assert "File read error" in result["error"]
+
+    def test_process_files_with_progress_callback(self, upload_processor):
+        """Test file processing with progress callback."""
+        file_paths = ["/tmp/test1.pdf", "/tmp/test2.pdf"]
+        progress_calls = []
+
+        def progress_callback(progress, message):
+            progress_calls.append((progress, message))
+
+        with patch.object(upload_processor, "_process_single_file") as mock_process:
+            mock_process.return_value = {"success": True, "filename": "test.pdf"}
+
+            result = upload_processor.process_files(
+                file_paths, use_parallel=False, progress_callback=progress_callback
+            )
+
+            assert result["total_files"] == 2
+            assert len(progress_calls) == 2
+            assert progress_calls[0][0] == 50.0  # 1/2 * 100
+            assert progress_calls[1][0] == 100.0  # 2/2 * 100

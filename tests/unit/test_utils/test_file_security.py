@@ -7,7 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from src.utils.file_security import FileSecurityError, FileUploadValidator
+from src.utils.file_security import (
+    FileSecurityError,
+    FileUploadValidator,
+    create_secure_upload_validator,
+)
 
 
 class TestFileUploadValidator:
@@ -127,6 +131,117 @@ class TestFileUploadValidator:
 
             with pytest.raises(FileSecurityError):
                 validator.validate_uploaded_file(filename, file_size, content)
+
+    def test_validate_mime_type_allowed(self):
+        """Test MIME type validation with allowed types."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            validator = FileUploadValidator(temp_dir)
+
+            # Test allowed MIME types
+            allowed_files = [
+                "document.pdf",
+                "report.docx",
+                "data.xlsx",
+                "notes.txt",
+            ]
+
+            for filename in allowed_files:
+                # Create a temporary file
+                file_path = Path(temp_dir) / filename
+                file_path.write_text("test content")
+
+                # Should not raise an exception
+                validator.validate_mime_type(str(file_path))
+
+    def test_validate_mime_type_unknown_extension(self):
+        """Test MIME type validation with unknown extensions."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            validator = FileUploadValidator(temp_dir)
+
+            # Test unknown extension - should not raise (defaults to application/octet-stream)
+            unknown_filename = "file.unknown"
+            file_path = Path(temp_dir) / unknown_filename
+            file_path.write_text("test content")
+
+            # Should not raise for unknown extensions
+            validator.validate_mime_type(str(file_path))
+
+    def test_validate_file_path_valid(self):
+        """Test file path validation with valid paths."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            validator = FileUploadValidator(temp_dir)
+
+            # Test valid file path within upload directory
+            file_path = Path(temp_dir) / "test.pdf"
+            file_path.write_text("test content")
+
+            result = validator.validate_file_path(str(file_path))
+            assert isinstance(result, Path)
+            assert result == file_path.resolve()
+
+    def test_validate_file_path_outside_upload_dir(self):
+        """Test file path validation with paths outside upload directory."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            validator = FileUploadValidator(temp_dir)
+
+            # Test path outside upload directory
+            outside_path = Path(temp_dir).parent / "outside.txt"
+
+            with pytest.raises(FileSecurityError):
+                validator.validate_file_path(str(outside_path))
+
+    def test_save_uploaded_file_success(self):
+        """Test successful file saving."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            validator = FileUploadValidator(temp_dir)
+
+            filename = "test.pdf"
+            content = b"PDF content here"
+
+            saved_path, file_info = validator.save_uploaded_file(filename, content)
+
+            assert saved_path.exists()
+            assert saved_path.is_file()
+            assert saved_path.suffix == ".pdf"
+            assert saved_path.parent == validator.upload_dir
+
+            assert isinstance(file_info, dict)
+            assert "sanitized_filename" in file_info
+            assert "file_size" in file_info
+            assert file_info["valid"] is True
+
+            # Verify content was saved
+            assert saved_path.read_bytes() == content
+
+    def test_get_file_info_success(self):
+        """Test getting file information."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            validator = FileUploadValidator(temp_dir)
+
+            # Create a test file
+            test_file = Path(temp_dir) / "test.pdf"
+            content = b"PDF content"
+            test_file.write_bytes(content)
+
+            file_info = validator.get_file_info(str(test_file))
+
+            assert isinstance(file_info, dict)
+            assert "filename" in file_info
+            assert "size" in file_info
+            assert "modified" in file_info
+            assert "mime_type" in file_info
+            assert file_info["size"] == len(content)
+            assert file_info["filename"] == "test.pdf"
+
+
+def test_create_secure_upload_validator():
+    """Test creation of secure upload validator."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        validator = create_secure_upload_validator(temp_dir, 50)  # 50MB limit
+
+        assert isinstance(validator, FileUploadValidator)
+        assert validator.upload_dir == Path(temp_dir).resolve()
+        assert validator.max_file_size == 50 * 1024 * 1024  # 50MB in bytes
 
 
 class TestFileSecurityError:
