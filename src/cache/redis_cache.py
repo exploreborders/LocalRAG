@@ -100,9 +100,7 @@ class RedisCache:
             logger.error(f"Cache stats error: {e}")
             return {}
 
-    def get_document_metadata(
-        self, doc_ids: list
-    ) -> Optional[Dict[int, Dict[str, Any]]]:
+    def get_document_metadata(self, doc_ids: list) -> Optional[Dict[int, Dict[str, Any]]]:
         """Retrieve cached document metadata for multiple documents"""
         if not doc_ids:
             return {}

@@ -107,9 +107,7 @@ class RelevanceScorer:
         for chunk in chunks:
             # Calculate different relevance components
             semantic_score = self._calculate_semantic_relevance(chunk, document_topics)
-            structural_score = self._calculate_structural_relevance(
-                chunk, document_structure
-            )
+            structural_score = self._calculate_structural_relevance(chunk, document_structure)
             topical_score = self._calculate_topical_relevance(chunk, document_topics)
             positional_score = self._calculate_positional_relevance(chunk, len(chunks))
 
@@ -134,9 +132,7 @@ class RelevanceScorer:
                         "topical": topical_score,
                         "positional": positional_score,
                     },
-                    "relevance_factors": self._identify_relevance_factors(
-                        chunk, document_topics
-                    ),
+                    "relevance_factors": self._identify_relevance_factors(chunk, document_topics),
                 }
             )
 
@@ -285,9 +281,7 @@ class RelevanceScorer:
 
         return min(1.0, topical_score)
 
-    def _calculate_positional_relevance(
-        self, chunk: Dict[str, Any], total_chunks: int
-    ) -> float:
+    def _calculate_positional_relevance(self, chunk: Dict[str, Any], total_chunks: int) -> float:
         """
         Calculate relevance based on position in document.
         """
@@ -317,9 +311,7 @@ class RelevanceScorer:
             "positional": 0.1,  # Least important - document position
         }
 
-        final_score = sum(
-            scores[component] * weight for component, weight in weights.items()
-        )
+        final_score = sum(scores[component] * weight for component, weight in weights.items())
 
         return round(final_score, 3)
 

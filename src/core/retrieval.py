@@ -13,7 +13,6 @@ from elasticsearch import Elasticsearch
 from langchain_ollama import OllamaLLM
 from langdetect import LangDetectException, detect
 
-
 from src.core.embeddings import get_embedding_model
 from src.core.knowledge_graph import KnowledgeGraph
 from src.database.models import Document, SessionLocal
@@ -52,9 +51,7 @@ class DatabaseRetriever:
         if not isinstance(model_name, str) or not model_name.strip():
             raise ValidationError("model_name must be a non-empty string")
 
-        if not isinstance(hybrid_alpha, (int, float)) or not (
-            0.0 <= hybrid_alpha <= 1.0
-        ):
+        if not isinstance(hybrid_alpha, (int, float)) or not (0.0 <= hybrid_alpha <= 1.0):
             raise ValidationError("hybrid_alpha must be a float between 0.0 and 1.0")
 
         self.model_name = model_name
@@ -109,9 +106,7 @@ class DatabaseRetriever:
 
         return results
 
-    def _build_enhanced_context(
-        self, query: str, filters: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _build_enhanced_context(self, query: str, filters: Dict[str, Any]) -> Dict[str, Any]:
         """
         Build enhanced search context using knowledge graph relationships.
 
@@ -241,9 +236,7 @@ class DatabaseRetriever:
                             if cat_assignment.category
                         ],
                         "metadata": source.get("metadata", {}),
-                        "chapter_title": source.get("metadata", {}).get(
-                            "chapter_title"
-                        ),
+                        "chapter_title": source.get("metadata", {}).get("chapter_title"),
                         "chapter_path": source.get("metadata", {}).get("chapter_path"),
                     }
                     results.append(result)
@@ -289,9 +282,7 @@ class DatabaseRetriever:
             filter_clauses.append({"terms": {"categories": list(categories_to_search)}})
 
         if filter_clauses:
-            es_query["query"] = {
-                "bool": {"must": es_query["query"], "filter": filter_clauses}
-            }
+            es_query["query"] = {"bool": {"must": es_query["query"], "filter": filter_clauses}}
 
         return es_query
 
@@ -366,9 +357,7 @@ class RAGPipelineDB:
             cache_enabled (bool): Whether to enable caching (overrides env var)
             cache_settings (dict): Cache configuration settings
         """
-        self.retriever = DatabaseRetriever(
-            model_name, backend, use_batch_processing=True
-        )
+        self.retriever = DatabaseRetriever(model_name, backend, use_batch_processing=True)
         self.llm = OllamaLLM(model=llm_model)
 
         # Initialize cache if enabled
@@ -418,8 +407,7 @@ class RAGPipelineDB:
             raise ValidationError("question must be a non-empty string")
 
         if hybrid_alpha is not None and (
-            not isinstance(hybrid_alpha, (int, float))
-            or not (0.0 <= hybrid_alpha <= 1.0)
+            not isinstance(hybrid_alpha, (int, float)) or not (0.0 <= hybrid_alpha <= 1.0)
         ):
             raise ValidationError("hybrid_alpha must be a float between 0.0 and 1.0")
 

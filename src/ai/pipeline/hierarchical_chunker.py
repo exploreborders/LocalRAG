@@ -102,9 +102,7 @@ class HierarchicalChunker:
         # Find chapter content in full text
         chapter_content = self._extract_chapter_content(full_text, chapter, hierarchy)
 
-        logger.debug(
-            f"Chapter content length: {len(chapter_content) if chapter_content else 0}"
-        )
+        logger.debug(f"Chapter content length: {len(chapter_content) if chapter_content else 0}")
 
         if not chapter_content:
             logger.debug(f"No content found for chapter: {chapter_title}")
@@ -369,8 +367,7 @@ class HierarchicalChunker:
         # Technical content indicators
         technical_indicators = ["algorithm", "method", "analysis", "system", "model"]
         technical_score = (
-            sum(1 for indicator in technical_indicators if indicator in text_lower)
-            * 0.1
+            sum(1 for indicator in technical_indicators if indicator in text_lower) * 0.1
         )
 
         # Length factor (longer chunks tend to be more substantial)
@@ -443,9 +440,7 @@ class HierarchicalChunker:
 
         return chunks
 
-    def _post_process_chunks(
-        self, chunks: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _post_process_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Post-process chunks to ensure quality and consistency.
         """
@@ -463,9 +458,7 @@ class HierarchicalChunker:
                 continue
 
             # Skip very small chunks, with higher minimum for vision content
-            min_words = max(
-                10, self.min_chunk_size // 10
-            )  # 10 words minimum for vision content
+            min_words = max(10, self.min_chunk_size // 10)  # 10 words minimum for vision content
             if chunk["word_count"] < min_words:
                 logger.debug(
                     f"Filtering out small chunk: {chunk['word_count']} words < {min_words} (content: {content[:100]}...)"
@@ -479,9 +472,7 @@ class HierarchicalChunker:
             # Update word count if it changed
             if new_word_count != original_word_count:
                 chunk["word_count"] = new_word_count
-                logger.debug(
-                    f"Updated word count from {original_word_count} to {new_word_count}"
-                )
+                logger.debug(f"Updated word count from {original_word_count} to {new_word_count}")
                 continue
 
             # Trim excessive whitespace
@@ -491,9 +482,7 @@ class HierarchicalChunker:
             # Update word count if it changed
             if new_word_count != original_word_count:
                 chunk["word_count"] = new_word_count
-                logger.debug(
-                    f"Updated word count from {original_word_count} to {new_word_count}"
-                )
+                logger.debug(f"Updated word count from {original_word_count} to {new_word_count}")
                 continue
 
             # Trim excessive whitespace
@@ -503,23 +492,17 @@ class HierarchicalChunker:
             # Update word count if it changed
             if new_word_count != original_word_count:
                 chunk["word_count"] = new_word_count
-                logger.debug(
-                    f"Updated word count from {original_word_count} to {new_word_count}"
-                )
+                logger.debug(f"Updated word count from {original_word_count} to {new_word_count}")
 
             # Ensure chunk size is within bounds
             if len(chunk["content"]) > self.max_chunk_size:
                 chunk["content"] = chunk["content"][: self.max_chunk_size]
                 chunk["word_count"] = len(chunk["content"].split())
-                logger.debug(
-                    f"Truncated chunk to max size: {self.max_chunk_size} chars"
-                )
+                logger.debug(f"Truncated chunk to max size: {self.max_chunk_size} chars")
 
             processed_chunks.append(chunk)
 
-        logger.info(
-            f"Post-processed {len(chunks)} chunks -> {len(processed_chunks)} kept"
-        )
+        logger.info(f"Post-processed {len(chunks)} chunks -> {len(processed_chunks)} kept")
         return processed_chunks
 
     def _is_ocr_artifact_chunk(self, content: str) -> bool:
@@ -578,9 +561,7 @@ class HierarchicalChunker:
             return True
 
         # Check for chunks with excessive special characters (OCR corruption)
-        special_chars = sum(
-            1 for char in content if not char.isalnum() and not char.isspace()
-        )
+        special_chars = sum(1 for char in content if not char.isalnum() and not char.isspace())
         if (
             len(content) > 0 and special_chars / len(content) > 0.3
         ):  # More than 30% special characters

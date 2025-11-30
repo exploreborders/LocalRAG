@@ -39,12 +39,8 @@ class Document(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     filepath: Mapped[str] = mapped_column(String(500), nullable=False)
     file_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
-    detected_language: Mapped[Optional[str]] = mapped_column(
-        String(10)
-    )  # ISO 639-1 language code
-    content_type: Mapped[Optional[str]] = mapped_column(
-        String(50)
-    )  # File type/extension
+    detected_language: Mapped[Optional[str]] = mapped_column(String(10))  # ISO 639-1 language code
+    content_type: Mapped[Optional[str]] = mapped_column(String(50))  # File type/extension
     status: Mapped[str] = mapped_column(
         String(20), default="uploaded"
     )  # Processing status: uploaded, processing, processed, needs_review, error
@@ -56,27 +52,15 @@ class Document(Base):
     )
 
     # Content columns for structured document content
-    full_content: Mapped[Optional[str]] = mapped_column(
-        Text
-    )  # Complete document content
-    chapter_content: Mapped[Optional[dict]] = mapped_column(
-        JSONB
-    )  # Content organized by chapters
-    toc_content: Mapped[Optional[list]] = mapped_column(
-        JSONB
-    )  # Table of contents structure
-    content_structure: Mapped[Optional[dict]] = mapped_column(
-        JSONB
-    )  # Document structure metadata
+    full_content: Mapped[Optional[str]] = mapped_column(Text)  # Complete document content
+    chapter_content: Mapped[Optional[dict]] = mapped_column(JSONB)  # Content organized by chapters
+    toc_content: Mapped[Optional[list]] = mapped_column(JSONB)  # Table of contents structure
+    content_structure: Mapped[Optional[dict]] = mapped_column(JSONB)  # Document structure metadata
 
     # AI-enriched metadata
-    document_summary: Mapped[Optional[str]] = mapped_column(
-        Text
-    )  # AI-generated summary
+    document_summary: Mapped[Optional[str]] = mapped_column(Text)  # AI-generated summary
     key_topics: Mapped[Optional[list]] = mapped_column(JSONB)  # Extracted key topics
-    reading_time_minutes: Mapped[Optional[int]] = mapped_column(
-        Integer
-    )  # Estimated reading time
+    reading_time_minutes: Mapped[Optional[int]] = mapped_column(Integer)  # Estimated reading time
     author: Mapped[Optional[str]] = mapped_column(String(255))  # Document author
     publication_date: Mapped[Optional[date]] = mapped_column(Date)  # Publication date
     custom_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)  # Flexible metadata
@@ -97,17 +81,13 @@ class DocumentChapter(Base):
     __tablename__ = "document_chapters"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    document_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("documents.id"), nullable=False
-    )
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"), nullable=False)
     chapter_title: Mapped[str] = mapped_column(String(255), nullable=False)
     chapter_path: Mapped[str] = mapped_column(
         String(100), nullable=False
     )  # Hierarchical path (e.g., "1.2")
     content: Mapped[str] = mapped_column(Text, nullable=False)  # Full chapter content
-    embedding: Mapped[Optional[list]] = mapped_column(
-        JSONB
-    )  # Pre-computed chapter embedding
+    embedding: Mapped[Optional[list]] = mapped_column(JSONB)  # Pre-computed chapter embedding
     embedding_model: Mapped[Optional[str]] = mapped_column(String(100))
     word_count: Mapped[int] = mapped_column(Integer, default=0)
     section_type: Mapped[str] = mapped_column(
@@ -134,9 +114,7 @@ class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    document_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("documents.id"), nullable=False
-    )
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"), nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding_model: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -180,9 +158,7 @@ class DocumentEmbedding(Base):
     __tablename__ = "document_embeddings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    chunk_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("document_chunks.id"), nullable=False
-    )
+    chunk_id: Mapped[int] = mapped_column(Integer, ForeignKey("document_chunks.id"), nullable=False)
     embedding = mapped_column(Vector(768))  # Vector embedding using pgvector
     embedding_model: Mapped[str] = mapped_column(String(100), nullable=False)
     created_at: Mapped[Optional[datetime]] = mapped_column(
@@ -206,9 +182,7 @@ class Topic(Base):
     category: Mapped[Optional[str]] = mapped_column(
         String(50)
     )  # 'academic', 'technical', 'business', etc.
-    parent_topic_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("topics.id")
-    )
+    parent_topic_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("topics.id"))
     created_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP, default=func.current_timestamp()
     )
@@ -226,21 +200,11 @@ class DocumentTopic(Base):
     __tablename__ = "document_topics"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    document_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("documents.id"), nullable=False
-    )
-    topic_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("topics.id"), nullable=False
-    )
-    relevance_score: Mapped[float] = mapped_column(
-        Float, nullable=False
-    )  # 0-1 relevance
-    confidence: Mapped[Optional[float]] = mapped_column(
-        Float
-    )  # AI confidence in classification
-    assigned_by: Mapped[str] = mapped_column(
-        String(50), default="auto"
-    )  # 'auto', 'manual', 'user'
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"), nullable=False)
+    topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
+    relevance_score: Mapped[float] = mapped_column(Float, nullable=False)  # 0-1 relevance
+    confidence: Mapped[Optional[float]] = mapped_column(Float)  # AI confidence in classification
+    assigned_by: Mapped[str] = mapped_column(String(50), default="auto")  # 'auto', 'manual', 'user'
     created_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP, default=func.current_timestamp()
     )
@@ -280,12 +244,8 @@ class DocumentTagAssignment(Base):
     __tablename__ = "document_tag_assignments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    document_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("documents.id"), nullable=False
-    )
-    tag_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("document_tags.id"), nullable=False
-    )
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"), nullable=False)
+    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("document_tags.id"), nullable=False)
     assigned_by: Mapped[str] = mapped_column(String(50), default="auto")
     created_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP, default=func.current_timestamp()
@@ -328,9 +288,7 @@ class DocumentCategoryAssignment(Base):
     __tablename__ = "document_category_assignments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    document_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("documents.id"), nullable=False
-    )
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"), nullable=False)
     category_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("document_categories.id"), nullable=False
     )
@@ -352,9 +310,7 @@ class ProcessingJob(Base):
     __tablename__ = "processing_jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    document_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("documents.id"), nullable=False
-    )
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"), nullable=False)
     job_type: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # 'embedding', 'topic_classification', 'structure_extraction'
@@ -365,9 +321,7 @@ class ProcessingJob(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
     error_message: Mapped[Optional[str]] = mapped_column(Text)
     progress: Mapped[float] = mapped_column(Float, default=0)  # 0-1 progress indicator
-    job_metadata: Mapped[Optional[dict]] = mapped_column(
-        JSONB
-    )  # Additional job-specific data
+    job_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)  # Additional job-specific data
     created_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP, default=func.current_timestamp()
     )

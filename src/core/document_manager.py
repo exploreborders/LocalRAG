@@ -52,9 +52,7 @@ class DocumentManager:
         """Get all tags for a document."""
         return self.tag_manager.get_document_tags(document_id)
 
-    def suggest_tags_for_document(
-        self, document_id: int, max_suggestions: int = 5
-    ) -> List[str]:
+    def suggest_tags_for_document(self, document_id: int, max_suggestions: int = 5) -> List[str]:
         """Suggest tags for a document using AI."""
         return self.tag_manager.suggest_tags_for_document(document_id, max_suggestions)
 
@@ -92,9 +90,7 @@ class DocumentManager:
 
     def remove_category_from_document(self, document_id: int, category_id: int) -> bool:
         """Remove a category from a document."""
-        return self.category_manager.remove_category_from_document(
-            document_id, category_id
-        )
+        return self.category_manager.remove_category_from_document(document_id, category_id)
 
     def get_document_categories(self, document_id: int) -> List[DocumentCategory]:
         """Get all categories for a document."""

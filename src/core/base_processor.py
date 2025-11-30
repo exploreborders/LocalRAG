@@ -30,9 +30,7 @@ class BaseProcessor:
         try:
             # Find documents that need processing
             pending_docs = (
-                self.db.query(Document)
-                .filter(Document.status.in_(["uploaded", "pending"]))
-                .all()
+                self.db.query(Document).filter(Document.status.in_(["uploaded", "pending"])).all()
             )
 
             if not pending_docs:
@@ -128,12 +126,8 @@ class BaseProcessor:
                 return False
 
             # Check file exists and is a regular file
-            if not os.path.exists(normalized_path) or not os.path.isfile(
-                normalized_path
-            ):
-                logger.warning(
-                    f"File does not exist or is not a regular file: {file_path}"
-                )
+            if not os.path.exists(normalized_path) or not os.path.isfile(normalized_path):
+                logger.warning(f"File does not exist or is not a regular file: {file_path}")
                 return False
 
             return True
