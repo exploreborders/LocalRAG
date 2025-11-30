@@ -61,27 +61,26 @@ class TestDatabaseRetriever:
                 mock_build_context.assert_called_once_with("test query", {})
                 mock_hybrid_search.assert_called_once()
 
-    @patch("src.core.retrieval.Elasticsearch")
     @patch("src.core.retrieval.SessionLocal")
-    def test_hybrid_search(self, mock_session, mock_es):
+    def test_hybrid_search(self, mock_session):
         """Test hybrid search functionality."""
-        mock_es_instance = MagicMock()
-        mock_es.return_value = mock_es_instance
-
         retriever = DatabaseRetriever()
 
         # Mock embeddings creation
         with patch("src.core.embeddings.create_embeddings") as mock_create_embeddings:
             mock_create_embeddings.return_value = ([MagicMock()], "ollama")
 
-            # Mock ES search
-            mock_es_instance.search.return_value = {
+            # Mock ES client and search
+            mock_es_client = MagicMock()
+            mock_es_client.search.return_value = {
                 "hits": {
                     "hits": [
                         {
+                            "_id": "chunk_123",
                             "_source": {
                                 "content": "test content",
                                 "metadata": {"title": "test"},
+                                "document_id": 1,
                             },
                             "_score": 0.8,
                         }
@@ -90,15 +89,26 @@ class TestDatabaseRetriever:
                 }
             }
 
-            with patch.object(retriever, "_rerank_results") as mock_rerank:
-                mock_rerank.return_value = [{"content": "reranked content"}]
+            # Mock document query
+            mock_document = MagicMock()
+            mock_document.id = 1
+            mock_document.filename = "test.pdf"
+            mock_document.tags = []
+            mock_document.categories = []
+            mock_session.query.return_value.filter.return_value.first.return_value = (
+                mock_document
+            )
 
-                result = retriever.hybrid_search("test query")
+            with patch.object(retriever, "_get_es_client", return_value=mock_es_client):
+                with patch.object(retriever, "_rerank_results") as mock_rerank:
+                    mock_rerank.return_value = [{"content": "reranked content"}]
 
-                assert isinstance(result, list)
-                assert len(result) == 1
-                assert result[0]["content"] == "reranked content"
-                mock_rerank.assert_called_once()
+                    result = retriever.hybrid_search("test query")
+
+                    assert isinstance(result, list)
+                    assert len(result) == 1
+                    assert result[0]["content"] == "reranked content"
+                    mock_rerank.assert_called_once()
 
 
 class TestRAGPipelineDB:
@@ -140,7 +150,9 @@ class TestRAGPipelineDB:
             mock_generate.return_value = "Generated answer"
 
             with patch.object(pipeline, "_format_sources") as mock_format:
-                mock_format.return_value = [{"title": "test", "content": "test content"}]
+                mock_format.return_value = [
+                    {"title": "test", "content": "test content"}
+                ]
 
                 result = pipeline.query("test question")
 
