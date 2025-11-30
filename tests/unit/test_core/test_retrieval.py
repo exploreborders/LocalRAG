@@ -72,31 +72,35 @@ class TestDatabaseRetriever:
 
         retriever = DatabaseRetriever()
 
-        # Mock ES search
-        mock_es_instance.search.return_value = {
-            "hits": {
-                "hits": [
-                    {
-                        "_source": {
-                            "content": "test content",
-                            "metadata": {"title": "test"},
-                        },
-                        "_score": 0.8,
-                    }
-                ],
-                "total": {"value": 1},
+        # Mock embeddings creation
+        with patch("src.core.embeddings.create_embeddings") as mock_create_embeddings:
+            mock_create_embeddings.return_value = ([MagicMock()], "ollama")
+
+            # Mock ES search
+            mock_es_instance.search.return_value = {
+                "hits": {
+                    "hits": [
+                        {
+                            "_source": {
+                                "content": "test content",
+                                "metadata": {"title": "test"},
+                            },
+                            "_score": 0.8,
+                        }
+                    ],
+                    "total": {"value": 1},
+                }
             }
-        }
 
-        with patch.object(retriever, "_rerank_results") as mock_rerank:
-            mock_rerank.return_value = [{"content": "reranked content"}]
+            with patch.object(retriever, "_rerank_results") as mock_rerank:
+                mock_rerank.return_value = [{"content": "reranked content"}]
 
-            result = retriever.hybrid_search("test query")
+                result = retriever.hybrid_search("test query")
 
-            assert isinstance(result, list)
-            assert len(result) == 1
-            assert result[0]["content"] == "reranked content"
-            mock_rerank.assert_called_once()
+                assert isinstance(result, list)
+                assert len(result) == 1
+                assert result[0]["content"] == "reranked content"
+                mock_rerank.assert_called_once()
 
 
 class TestRAGPipelineDB:
@@ -138,7 +142,9 @@ class TestRAGPipelineDB:
             mock_generate.return_value = "Generated answer"
 
             with patch.object(pipeline, "_format_sources") as mock_format:
-                mock_format.return_value = [{"title": "test", "content": "test content"}]
+                mock_format.return_value = [
+                    {"title": "test", "content": "test content"}
+                ]
 
                 result = pipeline.query("test question")
 

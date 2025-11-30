@@ -49,7 +49,9 @@ class TestDocumentProcessor:
 
     def test_init_without_db(self):
         """Test DocumentProcessor initialization without db parameter."""
-        with patch("src.core.processing.document_processor.SessionLocal") as mock_session:
+        with patch(
+            "src.core.processing.document_processor.SessionLocal"
+        ) as mock_session:
             mock_session.return_value = MagicMock()
             processor = DocumentProcessor()
             mock_session.assert_called_once()
@@ -149,7 +151,9 @@ class TestDocumentProcessor:
 
     def test_process_document_standard_mode(self, document_processor, mock_db_session):
         """Test document processing in standard mode."""
-        with patch.object(document_processor, "_process_document_standard") as mock_standard:
+        with patch.object(
+            document_processor, "_process_document_standard"
+        ) as mock_standard:
             mock_standard.return_value = {"success": True, "document_id": 1}
 
             result = document_processor.process_document(
@@ -168,7 +172,9 @@ class TestDocumentProcessor:
         def progress_callback(filename, progress, message):
             progress_calls.append((filename, progress, message))
 
-        with patch.object(document_processor, "_process_document_standard") as mock_standard:
+        with patch.object(
+            document_processor, "_process_document_standard"
+        ) as mock_standard:
             mock_standard.return_value = {"success": True, "document_id": 1}
 
             result = document_processor.process_document(
@@ -177,12 +183,16 @@ class TestDocumentProcessor:
                 progress_callback=progress_callback,
             )
 
-            mock_standard.assert_called_once_with("/tmp/test.pdf", None, progress_callback, None)
+            mock_standard.assert_called_once_with(
+                "/tmp/test.pdf", None, progress_callback, None
+            )
             assert result["success"] is True
 
     def test_process_document_advanced_mode(self, document_processor, mock_db_session):
         """Test document processing in advanced mode."""
-        with patch.object(document_processor, "_process_document_advanced") as mock_advanced:
+        with patch.object(
+            document_processor, "_process_document_advanced"
+        ) as mock_advanced:
             mock_advanced.return_value = {"success": True, "document_id": 1}
 
             result = document_processor.process_document(
@@ -227,7 +237,8 @@ class TestDocumentProcessor:
     def test_detect_language_from_content_with_exceptions(self, document_processor):
         """Test language detection with LangDetectException handling."""
         content = (
-            "This is a longer text that should be substantial enough for language detection. " * 20
+            "This is a longer text that should be substantial enough for language detection. "
+            * 20
         )
 
         with patch("src.core.processing.document_processor.detect") as mock_detect:
@@ -273,7 +284,9 @@ class TestDocumentProcessor:
     def test_create_chunks_with_chapters(self, document_processor):
         """Test chunk creation with chapter awareness."""
         content = "Long document content " * 100
-        chapters = [{"title": "Chapter 1", "content": content[:600], "path": "1", "level": 1}]
+        chapters = [
+            {"title": "Chapter 1", "content": content[:600], "path": "1", "level": 1}
+        ]
 
         chunks = document_processor._create_chunks(content, 1, chapters)
 
@@ -319,7 +332,9 @@ class TestDocumentProcessor:
         """Test chunk creation where individual chapter chunks are too small."""
         content = "Long document content " * 100
         # Create a chapter with content that will create chunks smaller than 50 chars
-        chapter_content = "x" * 600  # This will create chunks of "x" * 800, but with overlap
+        chapter_content = (
+            "x" * 600
+        )  # This will create chunks of "x" * 800, but with overlap
         chapters = [{"title": "Chapter 1", "content": chapter_content, "path": "1"}]
 
         chunks = document_processor._create_chunks(content, 1, chapters)
@@ -381,7 +396,9 @@ class TestDocumentProcessor:
         def progress_callback(filename, progress, message):
             progress_calls.append((filename, progress, message))
 
-        with patch.object(document_processor, "_process_document_advanced") as mock_advanced:
+        with patch.object(
+            document_processor, "_process_document_advanced"
+        ) as mock_advanced:
             mock_advanced.return_value = {"success": True, "document_id": 1}
 
             result = document_processor.process_document(
@@ -390,32 +407,61 @@ class TestDocumentProcessor:
                 progress_callback=progress_callback,
             )
 
-            mock_advanced.assert_called_once_with("/tmp/test.pdf", None, progress_callback, None)
+            mock_advanced.assert_called_once_with(
+                "/tmp/test.pdf", None, progress_callback, None
+            )
             assert result["success"] is True
 
     def test_suggest_categories_ai_edge_cases(self, document_processor):
         """Test category suggestion with various content types."""
-        # Test with very short content
-        result = document_processor._suggest_categories_ai("", "test.pdf", [])
-        assert isinstance(result, list)
+        # Test with very short content - mock LLM to fail and test fallback
+        with patch.object(
+            document_processor.tag_suggester,
+            "_call_llm",
+            side_effect=Exception("LLM error"),
+        ):
+            result = document_processor._suggest_categories_ai("", "test.pdf", [])
+            assert isinstance(result, list)
+            assert result == ["General"]  # Fallback for empty content
 
-        # Test with technical content
+        # Test with technical content - should trigger LLM or fallback
         technical_content = "machine learning neural networks deep learning algorithms"
-        result = document_processor._suggest_categories_ai(technical_content, "ml.pdf", [])
-        assert isinstance(result, list)
-        assert len(result) > 0
+        with patch.object(
+            document_processor.tag_suggester,
+            "_call_llm",
+            side_effect=Exception("LLM error"),
+        ):
+            result = document_processor._suggest_categories_ai(
+                technical_content, "ml.pdf", []
+            )
+            assert isinstance(result, list)
+            assert "Technical" in result  # Should match keyword "machine learning"
 
         # Test with academic content (should trigger line 118)
         academic_content = "research paper study academic journal publication"
-        result = document_processor._suggest_categories_ai(academic_content, "paper.pdf", [])
-        assert isinstance(result, list)
-        assert "Academic" in result
+        with patch.object(
+            document_processor.tag_suggester,
+            "_call_llm",
+            side_effect=Exception("LLM error"),
+        ):
+            result = document_processor._suggest_categories_ai(
+                academic_content, "paper.pdf", []
+            )
+            assert isinstance(result, list)
+            assert "Academic" in result  # Should match keyword "research"
 
         # Test with educational content (should trigger line 120)
         educational_content = "tutorial guide course education learning"
-        result = document_processor._suggest_categories_ai(educational_content, "tutorial.pdf", [])
-        assert isinstance(result, list)
-        assert "Educational" in result
+        with patch.object(
+            document_processor.tag_suggester,
+            "_call_llm",
+            side_effect=Exception("LLM error"),
+        ):
+            result = document_processor._suggest_categories_ai(
+                educational_content, "tutorial.pdf", []
+            )
+            assert isinstance(result, list)
+            assert "Educational" in result  # Should match keyword "tutorial"
 
     def test_detect_language_from_file_empty_file(self, document_processor):
         """Test language detection from empty file."""
