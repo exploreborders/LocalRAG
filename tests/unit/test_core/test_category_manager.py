@@ -45,9 +45,13 @@ class TestCategoryManager:
         manager = CategoryManager(mock_db_session)
         assert manager.db == mock_db_session
 
-    def test_get_category_by_name_no_parent(self, category_manager, mock_db_session, mock_category):
+    def test_get_category_by_name_no_parent(
+        self, category_manager, mock_db_session, mock_category
+    ):
         """Test getting category by name without parent."""
-        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_category
+        mock_db_session.query.return_value.filter.return_value.first.return_value = (
+            mock_category
+        )
 
         result = category_manager.get_category_by_name("test_category")
 
@@ -90,7 +94,9 @@ class TestCategoryManager:
         ) as mock_category_class:
             mock_category_class.return_value = mock_category
 
-            result = category_manager.create_category("test_category", "Test description", 5)
+            result = category_manager.create_category(
+                "test_category", "Test description", 5
+            )
 
             mock_category_class.assert_called_once_with(
                 name="test_category",
@@ -138,7 +144,9 @@ class TestCategoryManager:
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         mock_db_session.commit.side_effect = Exception("Database error")
 
-        with patch("src.core.categorization.category_manager.DocumentCategoryAssignment"):
+        with patch(
+            "src.core.categorization.category_manager.DocumentCategoryAssignment"
+        ):
             result = category_manager.add_category_to_document(1, 2)
 
             assert result is False
@@ -162,7 +170,9 @@ class TestCategoryManager:
         mock_db_session.delete.assert_called_once()
         mock_db_session.commit.assert_called_once()
 
-    def test_remove_category_from_document_not_found(self, category_manager, mock_db_session):
+    def test_remove_category_from_document_not_found(
+        self, category_manager, mock_db_session
+    ):
         """Test removing category when assignment doesn't exist."""
         # Mock the query chain: query().filter(doc_id, cat_id).first()
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
@@ -173,7 +183,9 @@ class TestCategoryManager:
         mock_db_session.delete.assert_not_called()
         mock_db_session.commit.assert_not_called()
 
-    def test_get_document_categories(self, category_manager, mock_db_session, mock_category):
+    def test_get_document_categories(
+        self, category_manager, mock_db_session, mock_category
+    ):
         """Test getting all categories for a document."""
         # Mock assignment with category
         mock_assignment = MagicMock()
@@ -192,7 +204,9 @@ class TestCategoryManager:
         assert len(result) == 1
         assert result[0] == mock_category
 
-    def test_get_category_hierarchy(self, category_manager, mock_db_session, mock_category):
+    def test_get_category_hierarchy(
+        self, category_manager, mock_db_session, mock_category
+    ):
         """Test getting category hierarchy path."""
         # Mock root category
         mock_root = MagicMock(spec=DocumentCategory)
@@ -221,7 +235,9 @@ class TestCategoryManager:
         assert result[0] == mock_root
         assert result[1] == mock_category
 
-    def test_get_root_categories(self, category_manager, mock_db_session, mock_category):
+    def test_get_root_categories(
+        self, category_manager, mock_db_session, mock_category
+    ):
         """Test getting root categories (no parent)."""
         # Mock query chain: query().filter().order_by().all()
         mock_query = MagicMock()
@@ -261,24 +277,24 @@ class TestCategoryManager:
         assert isinstance(result, list)
         # Tree structure validation would be complex, so we just check it's a list
 
-    def test_delete_category_success(self, category_manager, mock_db_session, mock_category):
+    def test_delete_category_success(
+        self, category_manager, mock_db_session, mock_category
+    ):
         """Test successful category deletion."""
         # Mock all queries to succeed
-        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_category
+        mock_db_session.query.return_value.filter.return_value.first.return_value = (
+            mock_category
+        )
         mock_db_session.query.return_value.filter.return_value.all.return_value = []  # No children
-        mock_db_session.query.return_value.filter.return_value.delete.return_value = None
+        mock_db_session.query.return_value.filter.return_value.delete.return_value = (
+            None
+        )
         mock_db_session.commit.return_value = None
 
         result = category_manager.delete_category(1)
 
         assert result is True
         mock_db_session.commit.assert_called_once()
-
-    @pytest.mark.skip(reason="Complex recursive mock setup")
-    def test_delete_category_with_children(self, category_manager, mock_db_session, mock_category):
-        """Test deleting category with children (recursive)."""
-        # Skipped due to complex recursive mock setup
-        pass
 
     def test_delete_category_not_found(self, category_manager, mock_db_session):
         """Test deleting non-existent category."""
