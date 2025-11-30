@@ -107,10 +107,10 @@ class TestReprocessDocuments:
 
         # Mock database models
         with (
-            patch("src.core.reprocess_documents.DocumentChapter") as mock_chapter_class,
-            patch("src.core.reprocess_documents.DocumentChunk") as mock_chunk_class,
-            patch("src.core.reprocess_documents.DocumentEmbedding") as mock_embedding_class,
-            patch("src.core.reprocess_documents.create_embeddings") as mock_create_embeddings,
+            patch("src.database.models.DocumentChapter") as mock_chapter_class,
+            patch("src.database.models.DocumentChunk") as mock_chunk_class,
+            patch("src.database.models.DocumentEmbedding") as mock_embedding_class,
+            patch("src.core.embeddings.create_embeddings") as mock_create_embeddings,
         ):
             # Mock embeddings creation
             mock_create_embeddings.return_value = ([MagicMock()], "ollama")
@@ -161,7 +161,9 @@ class TestReprocessDocuments:
         # Mock processors to raise errors
         mock_processor = MagicMock()
         mock_upload_processor_class.return_value = mock_processor
-        mock_processor.reprocess_existing_document.side_effect = Exception("Processing failed")
+        mock_processor.reprocess_existing_document.side_effect = Exception(
+            "Processing failed"
+        )
 
         mock_doc_processor = MagicMock()
         mock_doc_processor_class.return_value = mock_doc_processor

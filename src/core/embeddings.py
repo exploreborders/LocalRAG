@@ -1,7 +1,6 @@
 import hashlib
-import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -91,7 +90,9 @@ def create_embeddings(
         # Cache the new embeddings
         if use_cache and cache_backend and embeddings is not None:
             for i, embedding in enumerate(embeddings):
-                cache_key = _get_embedding_cache_key(uncached_texts[i], f"{backend}:{model_name}")
+                cache_key = _get_embedding_cache_key(
+                    uncached_texts[i], f"{backend}:{model_name}"
+                )
                 try:
                     cache_backend.set(cache_key, embedding.tolist())
                 except Exception as e:
@@ -329,7 +330,9 @@ class EmbeddingCache:
 
         return cached_embeddings, uncached_indices
 
-    def set_batch(self, texts: List[str], model_key: str, embeddings: np.ndarray) -> int:
+    def set_batch(
+        self, texts: List[str], model_key: str, embeddings: np.ndarray
+    ) -> int:
         """
         Cache multiple embeddings.
 

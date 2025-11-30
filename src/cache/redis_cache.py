@@ -1,4 +1,3 @@
-import hashlib
 import json
 import logging
 from datetime import datetime, timedelta
@@ -101,7 +100,9 @@ class RedisCache:
             logger.error(f"Cache stats error: {e}")
             return {}
 
-    def get_document_metadata(self, doc_ids: list) -> Optional[Dict[int, Dict[str, Any]]]:
+    def get_document_metadata(
+        self, doc_ids: list
+    ) -> Optional[Dict[int, Dict[str, Any]]]:
         """Retrieve cached document metadata for multiple documents"""
         if not doc_ids:
             return {}
@@ -137,5 +138,5 @@ class RedisCache:
         """Check if Redis is healthy"""
         try:
             return self.redis.ping()
-        except:
+        except Exception:
             return False

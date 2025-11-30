@@ -4,8 +4,6 @@ Unit tests for configuration management utilities.
 
 from unittest.mock import patch
 
-import pytest
-
 from src.utils.config_manager import (
     CacheConfig,
     ConfigManager,
@@ -162,7 +160,7 @@ class TestConfigManager:
         config = ConfigManager()
         cache_config = config.cache
 
-        assert cache_config.enabled == True
+        assert cache_config.enabled is True
         assert cache_config.cache_type == "redis"
         assert cache_config.ttl_hours == 48
 
@@ -171,7 +169,7 @@ class TestConfigManager:
         config = ConfigManager()
         cache_config = config.cache
 
-        assert cache_config.enabled == True  # default is True
+        assert cache_config.enabled is True  # default is True
         assert cache_config.cache_type == "redis"  # default
         assert cache_config.ttl_hours == 24  # default
 
@@ -222,7 +220,9 @@ class TestConfigClasses:
 
     def test_opensearch_config_creation(self):
         """Test OpenSearchConfig creation."""
-        config = OpenSearchConfig(host="es-host", port=9200, user="es-user", password="es-pass")
+        config = OpenSearchConfig(
+            host="es-host", port=9200, user="es-user", password="es-pass"
+        )
         assert config.host == "es-host"
         assert config.port == 9200
         assert config.user == "es-user"
@@ -244,7 +244,7 @@ class TestConfigClasses:
     def test_cache_config_creation(self):
         """Test CacheConfig creation."""
         config = CacheConfig(enabled=True, cache_type="redis", ttl_hours=24)
-        assert config.enabled == True
+        assert config.enabled is True
         assert config.cache_type == "redis"
         assert config.ttl_hours == 24
 
