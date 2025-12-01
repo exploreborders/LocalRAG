@@ -4,15 +4,16 @@ Migration script to move data from pickle files to PostgreSQL + OpenSearch.
 Run this after setting up both databases.
 """
 
+import hashlib
 import os
 import pickle
-import hashlib
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 import psycopg2
-from psycopg2.extras import execute_values
-from elasticsearch import Elasticsearch
 from dotenv import load_dotenv
+from elasticsearch import Elasticsearch
+from psycopg2.extras import execute_values
 
 load_dotenv()
 
@@ -135,8 +136,8 @@ def migrate_chunks_to_postgres():
     """
     print("Processing documents and creating chunks...")
 
-    import subprocess
     import os
+    import subprocess
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.join(script_dir, "..")
@@ -212,9 +213,7 @@ def migrate_embeddings_to_opensearch():
                 "_source": {
                     "document_id": i // 100,  # Placeholder logic
                     "chunk_id": i,
-                    "content": chunk.page_content
-                    if hasattr(chunk, "page_content")
-                    else str(chunk),
+                    "content": chunk.page_content if hasattr(chunk, "page_content") else str(chunk),
                     "embedding": embedding.tolist(),
                     "embedding_model": model_name,
                     "metadata": chunk.metadata if hasattr(chunk, "metadata") else {},

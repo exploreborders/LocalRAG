@@ -189,15 +189,11 @@ def render_rag_results(results):
                     st.markdown(f"**🏷️ Tags:** {', '.join(sorted(all_tags))}")
 
                 if all_categories:
-                    st.markdown(
-                        f"**📂 Categories:** {', '.join(sorted(all_categories))}"
-                    )
+                    st.markdown(f"**📂 Categories:** {', '.join(sorted(all_categories))}")
 
                 # Show content preview from most relevant chunk
                 if doc_data["chunks"]:
-                    best_chunk = max(
-                        doc_data["chunks"], key=lambda x: x.get("score", 0)
-                    )
+                    best_chunk = max(doc_data["chunks"], key=lambda x: x.get("score", 0))
                     content_preview = best_chunk.get("content_preview", "")
                     if content_preview:
                         st.markdown("**📄 Most Relevant Content:**")
@@ -226,25 +222,17 @@ def render_topic_aware_results(results):
             matching_topics = result.get("matching_topics", [])
 
             # Create expander title with topic boost indicator
-            boost_indicator = (
-                "🔥" if topic_boost > 0.5 else "⭐" if topic_boost > 0.2 else "📄"
-            )
+            boost_indicator = "🔥" if topic_boost > 0.5 else "⭐" if topic_boost > 0.2 else "📄"
             boost_text = f" (Topic Boost: {topic_boost:.2f})" if topic_boost > 0 else ""
 
-            with st.expander(
-                f"{boost_indicator} Document {i} (Score: {score:.4f}){boost_text}"
-            ):
-                page_content = (
-                    doc.page_content if hasattr(doc, "page_content") else str(doc)
-                )
+            with st.expander(f"{boost_indicator} Document {i} (Score: {score:.4f}){boost_text}"):
+                page_content = doc.page_content if hasattr(doc, "page_content") else str(doc)
                 metadata = doc.metadata if hasattr(doc, "metadata") else {}
 
                 # Content preview
                 st.markdown("**Content:**")
                 content_preview = (
-                    page_content[:500] + "..."
-                    if len(page_content) > 500
-                    else page_content
+                    page_content[:500] + "..." if len(page_content) > 500 else page_content
                 )
                 st.write(content_preview)
 
@@ -299,11 +287,7 @@ def render_advanced_search_analytics(result_data):
         with col3:
             query_complexity = analytics.get("query_complexity", 0)
             complexity_label = (
-                "Low"
-                if query_complexity < 2
-                else "Medium"
-                if query_complexity < 4
-                else "High"
+                "Low" if query_complexity < 2 else "Medium" if query_complexity < 4 else "High"
             )
             st.metric("Query Complexity", complexity_label)
 
@@ -377,9 +361,7 @@ def render_hybrid_search_results(result_data):
         # Score indicator
         score_indicator = "🔥" if score > 0.8 else "⭐" if score > 0.6 else "📄"
 
-        with st.expander(
-            f"{score_indicator} Result {i}: {document_title} (Score: {score:.3f})"
-        ):
+        with st.expander(f"{score_indicator} Result {i}: {document_title} (Score: {score:.3f})"):
             # Score breakdown
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -457,9 +439,7 @@ def render_search_suggestions():
                     st.write(f"  - {field}: {', '.join(values)}")
 
             if parsed_query.get("excluded_terms"):
-                st.write(
-                    f"• **Excluded terms:** {', '.join(parsed_query['excluded_terms'])}"
-                )
+                st.write(f"• **Excluded terms:** {', '.join(parsed_query['excluded_terms'])}")
 
         # Performance suggestions
         analytics = result_data.get("analytics", {})
@@ -496,9 +476,7 @@ def render_performance_metrics():
 
     col1, col2 = st.sidebar.columns(2)
     with col1:
-        retriever_status = (
-            "✅ Active" if status.get("retriever_active") else "❌ Offline"
-        )
+        retriever_status = "✅ Active" if status.get("retriever_active") else "❌ Offline"
         st.metric("Retriever", retriever_status)
 
     with col2:
@@ -512,7 +490,5 @@ def render_performance_metrics():
     # Average processing time
     history = st.session_state.get("query_history", [])
     if history:
-        avg_time = sum(item.get("processing_time", 0) for item in history) / len(
-            history
-        )
+        avg_time = sum(item.get("processing_time", 0) for item in history) / len(history)
         st.sidebar.metric("Avg Response Time", f"{avg_time:.2f}s")

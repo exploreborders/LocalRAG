@@ -7,13 +7,14 @@ import os
 import sys
 from pathlib import Path
 
+
 def check_database_readiness():
     """Check if database is ready for enhanced architecture."""
     print("🔍 Database Readiness Check for Enhanced Knowledge Graph Architecture")
     print("=" * 70)
 
     # Check if schema enhancement script exists
-    schema_script = Path(__file__).parent / 'enhance_knowledge_graph_schema.py'
+    schema_script = Path(__file__).parent / "enhance_knowledge_graph_schema.py"
     if schema_script.exists():
         print("✅ Schema enhancement script exists")
         print(f"   📁 Location: {schema_script}")
@@ -30,10 +31,10 @@ def check_database_readiness():
 
     # Check if all enhanced components exist
     enhanced_files = [
-        'src/core/knowledge_graph.py',
-        'src/ai/enrichment.py',
-        'src/core/retrieval.py',
-        'src/core/retrieval.py'  # RAG pipeline is integrated into retrieval.py
+        "src/core/knowledge_graph.py",
+        "src/ai/enrichment.py",
+        "src/core/retrieval.py",
+        "src/core/retrieval.py",  # RAG pipeline is integrated into retrieval.py
     ]
 
     print("\n📋 Checking enhanced architecture components:")
@@ -53,10 +54,10 @@ def check_database_readiness():
 
     # Check for required methods in key files
     required_methods = {
-        'src/core/knowledge_graph.py': ['expand_query_context', 'find_documents_by_relationships'],
-        'src/ai/enrichment.py': ['_classify_document_category'],
-        'src/core/retrieval.py': ['retrieve_with_topic_boost'],
-        'src/core/retrieval.py': ['query']  # RAG pipeline method
+        "src/core/knowledge_graph.py": ["expand_query_context", "find_documents_by_relationships"],
+        "src/ai/enrichment.py": ["_classify_document_category"],
+        "src/core/retrieval.py": ["retrieve_with_topic_boost"],
+        "src/core/retrieval.py": ["query"],  # RAG pipeline method
     }
 
     print("\n📋 Checking for enhanced methods:")
@@ -64,7 +65,7 @@ def check_database_readiness():
     for file_path, methods in required_methods.items():
         full_path = Path(__file__).parent.parent / file_path
         try:
-            with open(full_path, 'r') as f:
+            with open(full_path, "r") as f:
                 content = f.read()
 
             for method in methods:
@@ -83,7 +84,7 @@ def check_database_readiness():
 
     # Check database connection requirements
     print("\n🗄️  Database Connection Requirements:")
-    required_env_vars = ['POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_DB', 'POSTGRES_USER']
+    required_env_vars = ["POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB", "POSTGRES_USER"]
     missing_vars = []
 
     for var in required_env_vars:
@@ -131,6 +132,7 @@ def check_database_readiness():
     else:
         print("\n❌ ARCHITECTURE NOT READY - Fix missing components first")
         return False
+
 
 if __name__ == "__main__":
     success = check_database_readiness()

@@ -4,11 +4,11 @@ Unit tests for advanced_search module.
 Tests query parsing, hybrid search, and search analytics functionality.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
 import numpy as np
 
-from src.core.advanced_search import QueryParser, HybridSearchEngine
+from src.core.advanced_search import HybridSearchEngine, QueryParser
 
 
 class TestQueryParser:
@@ -92,9 +92,7 @@ class TestHybridSearchEngine:
 
     def test_init(self):
         """Test HybridSearchEngine initialization."""
-        engine = HybridSearchEngine(
-            model_name="test-model", backend="ollama", use_reranking=False
-        )
+        engine = HybridSearchEngine(model_name="test-model", backend="ollama", use_reranking=False)
 
         assert engine.model_name == "test-model"
         assert engine.backend == "ollama"
@@ -134,9 +132,7 @@ class TestHybridSearchEngine:
     def test_get_query_embedding(self):
         """Test query embedding generation."""
         with patch("src.core.advanced_search.create_embeddings") as mock_create:
-            with patch(
-                "src.core.advanced_search.get_embedding_model"
-            ) as mock_get_model:
+            with patch("src.core.advanced_search.get_embedding_model") as mock_get_model:
                 mock_model = MagicMock()
                 mock_get_model.return_value = mock_model
                 mock_create.return_value = (np.array([[0.1, 0.2, 0.3]]), "test_model")

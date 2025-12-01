@@ -6,6 +6,7 @@ Verify that the enhanced knowledge graph schema is properly set up.
 import os
 import sys
 
+
 def check_enhanced_schema():
     """Check if enhanced schema tables exist."""
     print("🔍 Checking Enhanced Knowledge Graph Schema")
@@ -30,7 +31,7 @@ def check_enhanced_schema():
             port=os.getenv("POSTGRES_PORT", 5432),
             dbname=os.getenv("POSTGRES_DB", "rag_system"),
             user=os.getenv("POSTGRES_USER", "christianhein"),
-            password=os.getenv("POSTGRES_PASSWORD", "")
+            password=os.getenv("POSTGRES_PASSWORD", ""),
         )
         cursor = conn.cursor()
     except Exception as e:
@@ -40,17 +41,16 @@ def check_enhanced_schema():
 
     try:
         # Check for enhanced tables
-        required_tables = [
-            'tag_relationships',
-            'tag_category_relationships'
-        ]
+        required_tables = ["tag_relationships", "tag_category_relationships"]
 
         existing_tables = []
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
-        """)
+        """
+        )
         all_tables = [row[0] for row in cursor.fetchall()]
 
         print("📋 Checking for enhanced schema tables:")
@@ -63,18 +63,20 @@ def check_enhanced_schema():
 
         # Check for enhanced columns
         enhanced_columns = {
-            'document_categories': ['ai_confidence', 'ai_suggested', 'alternative_categories'],
-            'documents': ['kg_context_expansion', 'kg_relationship_score', 'kg_last_updated']
+            "document_categories": ["ai_confidence", "ai_suggested", "alternative_categories"],
+            "documents": ["kg_context_expansion", "kg_relationship_score", "kg_last_updated"],
         }
 
         print("\n📋 Checking for enhanced columns:")
         for table, columns in enhanced_columns.items():
             if table in all_tables:
-                cursor.execute(f"""
+                cursor.execute(
+                    f"""
                     SELECT column_name
                     FROM information_schema.columns
                     WHERE table_name = '{table}' AND table_schema = 'public'
-                """)
+                """
+                )
                 existing_cols = [row[0] for row in cursor.fetchall()]
 
                 for col in columns:
@@ -87,20 +89,22 @@ def check_enhanced_schema():
 
         # Check for indexes
         required_indexes = [
-            'idx_tag_relationships_parent',
-            'idx_tag_relationships_child',
-            'idx_tag_cat_relationships_tag',
-            'idx_tag_cat_relationships_cat',
-            'idx_documents_kg_score',
-            'idx_categories_ai_confidence'
+            "idx_tag_relationships_parent",
+            "idx_tag_relationships_child",
+            "idx_tag_cat_relationships_tag",
+            "idx_tag_cat_relationships_cat",
+            "idx_documents_kg_score",
+            "idx_categories_ai_confidence",
         ]
 
         print("\n📋 Checking for performance indexes:")
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT indexname
             FROM pg_indexes
             WHERE schemaname = 'public'
-        """)
+        """
+        )
         existing_indexes = [row[0] for row in cursor.fetchall()]
 
         for idx in required_indexes:
@@ -119,10 +123,16 @@ def check_enhanced_schema():
             print(f"  ❌ {len(required_tables) - len(existing_tables)} required tables missing")
 
         # Check if we have the basic schema at least
-        basic_tables_exist = all(table in all_tables for table in [
-            'documents', 'document_tags', 'document_categories',
-            'document_tag_assignments', 'document_category_assignments'
-        ])
+        basic_tables_exist = all(
+            table in all_tables
+            for table in [
+                "documents",
+                "document_tags",
+                "document_categories",
+                "document_tag_assignments",
+                "document_category_assignments",
+            ]
+        )
 
         if basic_tables_exist:
             print("  ✅ Basic tagging and categorization schema exists")
@@ -142,11 +152,13 @@ def check_enhanced_schema():
     except Exception as e:
         print(f"❌ Error during schema verification: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:
         cursor.close()
         conn.close()
+
 
 if __name__ == "__main__":
     success = check_enhanced_schema()

@@ -2,9 +2,10 @@
 Query interface components for the Local RAG Web Interface
 """
 
-import streamlit as st
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict
+
+import streamlit as st
 
 
 def render_query_input():
@@ -160,7 +161,8 @@ def render_advanced_filters() -> Dict[str, Any]:
 
 def render_advanced_query_help():
     """Render help text for advanced query syntax"""
-    st.markdown("""
+    st.markdown(
+        """
     **Advanced Query Syntax:**
     - **Boolean operators**: `AND`, `OR`, `NOT`
     - **Field search**: `title:topic`, `tags:machine learning`
@@ -171,7 +173,8 @@ def render_advanced_query_help():
         - `machine learning AND deep learning`
         - `title:"neural networks" OR tags:AI`
         - `author:Smith NOT draft`
-    """)
+    """
+    )
 
 
 def render_faceted_tag_filter(query: str, filters: Dict[str, Any]):
@@ -182,9 +185,7 @@ def render_faceted_tag_filter(query: str, filters: Dict[str, Any]):
         search_engine = HybridSearchEngine()
         facets = search_engine.get_search_facets(query)
 
-        tag_options = [
-            f"{tag['value']} ({tag['count']})" for tag in facets.get("tags", [])
-        ]
+        tag_options = [f"{tag['value']} ({tag['count']})" for tag in facets.get("tags", [])]
         selected_display = st.multiselect(
             "Filter by Tags (with counts)",
             tag_options,
@@ -231,9 +232,7 @@ def render_faceted_category_filter(query: str, filters: Dict[str, Any]):
         search_engine = HybridSearchEngine()
         facets = search_engine.get_search_facets(query)
 
-        cat_options = [
-            f"{cat['value']} ({cat['count']})" for cat in facets.get("categories", [])
-        ]
+        cat_options = [f"{cat['value']} ({cat['count']})" for cat in facets.get("categories", [])]
         selected_display = st.multiselect(
             "Filter by Categories (with counts)",
             cat_options,
@@ -292,9 +291,9 @@ def render_language_filter(filters: Dict[str, Any]):
     selected_lang = st.selectbox(
         "Language",
         ["All"] + languages,
-        format_func=lambda x: lang_labels.get(x, x.upper() if x else "unknown")
-        if x != "All"
-        else "🌍 All Languages",
+        format_func=lambda x: (
+            lang_labels.get(x, x.upper() if x else "unknown") if x != "All" else "🌍 All Languages"
+        ),
         help="Filter by document language",
     )
     if selected_lang != "All":
@@ -303,9 +302,7 @@ def render_language_filter(filters: Dict[str, Any]):
 
 def render_submit_button(query, mode):
     """Render the submit button and handle query processing"""
-    disabled = not query.strip() or not st.session_state.get(
-        "system_initialized", False
-    )
+    disabled = not query.strip() or not st.session_state.get("system_initialized", False)
 
     if st.button("🔎 Search", type="primary", disabled=disabled):
         if not query.strip():
@@ -322,9 +319,7 @@ def render_submit_button(query, mode):
 def render_processing_status():
     """Render processing status during query execution"""
     if st.session_state.get("processing_time", 0) > 0:
-        st.info(
-            f"⏱️ Last query processed in {st.session_state.processing_time:.2f} seconds"
-        )
+        st.info(f"⏱️ Last query processed in {st.session_state.processing_time:.2f} seconds")
 
 
 def render_query_history():

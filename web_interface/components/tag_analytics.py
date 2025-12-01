@@ -4,15 +4,16 @@ Tag analytics and insights component for the web interface.
 Provides comprehensive tag usage statistics, trends, and recommendations.
 """
 
-import streamlit as st
+import logging
+import os
+import sys
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
-import sys
-import os
-import logging
+import streamlit as st
 
 logger = logging.getLogger(__name__)
 
@@ -270,9 +271,7 @@ def render_tag_analytics():
                                     deleted_count += 1
 
                             if deleted_count > 0:
-                                st.success(
-                                    f"✅ Successfully removed {deleted_count} unused tags!"
-                                )
+                                st.success(f"✅ Successfully removed {deleted_count} unused tags!")
                                 st.rerun()
                             else:
                                 st.warning(
@@ -289,9 +288,7 @@ def render_tag_analytics():
                     with st.container():
                         st.info(f"🎨 {rec['message']}\n\n*{rec['action']}*")
                         if "details" in rec:
-                            with st.expander(
-                                "📋 View conflicting colors", expanded=False
-                            ):
+                            with st.expander("📋 View conflicting colors", expanded=False):
                                 for detail in rec["details"]:
                                     st.write(detail)
 
@@ -303,40 +300,28 @@ def render_tag_analytics():
                             try:
                                 # Get tags with conflicting colors
                                 conflicting_color_list = list(conflicting_colors.index)
-                                tags_to_update = df[
-                                    df["color"].isin(conflicting_color_list)
-                                ]
+                                tags_to_update = df[df["color"].isin(conflicting_color_list)]
 
                                 updated_count = 0
                                 for _, tag_row in tags_to_update.iterrows():
                                     # Generate new unique color for this tag
-                                    new_color = (
-                                        tag_manager.color_manager.generate_color(
-                                            tag_row["name"]
-                                        )
+                                    new_color = tag_manager.color_manager.generate_color(
+                                        tag_row["name"]
                                     )
                                     existing_colors = set(
-                                        df[df["name"] != tag_row["name"]][
-                                            "color"
-                                        ].tolist()
+                                        df[df["name"] != tag_row["name"]]["color"].tolist()
                                     )
 
                                     # Ensure uniqueness
                                     while new_color in existing_colors and len(
                                         existing_colors
-                                    ) < len(
-                                        tag_manager.color_manager.PROFESSIONAL_PALETTE
-                                    ):
-                                        new_color = (
-                                            tag_manager.color_manager.get_similar_color(
-                                                new_color, existing_colors
-                                            )
+                                    ) < len(tag_manager.color_manager.PROFESSIONAL_PALETTE):
+                                        new_color = tag_manager.color_manager.get_similar_color(
+                                            new_color, existing_colors
                                         )
 
                                     # Update the tag color in database
-                                    if tag_manager.update_tag_color(
-                                        tag_row["name"], new_color
-                                    ):
+                                    if tag_manager.update_tag_color(tag_row["name"], new_color):
                                         updated_count += 1
 
                                 if updated_count > 0:
@@ -378,9 +363,7 @@ def render_tag_analytics():
             db.close()
 
 
-def render_tag_suggestions(
-    document_id: int, document_content: str, document_title: str = ""
-):
+def render_tag_suggestions(document_id: int, document_content: str, document_title: str = ""):
     """
     Render AI-powered tag suggestions for a specific document.
 
@@ -393,7 +376,7 @@ def render_tag_suggestions(
 
     try:
         from src.core.tagging.tag_manager import TagManager
-        from src.database.models import SessionLocal, Document, DocumentTagAssignment
+        from src.database.models import Document, DocumentTagAssignment, SessionLocal
 
         db = SessionLocal()
         tag_manager = TagManager(db)
@@ -404,9 +387,7 @@ def render_tag_suggestions(
 
         # Generate suggestions
         with st.spinner("Analyzing document content..."):
-            suggestions = tag_manager.suggest_tags_for_document(
-                document_id, max_suggestions=6
-            )
+            suggestions = tag_manager.suggest_tags_for_document(document_id, max_suggestions=6)
 
         if suggestions:
             st.success(f"Generated {len(suggestions)} tag suggestions")
@@ -431,9 +412,7 @@ def render_tag_suggestions(
                         confidence_label = "Low"
 
                     # Check if tag already exists on document
-                    already_assigned = tag_name.lower() in [
-                        t.lower() for t in existing_tag_names
-                    ]
+                    already_assigned = tag_name.lower() in [t.lower() for t in existing_tag_names]
 
                     st.markdown(
                         f"""
@@ -468,9 +447,7 @@ def render_tag_suggestions(
                                 if not tag:
                                     tag = tag_manager.create_tag_with_ai_color(tag_name)
 
-                                if tag and tag_manager.add_tag_to_document(
-                                    document_id, tag.id
-                                ):
+                                if tag and tag_manager.add_tag_to_document(document_id, tag.id):
                                     st.success(f"✅ Added '{tag_name}'")
                                     st.rerun()
                                 else:
@@ -498,9 +475,7 @@ def render_tag_suggestions(
                                     for doc in tag_docs:
                                         st.write(f"• {doc.filename}")
                                 else:
-                                    st.info(
-                                        f"📄 No documents currently tagged with '{tag_name}'"
-                                    )
+                                    st.info(f"📄 No documents currently tagged with '{tag_name}'")
                             else:
                                 st.info(f"📄 '{tag_name}' is a new tag")
 
@@ -511,18 +486,12 @@ def render_tag_suggestions(
             ):  # Only suggest auto-assign for untagged documents
                 st.divider()
                 st.markdown("### ⚡ Quick Auto-Assign")
-                st.markdown(
-                    "Automatically assign high-confidence tags to this document:"
-                )
+                st.markdown("Automatically assign high-confidence tags to this document:")
 
                 if st.button("🚀 Auto-assign high confidence tags"):
-                    assigned = tag_manager.auto_assign_tags(
-                        document_id, min_confidence=0.8
-                    )
+                    assigned = tag_manager.auto_assign_tags(document_id, min_confidence=0.8)
                     if assigned:
-                        st.success(
-                            f"✅ Auto-assigned {len(assigned)} tags: {', '.join(assigned)}"
-                        )
+                        st.success(f"✅ Auto-assigned {len(assigned)} tags: {', '.join(assigned)}")
                         st.rerun()
                     else:
                         st.warning("No high-confidence tags were assigned")

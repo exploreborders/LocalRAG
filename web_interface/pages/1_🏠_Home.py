@@ -3,11 +3,12 @@
 Home Page - Main Query Interface
 """
 
-import streamlit as st
-import time
 import os
 import sys
+import time
 from pathlib import Path
+
+import streamlit as st
 
 # Find project root (two levels up from /web_interface/pages/)
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,8 +25,8 @@ try:
     from src.core.retrieval import (
         DatabaseRetriever,
         RAGPipelineDB,
-        format_results_db,
         format_answer_db,
+        format_results_db,
     )
 except ImportError:
     st.error(
@@ -35,17 +36,17 @@ except ImportError:
 
 # Import web interface components (after path setup)
 try:
-    from web_interface.utils.session_manager import (
-        load_settings,
-        update_settings,
-        initialize_session_state,
-        add_query_to_history,
-    )
     from web_interface.components.query_interface import (
         render_query_input,
         render_submit_button,
     )
     from web_interface.components.results_display import render_results
+    from web_interface.utils.session_manager import (
+        add_query_to_history,
+        initialize_session_state,
+        load_settings,
+        update_settings,
+    )
 except ImportError as e:
     st.error(f"❌ Could not import web interface components: {e}")
     st.stop()
@@ -106,8 +107,8 @@ def initialize_system(show_ui=True):
 
 def _do_initialization():
     """Core initialization logic without UI"""
-    import warnings
     import logging
+    import warnings
 
     # Suppress common PyTorch warnings that are usually harmless
     warnings.filterwarnings("ignore", message=".*torch.classes.*")
@@ -122,9 +123,7 @@ def _do_initialization():
     from web_interface.utils.session_manager import load_settings
 
     settings = load_settings()
-    embedding_model = settings.get("retrieval", {}).get(
-        "embedding_model", "embeddinggemma:latest"
-    )
+    embedding_model = settings.get("retrieval", {}).get("embedding_model", "embeddinggemma:latest")
     embedding_backend = "ollama"  # Fixed backend
     embedding_backend = settings.get("retrieval", {}).get("embedding_backend", "ollama")
     llm_model = settings.get("generation", {}).get("model", "llama2")
@@ -186,13 +185,9 @@ def process_query(query, mode="topic-aware", filters=None):
 
         elif mode == "rag":
             if st.session_state.rag_pipeline is None:
-                raise Exception(
-                    "RAG pipeline not available. Please ensure Ollama is running."
-                )
+                raise Exception("RAG pipeline not available. Please ensure Ollama is running.")
 
-            result = st.session_state.rag_pipeline.query(
-                query, top_k=3, filters=filters or {}
-            )
+            result = st.session_state.rag_pipeline.query(query, top_k=3, filters=filters or {})
             formatted_answer = format_answer_db(result["answer"])
 
         # Store results for display
@@ -204,17 +199,13 @@ def process_query(query, mode="topic-aware", filters=None):
             "filters": filters,
             "processing_info": {
                 "ocr_used": getattr(st.session_state, "last_upload_ocr_used", False),
-                "is_scanned": getattr(
-                    st.session_state, "last_upload_is_scanned", False
-                ),
+                "is_scanned": getattr(st.session_state, "last_upload_is_scanned", False),
             },
         }
 
         # Add to query history
         processing_time = time.time() - start_time
-        add_query_to_history(
-            query, mode, processing_time, st.session_state.current_results
-        )
+        add_query_to_history(query, mode, processing_time, st.session_state.current_results)
 
         st.session_state.processing_time = processing_time
 

@@ -3,9 +3,9 @@
 Convenience script to run the Local RAG web interface
 """
 
+import os
 import subprocess
 import sys
-import os
 
 
 def check_dependencies():
@@ -163,7 +163,7 @@ st_cli.main()
         # Clean up temporary file
         try:
             os.unlink(wrapper_path)
-        except:
+        except OSError:
             pass
 
 

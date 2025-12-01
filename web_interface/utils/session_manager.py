@@ -2,17 +2,16 @@
 Session management utilities for the Local RAG Web Interface
 """
 
-import streamlit as st
-from datetime import datetime
-import yaml
 import os
+from datetime import datetime
+
+import streamlit as st
+import yaml
 
 
 def load_settings():
     """Load settings from YAML file"""
-    settings_path = os.path.join(
-        os.path.dirname(__file__), "..", "config", "default_settings.yaml"
-    )
+    settings_path = os.path.join(os.path.dirname(__file__), "..", "config", "default_settings.yaml")
     try:
         with open(settings_path, "r") as f:
             return yaml.safe_load(f)
@@ -74,9 +73,7 @@ def add_query_to_history(query, mode, processing_time, results=None):
     st.session_state.query_history.insert(0, history_item)
 
     # Keep only the configured maximum
-    max_history = st.session_state.settings.get("system", {}).get(
-        "max_query_history", 10
-    )
+    max_history = st.session_state.settings.get("system", {}).get("max_query_history", 10)
     st.session_state.query_history = st.session_state.query_history[:max_history]
 
 

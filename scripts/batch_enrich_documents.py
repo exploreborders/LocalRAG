@@ -8,10 +8,11 @@ import sys
 from pathlib import Path
 
 # Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from database.models import SessionLocal, Document
 from ai.enrichment import AIEnrichmentService
+from database.models import Document, SessionLocal
+
 
 def main():
     print("🤖 Batch AI Enrichment for Existing Documents")
@@ -41,7 +42,7 @@ def main():
             # Enrich document
             result = enrichment_service.enrich_document(doc.id, force=False)
 
-            if result['success']:
+            if result["success"]:
                 print("  ✅ Successfully enriched")
                 successful += 1
             else:
@@ -57,9 +58,11 @@ def main():
     except Exception as e:
         print(f"❌ Error during batch enrichment: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     main()

@@ -3,11 +3,12 @@
 Settings Page - Configuration Options
 """
 
-import streamlit as st
 import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
+
+import streamlit as st
 
 # Find project root (two levels up from /web_interface/pages/)
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,9 +22,9 @@ for p in (SRC, WEB):
 
 # Import utilities
 from web_interface.utils.session_manager import (
+    initialize_session_state,
     load_settings,
     update_settings,
-    initialize_session_state,
 )
 
 # Page configuration
@@ -66,9 +67,7 @@ def save_settings_to_file(settings):
     """Save settings to YAML file and update Streamlit config"""
     import yaml
 
-    settings_path = os.path.join(
-        os.path.dirname(__file__), "..", "config", "default_settings.yaml"
-    )
+    settings_path = os.path.join(os.path.dirname(__file__), "..", "config", "default_settings.yaml")
     streamlit_config_path = os.path.join(
         os.path.dirname(__file__), "..", "..", ".streamlit", "config.toml"
     )
@@ -92,9 +91,7 @@ def get_installed_ollama_models():
     """Get list of installed Ollama models"""
     try:
         # Run ollama list command
-        result = subprocess.run(
-            ["ollama", "list"], capture_output=True, text=True, timeout=5
-        )
+        result = subprocess.run(["ollama", "list"], capture_output=True, text=True, timeout=5)
 
         if result.returncode == 0:
             lines = result.stdout.strip().split("\n")
@@ -242,9 +239,7 @@ def main():
         with col2:
             ollama_host = st.text_input(
                 "Ollama Host",
-                value=settings.get("generation", {}).get(
-                    "ollama_host", "http://localhost:11434"
-                ),
+                value=settings.get("generation", {}).get("ollama_host", "http://localhost:11434"),
                 help="URL where Ollama server is running",
             )
 
@@ -263,9 +258,11 @@ def main():
             model_name = st.selectbox(
                 "LLM Model",
                 installed_models,
-                index=installed_models.index(current_model)
-                if current_model in installed_models
-                else 0,
+                index=(
+                    installed_models.index(current_model)
+                    if current_model in installed_models
+                    else 0
+                ),
                 help=f"Available Ollama models: {', '.join(installed_models)}",
             )
 
@@ -274,9 +271,7 @@ def main():
             temperature != settings.get("generation", {}).get("temperature", 0.7)
             or max_tokens != settings.get("generation", {}).get("max_tokens", 500)
             or ollama_host
-            != settings.get("generation", {}).get(
-                "ollama_host", "http://localhost:11434"
-            )
+            != settings.get("generation", {}).get("ollama_host", "http://localhost:11434")
             or model_name != settings.get("generation", {}).get("model", "llama2")
         ):
             settings_changed = True
@@ -334,9 +329,11 @@ def main():
             embedding_model = st.selectbox(
                 "Embedding Model",
                 available_embedding_models,
-                index=available_embedding_models.index(current_embedding_model)
-                if current_embedding_model in available_embedding_models
-                else 0,
+                index=(
+                    available_embedding_models.index(current_embedding_model)
+                    if current_embedding_model in available_embedding_models
+                    else 0
+                ),
                 help="Embedding model (uses Ollama backend)",
             )
 
@@ -349,9 +346,7 @@ def main():
             or chunk_overlap != settings.get("retrieval", {}).get("chunk_overlap", 200)
             or k_retrieval != settings.get("retrieval", {}).get("k_retrieval", 3)
             or embedding_model
-            != settings.get("retrieval", {}).get(
-                "embedding_model", "embeddinggemma:latest"
-            )
+            != settings.get("retrieval", {}).get("embedding_model", "embeddinggemma:latest")
         ):
             settings_changed = True
             settings["retrieval"] = {
@@ -392,9 +387,7 @@ def main():
             theme = st.selectbox(
                 "Theme",
                 ["light", "dark"],
-                index=["light", "dark"].index(
-                    settings.get("interface", {}).get("theme", "light")
-                ),
+                index=["light", "dark"].index(settings.get("interface", {}).get("theme", "light")),
                 help="UI theme - requires app restart to take effect",
             )
 
@@ -449,9 +442,7 @@ def main():
 
                     # Clear cache button
                     if st.button("🗑️ Clear Cache", type="secondary"):
-                        cleared = st.session_state.rag_pipeline.cache.clear_pattern(
-                            "llm:*"
-                        )
+                        cleared = st.session_state.rag_pipeline.cache.clear_pattern("llm:*")
                         st.success(f"✅ Cleared {cleared} cached responses")
                         st.rerun()
                 else:

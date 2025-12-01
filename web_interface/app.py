@@ -4,11 +4,12 @@ Local RAG System - Web Interface Landing Page
 Main entry point for the multipage Streamlit application
 """
 
-import streamlit as st
-import warnings
 import logging
 import sys
+import warnings
 from pathlib import Path
+
+import streamlit as st
 
 # Suppress common warnings that are usually harmless
 warnings.filterwarnings("ignore", message=".*torch.classes.*")
@@ -142,9 +143,7 @@ st.markdown(
 
 def main():
     """Main landing page"""
-    st.markdown(
-        '<h1 class="welcome-header">🤖 Local RAG System</h1>', unsafe_allow_html=True
-    )
+    st.markdown('<h1 class="welcome-header">🤖 Local RAG System</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="welcome-subtitle">Retrieval-Augmented Generation for local document analysis</p>',
         unsafe_allow_html=True,
@@ -159,34 +158,42 @@ def main():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("""
+        st.markdown(
+            """
         **🏠 Home**: Ask questions and get answers
         - Natural language queries
         - Retrieval-only or AI-powered responses
         - Query history and performance tracking
-        """)
+        """
+        )
 
-        st.markdown("""
+        st.markdown(
+            """
         **📁 Documents**: Manage your knowledge base
         - Upload new documents (PDF, DOCX, TXT, etc.)
         - View document library
         - Reprocess documents for updates
-        """)
+        """
+        )
 
     with col2:
-        st.markdown("""
+        st.markdown(
+            """
         **⚙️ Settings**: Configure system parameters
         - Adjust retrieval and generation settings
         - Choose embedding models and parameters
         - Customize interface preferences
-        """)
+        """
+        )
 
-        st.markdown("""
+        st.markdown(
+            """
         **📊 Analytics**: Monitor performance
         - Query statistics and trends
         - System health metrics
         - Performance analytics and exports
-        """)
+        """
+        )
 
     st.markdown("---")
 
@@ -249,29 +256,35 @@ def main():
     st.markdown("### 📚 Getting Started")
 
     with st.expander("🔧 System Setup"):
-        st.markdown("""
+        st.markdown(
+            """
         1. **System auto-initializes** when you first visit the Home page
         2. **Upload documents** via the Documents page
         3. **Reprocess documents** to create embeddings
         4. **Start asking questions!**
-        """)
+        """
+        )
 
     with st.expander("🤖 RAG Mode Setup"):
-        st.markdown("""
+        st.markdown(
+            """
         For AI-powered answers, you'll need Ollama:
         1. Install Ollama from https://ollama.ai
         2. Run `ollama serve` in a terminal
         3. Pull a model: `ollama pull llama2`
         4. The system will automatically detect RAG availability
-        """)
+        """
+        )
 
     with st.expander("📊 Performance Tips"):
-        st.markdown("""
+        st.markdown(
+            """
         - **Faster responses**: Reduce chunk size or k-value
         - **Better accuracy**: Increase k-value or use larger chunks
         - **Memory efficiency**: Use smaller embedding models
         - **Batch processing**: Upload multiple documents at once
-        """)
+        """
+        )
 
     # Footer
     st.markdown("---")
