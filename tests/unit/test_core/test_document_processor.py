@@ -659,6 +659,84 @@ class TestDocumentProcessor:
         assert chapter_data["2.4.1"]["level"] == 3
         assert chapter_data["2.4.2"]["level"] == 3
 
+    def test_create_chunks_fallback_when_chapters_empty(self, document_processor):
+        """Test chunk creation falls back to position-based assignment when chapters have no content."""
+        # Create substantial document content
+        content = "This is test content for chunking. " * 200  # ~4000 characters
+
+        # Create chapters with empty content (like from table parsing)
+        chapters = [
+            {"title": "Chapter 1", "content": "", "path": "1", "level": 1},
+            {"title": "Chapter 2", "content": "", "path": "2", "level": 1},
+            {"title": "Chapter 3", "content": "", "path": "3", "level": 1},
+        ]
+
+        chunks = document_processor._create_chunks(content, 1, chapters)
+
+        # Should create chunks despite empty chapter content
+        assert len(chunks) > 0
+
+        # All chunks should have chapter metadata
+        for chunk in chunks:
+            assert "metadata" in chunk
+            assert "chapter_title" in chunk["metadata"]
+            assert "chapter_path" in chunk["metadata"]
+            assert chunk["metadata"]["chapter_title"] is not None
+            assert chunk["metadata"]["chapter_path"] is not None
+
+        # Should have chunks assigned to different chapters
+        chapter_titles = set(chunk["metadata"]["chapter_title"] for chunk in chunks)
+        assert len(chapter_titles) >= 2  # At least some different chapters
+
+        # Verify chunk content is substantial
+        for chunk in chunks:
+            assert len(chunk["content"]) > 100  # Reasonable chunk size
+
+    def test_create_chunks_no_fallback_for_small_chapters(self, document_processor):
+        """Test that fallback doesn't trigger for chapters with small but non-empty content."""
+        content = "This is test content for chunking. " * 200
+
+        # Create chapters with small content (should not trigger fallback)
+        chapters = [
+            {"title": "Chapter 1", "content": "Short content", "path": "1", "level": 1},
+            {"title": "Chapter 2", "content": "Also short", "path": "2", "level": 1},
+        ]
+
+        chunks = document_processor._create_chunks(content, 1, chapters)
+
+        # Should not create chunks because chapter content is too small (< 500 chars)
+        # and fallback only triggers when ALL chapters have empty content
+        assert len(chunks) == 0
+
+    def test_create_chunks_mixed_content_chapters(self, document_processor):
+        """Test chunking with mix of chapters with and without content."""
+        content = "This is test content for chunking. " * 200
+
+        chapters = [
+            {
+                "title": "Chapter 1",
+                "content": "This is substantial content for chapter 1. " * 20,
+                "path": "1",
+                "level": 1,
+            },  # > 500 chars
+            {
+                "title": "Chapter 2",
+                "content": "",
+                "path": "2",
+                "level": 1,
+            },  # Empty content
+        ]
+
+        chunks = document_processor._create_chunks(content, 1, chapters)
+
+        # Should create chunks from Chapter 1 (has content) but not trigger fallback
+        # because not ALL chapters have empty content
+        assert len(chunks) > 0
+
+        # All chunks should be from Chapter 1
+        chapter_titles = set(chunk["metadata"]["chapter_title"] for chunk in chunks)
+        assert chapter_titles == {"Chapter 1"}
+
     def test_del_method(self, document_processor, mock_db_session):
         """Test cleanup in destructor."""
         document_processor.__del__()
