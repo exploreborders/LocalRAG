@@ -752,11 +752,8 @@ class DocumentProcessor(BaseProcessor):
         if len(unique_entries) > 5:  # Substantial TOC found
             chapters.clear()
             for number, title in unique_entries:
-                # Include chapter number in title for main chapters
-                if number.count(".") == 0:  # Main chapter
-                    display_title = f"{number} {title}"
-                else:
-                    display_title = title
+                # Use title as-is (chapter numbers are in the path field)
+                display_title = title
 
                 chapters.append(
                     {
