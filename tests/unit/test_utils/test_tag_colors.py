@@ -4,8 +4,6 @@ Unit tests for TagColorManager class.
 Tests color generation, validation, contrast calculation, and palette management.
 """
 
-import pytest
-
 from src.utils.tag_colors import TagColorManager
 
 

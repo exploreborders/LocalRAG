@@ -5,10 +5,9 @@ Tests the coordination between TagManager, CategoryManager,
 DocumentProcessor, and UploadProcessor through the facade.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy.orm import Session
 
 from src.core.document_manager import DocumentManager
 

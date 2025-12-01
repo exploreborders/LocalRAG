@@ -97,7 +97,7 @@ class TagColorManager:
                 return color
 
         # Generate consistent color based on tag name hash
-        hash_obj = hashlib.md5(tag_name.encode())
+        hash_obj = hashlib.sha256(tag_name.encode())
         hash_int = int(hash_obj.hexdigest(), 16)
 
         # Use hash to select from professional palette
@@ -238,7 +238,7 @@ class TagColorManager:
             Dict mapping tag names to suggested colors
         """
         suggestions = {}
-        used_colors = set()
+        used_colors: set[str] = set()
 
         for tag in tags:
             color = self.generate_color(tag)

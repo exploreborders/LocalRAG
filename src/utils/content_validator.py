@@ -42,7 +42,7 @@ class ContentValidator:
 
     @staticmethod
     def validate_content_quality(
-        content: str, chunks: Optional[List[str]] = None
+        content: Any, chunks: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Comprehensive content quality validation.

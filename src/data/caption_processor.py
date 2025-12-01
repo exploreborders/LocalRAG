@@ -6,7 +6,7 @@ by keeping captions and their associated content together during text splitting.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from docling_core.types.doc.document import DoclingDocument
 from langchain_core.documents import Document as LangchainDocument
@@ -185,7 +185,6 @@ class CaptionAwareProcessor:
         for caption in captions:
             line_number = caption.get("line_number", 0)
             caption_text = caption.get("text", "")
-            context = caption.get("context", "")
 
             # Create a chunk centered around this caption
             # Include some lines before and after the caption

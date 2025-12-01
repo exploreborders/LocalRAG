@@ -8,7 +8,6 @@ and tree building functionality.
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy.orm import Session
 
 from src.core.categorization.category_manager import CategoryManager
 from src.database.models import DocumentCategory, DocumentCategoryAssignment

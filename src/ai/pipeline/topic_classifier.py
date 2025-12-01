@@ -427,7 +427,7 @@ class TopicClassifier:
         """
         Identify specific relationships between documents.
         """
-        relationships = []
+        relationships: List[Dict[str, Any]] = []
 
         # Process each cluster
         for cluster in clusters:
@@ -454,7 +454,7 @@ class TopicClassifier:
 
     def _calculate_topic_distribution(self, doc_topics: Dict[str, Set[str]]) -> Dict[str, int]:
         """Calculate the distribution of topics across documents."""
-        all_topics = []
+        all_topics: List[str] = []
         for topics in doc_topics.values():
             all_topics.extend(topics)
 

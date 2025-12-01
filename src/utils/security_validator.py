@@ -6,7 +6,7 @@ Validates environment variables and security settings.
 import logging
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,6 @@ class SecurityValidator:
         if require_secure:
             # In production, check for secure bindings
             postgres_host = os.getenv("POSTGRES_HOST", "localhost")
-            opensearch_host = os.getenv("OPENSEARCH_HOST", "localhost")
-            redis_host = os.getenv("REDIS_HOST", "localhost")
 
             if postgres_host == "localhost":
                 self.issues.append(

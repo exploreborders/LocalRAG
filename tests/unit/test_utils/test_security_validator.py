@@ -8,8 +8,6 @@ and file security validation.
 import os
 from unittest.mock import patch
 
-import pytest
-
 from src.utils.security_validator import SecurityValidator, validate_security_on_startup
 
 

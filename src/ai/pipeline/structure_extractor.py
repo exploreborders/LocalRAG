@@ -199,7 +199,7 @@ class StructureExtractor:
 
                     parsed["hierarchy"] = filtered_hierarchy
 
-                    return parsed
+                    return dict(parsed)  # Ensure it's a dict
 
             # If we get here, no valid JSON was found
             logger.warning("No complete JSON object found in structure response")

@@ -5,8 +5,6 @@ Tests content quality validation, OCR artifact detection, structure analysis,
 and chunk quality assessment.
 """
 
-import pytest
-
 from src.utils.content_validator import ContentValidator
 
 

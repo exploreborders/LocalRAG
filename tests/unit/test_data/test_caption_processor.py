@@ -6,7 +6,6 @@ Tests caption extraction, context identification, and caption-centric chunking.
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from docling_core.types.doc.document import DoclingDocument
 
 from src.data.caption_processor import CaptionAwareProcessor

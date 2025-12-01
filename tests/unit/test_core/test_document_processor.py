@@ -5,20 +5,12 @@ Tests document processing, AI enrichment, chunking, language detection,
 and search indexing functionality.
 """
 
-import os
-import tempfile
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-from sqlalchemy.orm import Session
 
 from src.core.processing.document_processor import DocumentProcessor
-from src.database.models import (
-    Document,
-    DocumentChapter,
-    DocumentChunk,
-    DocumentEmbedding,
-)
+from src.database.models import Document
 
 
 class TestDocumentProcessor:
@@ -51,7 +43,7 @@ class TestDocumentProcessor:
         """Test DocumentProcessor initialization without db parameter."""
         with patch("src.core.processing.document_processor.SessionLocal") as mock_session:
             mock_session.return_value = MagicMock()
-            processor = DocumentProcessor()
+            _ = DocumentProcessor()
             mock_session.assert_called_once()
 
     def test_suggest_categories_ai_success(self, document_processor):

@@ -2,6 +2,7 @@ import io
 import logging
 import os
 import re
+import warnings
 from typing import Any, Dict, List
 
 from docling.document_converter import DocumentConverter
@@ -10,6 +11,9 @@ from langchain_core.documents import Document
 from PIL import Image
 
 logger = logging.getLogger(__name__)
+
+# Suppress swig deprecation warnings from fitz library
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="importlib._bootstrap")
 
 try:
     import pytesseract
@@ -28,12 +32,7 @@ try:
     logger.info("Ollama vision model available")
 except ImportError:
     try:
-        import torch
-        from transformers import (
-            AutoProcessor,
-            AutoTokenizer,
-            Qwen2VLForConditionalGeneration,
-        )
+        import transformers  # noqa: F401
 
         VISION_MODEL_AVAILABLE = True
         VISION_BACKEND = "transformers"
@@ -59,8 +58,6 @@ def extract_text_with_ocr(pdf_path: str) -> str:
         return ""
 
     try:
-        import io
-
         import fitz
         from PIL import Image
 
@@ -192,8 +189,6 @@ def _post_process_ocr_text(text: str) -> str:
     return text.strip()
 
     try:
-        import io
-
         import fitz
         from PIL import Image
 
@@ -261,8 +256,6 @@ def _post_process_ocr_text(text: str) -> str:
         return ""
 
     try:
-        import io
-
         import fitz
         from PIL import Image
 
@@ -577,7 +570,6 @@ class AdvancedDocumentProcessor:
 
         try:
             import base64
-            import io
 
             import fitz
             from PIL import Image
@@ -695,35 +687,7 @@ class AdvancedDocumentProcessor:
     ) -> str:
         """Query DeepSeek-OCR model for German technical document analysis."""
         try:
-            import ollama
-
-            prompt = f"""Extract ALL text from this scanned German technical document page {page_num}.
-
-CRITICAL REQUIREMENTS for German Computer Science/Deep Learning content:
-
-1. GERMAN LANGUAGE PRESERVATION:
-   - Extract every visible character, symbol, and mark
-   - Preserve German umlauts: ä, ö, ü, ß
-   - Maintain German compound words: MaschinellesLernen → Maschinelles Lernen
-   - Keep German technical terminology intact
-
-2. MATHEMATICAL CONTENT:
-   - Extract formulas, equations, and symbols accurately
-   - Preserve mathematical notation and symbols
-   - Keep algorithm pseudocode and mathematical expressions
-
-3. DOCUMENT STRUCTURE:
-   - Identify chapter headers: "Kapitel 1", "1. Einleitung"
-   - Extract section titles and hierarchy
-   - Preserve table content and figure captions
-   - Maintain hierarchical structure (sections, subsections)
-
-4. TECHNICAL ACCURACY:
-   - Extract code snippets and programming examples
-   - Preserve technical terms: neuronale Netze, Deep Learning, Optimierungsalgorithmen
-   - Maintain citation and reference formatting
-
-OUTPUT: Clean, structured text with proper German formatting. Preserve all technical content, mathematical notation, and document structure. Do not add commentary or explanations."""
+            import ollama  # noqa: F401
 
             # Temporarily use Tesseract while DeepSeek-OCR image format issues are resolved
             if image_obj is not None:
@@ -1104,7 +1068,7 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                 elif line.strip().isdigit() and len(line.strip()) == 1:
                     is_header = True
                     level = 1  # Chapter
-                    logger.debug(f"  -> Matched main chapter")
+                    logger.debug("  -> Matched main chapter")
 
                 # Check for German/English header keywords
                 elif any(
@@ -1143,19 +1107,19 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                         )
                         else 2
                     )
-                    logger.debug(f"  -> Matched keyword")
+                    logger.debug("  -> Matched keyword")
 
                 # Check for ALL CAPS (common in headers)
                 elif line.isupper() and len(line) > 5:
                     is_header = True
                     level = 1
-                    logger.debug(f"  -> Matched ALL CAPS")
+                    logger.debug("  -> Matched ALL CAPS")
 
                 # Check for title case with reasonable length
                 elif line[0].isupper() and len(line) > 10 and len(line) < 80:
                     is_header = True
                     level = 2
-                    logger.debug(f"  -> Matched title case")
+                    logger.debug("  -> Matched title case")
 
                 if is_header:
                     logger.debug(f"Found header: '{line}' (level {level})")
@@ -1168,7 +1132,7 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                         }
                     )
                 else:
-                    logger.debug(f"  -> Not a header")
+                    logger.debug("  -> Not a header")
 
         # Group headers into chapters
         if structure["headers_found"]:
@@ -1349,7 +1313,7 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
             page_count = len(doc)
             doc.close()
             return page_count
-        except:
+        except (IOError, OSError, Exception):
             return 1
 
 

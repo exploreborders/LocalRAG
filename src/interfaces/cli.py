@@ -4,11 +4,8 @@ Enhanced CLI for the Local RAG System
 Modern, user-friendly command-line interface with rich features
 """
 
-import os
 import sys
 import time
-from pathlib import Path
-from typing import Optional
 
 from src.core.processing.document_processor import DocumentProcessor
 from src.core.retrieval import (
@@ -134,7 +131,7 @@ class RAGCLI:
                     continue
                 search_time = time.time() - start_time
 
-                print(".2f")
+                print(f"✅ Search completed in {search_time:.2f} seconds")
                 print(format_results_db(results))
 
                 if results:
@@ -191,6 +188,8 @@ class RAGCLI:
                 result = self.rag_pipeline.query(question)
                 response_time = time.time() - start_time
 
+                print(f"✅ Response generated in {response_time:.2f} seconds")
+
                 # Show language detection
                 query_lang = result.get("query_language", "unknown")
                 if query_lang != "unknown":
@@ -246,7 +245,7 @@ class RAGCLI:
                 return
             process_time = time.time() - start_time
 
-            print(".1f")
+            print(f"✅ Documents processed in {process_time:.1f} seconds")
         except Exception as e:
             print(f"❌ Error processing documents: {e}")
 

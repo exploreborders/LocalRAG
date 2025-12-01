@@ -13,17 +13,14 @@ This module provides advanced search capabilities including:
 import logging
 import re
 import time
-from collections import defaultdict, Counter
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
-from datetime import datetime, timedelta
+from collections import Counter, defaultdict
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from elasticsearch import Elasticsearch
-from langdetect import LangDetectException, detect
 
-from src.core.embeddings import get_embedding_model, create_embeddings
+from src.core.embeddings import create_embeddings, get_embedding_model
 from src.core.knowledge_graph import KnowledgeGraph
-from src.core.retrieval import DatabaseRetriever
 from src.database.models import Document, SessionLocal
 from src.utils.error_handler import ErrorHandler, ProcessingError, ValidationError
 
@@ -255,15 +252,11 @@ class HybridSearchEngine:
             bm25_results = self._bm25_search(expanded_query, top_k * 2, filters)
 
             # Combine results
-            combined_results = self._combine_hybrid_results(
-                vector_results, bm25_results, top_k
-            )
+            combined_results = self._combine_hybrid_results(vector_results, bm25_results, top_k)
 
             # Apply faceted filtering if requested
             if search_config.get("enable_facets", False):
-                combined_results = self._apply_faceted_filters(
-                    combined_results, filters
-                )
+                combined_results = self._apply_faceted_filters(combined_results, filters)
 
             # Rerank if enabled
             if self.use_reranking:
@@ -371,12 +364,9 @@ class HybridSearchEngine:
                         "score": hit["_score"],
                         "document_title": document.filename,
                         "document_id": doc_id,
-                        "tags": [
-                            tag_assignment.tag.name for tag_assignment in document.tags
-                        ],
+                        "tags": [tag_assignment.tag.name for tag_assignment in document.tags],
                         "categories": [
-                            cat_assignment.category.name
-                            for cat_assignment in document.categories
+                            cat_assignment.category.name for cat_assignment in document.categories
                         ],
                         "metadata": source.get("metadata", {}),
                         "search_type": "bm25",
@@ -411,9 +401,7 @@ class HybridSearchEngine:
         if boolean_query:
             # Simple boolean query handling
             query_str = boolean_query.get("query", "")
-            must_clauses.append(
-                {"query_string": {"query": query_str, "default_field": "content"}}
-            )
+            must_clauses.append({"query_string": {"query": query_str, "default_field": "content"}})
         else:
             # Handle simple terms
             simple_terms = expanded_query.get("simple_terms", [])
@@ -472,9 +460,7 @@ class HybridSearchEngine:
 
         return {"query": query}
 
-    def _build_filter_clauses(
-        self, filters: Dict[str, Any], filter_clauses: List[Dict[str, Any]]
-    ):
+    def _build_filter_clauses(self, filters: Dict[str, Any], filter_clauses: List[Dict[str, Any]]):
         """Build filter clauses from filters dict."""
         # Tag filters
         tags = filters.get("tags", [])
@@ -552,9 +538,7 @@ class HybridSearchEngine:
                 combined[key] = result_copy
 
         # Sort by combined score and return top_k
-        sorted_results = sorted(
-            combined.values(), key=lambda x: x["combined_score"], reverse=True
-        )
+        sorted_results = sorted(combined.values(), key=lambda x: x["combined_score"], reverse=True)
 
         # Update final score
         for result in sorted_results[:top_k]:
@@ -603,8 +587,6 @@ class HybridSearchEngine:
         query_terms = set(query.split())
 
         for result in results:
-            original_score = result["score"]
-
             # Boost for exact matches
             if query_lower in result["content"].lower():
                 result["score"] *= 1.2
@@ -633,12 +615,10 @@ class HybridSearchEngine:
             "query_complexity": self._calculate_query_complexity(parsed_query),
             "result_distribution": self._analyze_result_distribution(results),
             "performance_metrics": {
-                "avg_score": sum(r.get("score", 0) for r in results) / len(results)
-                if results
-                else 0,
-                "score_variance": np.var([r.get("score", 0) for r in results])
-                if results
-                else 0,
+                "avg_score": (
+                    sum(r.get("score", 0) for r in results) / len(results) if results else 0
+                ),
+                "score_variance": np.var([r.get("score", 0) for r in results]) if results else 0,
                 "top_score": max((r.get("score", 0) for r in results), default=0),
             },
         }
@@ -668,9 +648,7 @@ class HybridSearchEngine:
 
         return min(complexity, 5.0)  # Cap at 5.0
 
-    def _analyze_result_distribution(
-        self, results: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _analyze_result_distribution(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze distribution of results."""
         if not results:
             return {}
@@ -690,9 +668,7 @@ class HybridSearchEngine:
 
         return {
             "unique_documents": len(doc_counts),
-            "documents_with_multiple_chunks": sum(
-                1 for count in doc_counts.values() if count > 1
-            ),
+            "documents_with_multiple_chunks": sum(1 for count in doc_counts.values() if count > 1),
             "top_tags": dict(tag_counts.most_common(5)),
             "top_categories": dict(cat_counts.most_common(5)),
         }

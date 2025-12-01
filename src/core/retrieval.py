@@ -577,7 +577,7 @@ class RAGPipelineDB:
             key_components.append(str(sorted(filters.items())))
         if hybrid_alpha is not None:
             key_components.append(str(hybrid_alpha))
-        return hashlib.md5("|".join(key_components).encode()).hexdigest()
+        return hashlib.sha256("|".join(key_components).encode()).hexdigest()
 
 
 # Format functions for web interface

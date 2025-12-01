@@ -8,7 +8,7 @@ import hashlib
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 # MIME type detection based on file extensions
 EXTENSION_MIME_MAP = {
@@ -338,7 +338,7 @@ class FileUploadValidator:
         file_path = self.upload_dir / safe_name
         if file_path.exists():
             name, ext = os.path.splitext(safe_name)
-            hash_suffix = hashlib.md5(original_filename.encode()).hexdigest()[:8]
+            hash_suffix = hashlib.sha256(original_filename.encode()).hexdigest()[:8]
             safe_name = f"{name}_{hash_suffix}{ext}"
 
         return safe_name
@@ -376,7 +376,7 @@ class FileUploadValidator:
             self.validate_file_size(file_size)
 
             # Create temporary file to validate MIME type
-            temp_path = self.upload_dir / f"temp_{hashlib.md5(file_content).hexdigest()}"
+            temp_path = self.upload_dir / f"temp_{hashlib.sha256(file_content).hexdigest()}"
             try:
                 with open(temp_path, "wb") as f:
                     f.write(file_content)

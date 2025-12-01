@@ -65,7 +65,8 @@ class AITagSuggester:
 
             if response.status_code == 200:
                 result = response.json()
-                return result.get("response", "").strip()
+                response_text = result.get("response", "")
+                return str(response_text).strip()
             else:
                 logger.error(f"LLM call failed: {response.status_code} - {response.text}")
                 return ""
@@ -279,7 +280,7 @@ class AITagSuggester:
             )
 
         # Sort by confidence (highest first)
-        scored_tags.sort(key=lambda x: x["confidence"], reverse=True)
+        scored_tags.sort(key=lambda x: x.get("confidence", 0), reverse=True)
 
         return scored_tags
 
@@ -388,7 +389,7 @@ class AITagSuggester:
         try:
             # Try to parse JSON response
             result = json.loads(response)
-            return result
+            return dict(result)  # Ensure it's a dict
         except json.JSONDecodeError:
             # Fallback to basic analysis
             return {

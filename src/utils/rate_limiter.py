@@ -5,7 +5,6 @@ Rate limiting utilities for API calls and resource-intensive operations.
 import logging
 import threading
 import time
-from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
@@ -20,7 +19,7 @@ T = TypeVar("T")
 class RateLimitInfo:
     """Information about rate limiting."""
 
-    requests_per_minute: int
+    requests_per_minute: float
     requests_per_hour: int
     burst_limit: int
     current_minute_count: int = 0
@@ -262,7 +261,7 @@ def rate_limited(
                 if isinstance(limiter, AdaptiveRateLimiter):
                     limiter.record_success()
                 return result
-            except Exception as e:
+            except Exception:
                 if isinstance(limiter, AdaptiveRateLimiter):
                     limiter.record_failure()
                 raise
@@ -299,7 +298,7 @@ def rate_limit_context(
 
     try:
         yield
-    except Exception as e:
+    except Exception:
         if isinstance(limiter, AdaptiveRateLimiter):
             limiter.record_failure()
         raise
@@ -363,7 +362,7 @@ class CircuitBreaker:
                 result = func(*args, **kwargs)
                 self._on_success()
                 return result
-            except self.expected_exception as e:
+            except self.expected_exception:
                 self._on_failure()
                 raise
 

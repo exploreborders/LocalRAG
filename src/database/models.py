@@ -2,28 +2,30 @@
 Enhanced SQLAlchemy models for AI-powered RAG system with hierarchical structure and topic classification.
 """
 
+import os
 from datetime import date, datetime
 from typing import Optional
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
-    JSON,
     TIMESTAMP,
-    Boolean,
-    Column,
     Date,
     Float,
     ForeignKey,
     Integer,
     String,
-    Table,
     Text,
     create_engine,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Mapped, mapped_column, relationship, sessionmaker
+from sqlalchemy.orm import (
+    Mapped,
+    declarative_base,
+    mapped_column,
+    relationship,
+    sessionmaker,
+)
 
 Base = declarative_base()
 
@@ -331,8 +333,6 @@ class ProcessingJob(Base):
 
 
 # Database connection
-import os
-
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     f"postgresql://{os.getenv('POSTGRES_USER', 'christianhein')}:{os.getenv('POSTGRES_PASSWORD', '')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'rag_system')}",

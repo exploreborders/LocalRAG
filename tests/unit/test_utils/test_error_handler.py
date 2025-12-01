@@ -2,7 +2,7 @@
 Unit tests for error handling utilities.
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 

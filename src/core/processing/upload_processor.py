@@ -662,8 +662,8 @@ class UploadProcessor(BaseProcessor):
         for temp_file in temp_files:
             try:
                 os.unlink(temp_file)
-            except Exception:
-                pass  # Ignore cleanup errors
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary file {temp_file}: {e}")
 
         return result
 

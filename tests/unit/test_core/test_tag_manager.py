@@ -8,12 +8,9 @@ and color management functionality.
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy.orm import Session
 
 from src.core.tagging.tag_manager import TagManager
 from src.database.models import (
-    Document,
-    DocumentChunk,
     DocumentTag,
     DocumentTagAssignment,
 )

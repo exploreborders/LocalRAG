@@ -81,7 +81,11 @@ class ErrorHandler:
 
     def __init__(self, logger_name: Optional[str] = None):
         self.logger = logging.getLogger(logger_name) if logger_name else logging.getLogger(__name__)
-        self.error_stats = {"total_errors": 0, "error_types": {}, "recent_errors": []}
+        self.error_stats: Dict[str, Any] = {
+            "total_errors": 0,
+            "error_types": {},
+            "recent_errors": [],
+        }
 
     def handle_error(
         self,
@@ -362,14 +366,20 @@ def validate_and_handle(validation_func: Callable, error_message: Optional[str] 
                 if not validation_func(*args, **kwargs):
                     raise ValidationError(
                         error_message or f"Validation failed for {func.__name__}",
-                        context={"function": func.__name__, "args": args, "kwargs": kwargs},
+                        context={
+                            "function": func.__name__,
+                            "args": args,
+                            "kwargs": kwargs,
+                        },
                     )
                 return func(*args, **kwargs)
             except Exception as e:
                 if isinstance(e, ValidationError):
                     raise
                 global_error_handler.handle_error(
-                    e, context={"function": func.__name__, "validation": True}, reraise=True
+                    e,
+                    context={"function": func.__name__, "validation": True},
+                    reraise=True,
                 )
 
         return wrapper

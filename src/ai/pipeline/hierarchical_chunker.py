@@ -93,7 +93,7 @@ class HierarchicalChunker:
         """
         Create chunks for a specific chapter with hierarchical context.
         """
-        chunks = []
+        chunks: List[Dict[str, Any]] = []
         chapter_path = chapter.get("path", "")
         chapter_title = chapter.get("title", "")
 
@@ -240,9 +240,9 @@ class HierarchicalChunker:
         """
         Create chunks from a section with appropriate metadata.
         """
-        chunks = []
+        chunks: List[Dict[str, Any]] = []
         words = section_text.split()
-        current_chunk = []
+        current_chunk: List[str] = []
         current_length = 0
         chunk_start = 0
 
@@ -295,7 +295,7 @@ class HierarchicalChunker:
 
     def _get_overlap_words(self, words: List[str], max_overlap: int) -> List[str]:
         """Get overlap words from the end of a chunk."""
-        overlap_words = []
+        overlap_words: List[str] = []
         current_length = 0
 
         for word in reversed(words):
@@ -382,9 +382,9 @@ class HierarchicalChunker:
         """
         logger.info("Using standard chunking (no hierarchy available)")
 
-        chunks = []
+        chunks: List[Dict[str, Any]] = []
         words = text.split()
-        current_chunk = []
+        current_chunk: List[str] = []
         current_length = 0
         chunk_index = 0
 

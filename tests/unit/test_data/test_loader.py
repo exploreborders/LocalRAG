@@ -7,14 +7,13 @@ Tests document loading, OCR processing, and advanced document processing.
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.data.loader import (
     AdvancedDocumentProcessor,
     extract_text_with_ocr,
-    is_scanned_pdf,
     load_documents,
     split_documents,
 )

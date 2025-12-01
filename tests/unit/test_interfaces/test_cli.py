@@ -4,8 +4,6 @@ Unit tests for RAGCLI class.
 Tests CLI interface functionality, menu system, command handling, and user interactions.
 """
 
-import io
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -256,7 +254,7 @@ class TestRAGCLI:
 
         cli = RAGCLI()
 
-        with patch("sys.exit") as mock_exit:
+        with patch("sys.exit"):
             cli.run()
             # Should not reach sys.exit in test
 

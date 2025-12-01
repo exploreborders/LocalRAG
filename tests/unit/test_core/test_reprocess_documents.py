@@ -6,8 +6,6 @@ Tests document reprocessing functionality with mocked dependencies.
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.core.reprocess_documents import reprocess_documents
 
 
@@ -107,9 +105,9 @@ class TestReprocessDocuments:
 
         # Mock database models
         with (
-            patch("src.database.models.DocumentChapter") as mock_chapter_class,
-            patch("src.database.models.DocumentChunk") as mock_chunk_class,
-            patch("src.database.models.DocumentEmbedding") as mock_embedding_class,
+            patch("src.database.models.DocumentChapter"),
+            patch("src.database.models.DocumentChunk"),
+            patch("src.database.models.DocumentEmbedding"),
             patch("src.core.embeddings.create_embeddings") as mock_create_embeddings,
         ):
             # Mock embeddings creation

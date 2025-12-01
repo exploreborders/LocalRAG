@@ -104,7 +104,7 @@ class DocumentProcessor(BaseProcessor):
 
             return validated_categories
 
-        except Exception as _e:
+        except Exception as _e:  # noqa: F841
             # Fallback to simple keyword-based categorization
             content_lower = content.lower()
             categories = []
@@ -184,7 +184,7 @@ class DocumentProcessor(BaseProcessor):
                 # Fallback summary
                 return f"Document about {', '.join(tags[:3]) if tags else 'various topics'}. {chapters_count} chapters detected."
 
-        except Exception as _e:
+        except Exception as _e:  # noqa: F841
             # Fallback to basic summary
             return f"Document processed with advanced AI pipeline. Covers {', '.join(tags[:3]) if tags else 'various topics'}. {chapters_count} chapters detected."
 

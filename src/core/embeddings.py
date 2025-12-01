@@ -198,9 +198,9 @@ def _get_embedding_cache_key(text: str, model_key: str) -> str:
     Returns:
         str: Cache key
     """
-    # Create hash of text + model combination
+    # Create hash of text + model combination for caching
     content = f"{model_key}:{text}".encode("utf-8")
-    return f"embedding:{hashlib.md5(content).hexdigest()}"
+    return f"embedding:{hashlib.sha256(content).hexdigest()}"
 
 
 def get_available_models(backend="ollama"):

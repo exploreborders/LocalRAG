@@ -4,15 +4,11 @@ Unit tests for UploadProcessor class.
 Tests batch processing, reprocessing, file validation, and parallel execution.
 """
 
-import os
-import tempfile
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-from sqlalchemy.orm import Session
 
 from src.core.processing.upload_processor import UploadProcessor
-from src.database.models import Document
 
 
 class TestUploadProcessor:

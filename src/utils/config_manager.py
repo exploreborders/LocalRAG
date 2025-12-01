@@ -5,7 +5,7 @@ Centralizes all model names, URLs, and configurable parameters.
 
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 @dataclass

@@ -51,7 +51,7 @@ class CategoryManager:
             self.db.add(category)
             self.db.commit()
             return category
-        except Exception as _e:
+        except Exception as _e:  # noqa: F841
             self.db.rollback()
             return None
 
@@ -77,7 +77,7 @@ class CategoryManager:
             self.db.add(assignment)
             self.db.commit()
             return True
-        except Exception as _e:
+        except Exception as _e:  # noqa: F841
             self.db.rollback()
             return False
 
@@ -98,7 +98,7 @@ class CategoryManager:
                 self.db.commit()
                 return True
             return False
-        except Exception as _e:
+        except Exception as _e:  # noqa: F841
             self.db.rollback()
             return False
 

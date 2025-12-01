@@ -6,7 +6,7 @@ import logging
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class ProgressTracker:
 
         # Update ETA if we have sub-operations
         if self.sub_operations:
-            total_eta = 0
+            total_eta = 0.0
             for sub_tracker in self.sub_operations.values():
                 if sub_tracker.estimated_time_remaining:
                     total_eta += sub_tracker.estimated_time_remaining

@@ -126,7 +126,7 @@ class TestProgressTracker:
     def test_complete_sub_operation(self):
         """Test completing sub-operations."""
         tracker = ProgressTracker("main", 10)
-        sub_tracker = tracker.start_sub_operation("sub", 5)
+        tracker.start_sub_operation("sub", 5)
 
         assert "sub" in tracker.sub_operations
 
@@ -271,7 +271,7 @@ class TestProgressUtilities:
         callback = MagicMock()
 
         with pytest.raises(ValueError):
-            with track_progress("test_operation", 10, callback) as tracker:
+            with track_progress("test_operation", 10, callback) as _:
                 # Check initial callback
                 assert callback.call_count == 1
 
