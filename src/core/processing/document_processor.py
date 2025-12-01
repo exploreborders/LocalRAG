@@ -55,9 +55,7 @@ class DocumentProcessor(BaseProcessor):
         self.embedding_model = embedding_model
         self.tag_suggester = AITagSuggester()
 
-    def _suggest_categories_ai(
-        self, content: str, filename: str, tags: List[str]
-    ) -> List[str]:
+    def _suggest_categories_ai(self, content: str, filename: str, tags: List[str]) -> List[str]:
         """
         Suggest categories for a document using AI-based classification.
 
@@ -82,9 +80,7 @@ class DocumentProcessor(BaseProcessor):
             Return only category names separated by commas (no explanations):
             """
 
-            response = self.tag_suggester._call_llm(
-                category_prompt, max_tokens=50
-            ).strip()
+            response = self.tag_suggester._call_llm(category_prompt, max_tokens=50).strip()
 
             # Parse the response
             categories = [cat.strip() for cat in response.split(",") if cat.strip()]
@@ -104,9 +100,7 @@ class DocumentProcessor(BaseProcessor):
             ]
 
             # Filter to valid categories and limit to 3
-            validated_categories = [
-                cat for cat in categories if cat in valid_categories
-            ][:3]
+            validated_categories = [cat for cat in categories if cat in valid_categories][:3]
 
             return validated_categories
 
@@ -120,15 +114,9 @@ class DocumentProcessor(BaseProcessor):
                 for word in ["deep learning", "neural", "machine learning", "ai"]
             ):
                 categories.append("Technical")
-            if any(
-                word in content_lower
-                for word in ["academic", "research", "paper", "study"]
-            ):
+            if any(word in content_lower for word in ["academic", "research", "paper", "study"]):
                 categories.append("Academic")
-            if any(
-                word in content_lower
-                for word in ["tutorial", "guide", "course", "education"]
-            ):
+            if any(word in content_lower for word in ["tutorial", "guide", "course", "education"]):
                 categories.append("Educational")
 
             return categories[:3] if categories else ["General"]
@@ -153,21 +141,21 @@ class DocumentProcessor(BaseProcessor):
             summary_prompt = f"""
             Create a concise but informative summary of this document in 2-3 sentences.
 
-            Content preview: {content[:800]}
+            Content preview: {content[:2000]}
             Tags: {", ".join(tags[:5])}  # Limit tags for prompt
 
             Focus on:
             - Main topics and subject matter
-            - Key concepts covered
-            - Document type and purpose
-            - Target audience (if apparent)
+            - Key concepts and technologies covered
+            - Document type and purpose (book, tutorial, reference, etc.)
+            - Target audience and skill level
+            - Overall structure and approach
 
-            Summary should be professional and informative. Do not mention the filename or chapter/section counts.
+            If this appears to be a table of contents or outline, look for the actual content that follows.
+            Summary should be professional and informative. Do not mention the filename.
             """
 
-            summary = self.tag_suggester._call_llm(
-                summary_prompt, max_tokens=200
-            ).strip()
+            summary = self.tag_suggester._call_llm(summary_prompt, max_tokens=200).strip()
 
             # Clean up the summary - remove unwanted prefixes
             if summary and len(summary) > 20:  # Ensure we have meaningful content
@@ -261,19 +249,11 @@ class DocumentProcessor(BaseProcessor):
             Processing results
         """
         if use_advanced_processing:
-            logger.info(
-                f"Using ADVANCED processing for {filename or os.path.basename(file_path)}"
-            )
-            return self._process_document_advanced(
-                file_path, filename, progress_callback, content
-            )
+            logger.info(f"Using ADVANCED processing for {filename or os.path.basename(file_path)}")
+            return self._process_document_advanced(file_path, filename, progress_callback, content)
         else:
-            logger.info(
-                f"Using STANDARD processing for {filename or os.path.basename(file_path)}"
-            )
-            return self._process_document_standard(
-                file_path, filename, progress_callback, content
-            )
+            logger.info(f"Using STANDARD processing for {filename or os.path.basename(file_path)}")
+            return self._process_document_standard(file_path, filename, progress_callback, content)
 
     def _process_document_advanced(
         self,
@@ -314,17 +294,16 @@ class DocumentProcessor(BaseProcessor):
             with open(file_path, "rb") as f:
                 file_hash = hashlib.sha256(f.read()).hexdigest()
 
-            # Generate tags using AI
-            content_for_analysis = results.get("extracted_content", "")[
-                :2000
-            ]  # Sample for analysis
+            # Generate tags using AI - extract meaningful content, skipping TOC
+            full_content = results.get("extracted_content", "")
+
+            # Try to find actual content by skipping table of contents
+            content_for_analysis = self._extract_meaningful_content_for_analysis(full_content)
             suggested_tags_data = self.tag_suggester.suggest_tags(
                 content_for_analysis, filename or os.path.basename(file_path)
             )
             # Extract tag names from the suggestion data
-            suggested_tags = [
-                tag.get("tag", "") for tag in suggested_tags_data if tag.get("tag")
-            ]
+            suggested_tags = [tag.get("tag", "") for tag in suggested_tags_data if tag.get("tag")]
 
             # Generate categories using AI-based classification
             suggested_categories = self._suggest_categories_ai(
@@ -382,9 +361,7 @@ class DocumentProcessor(BaseProcessor):
                     category = self.category_manager.get_category_by_name(category_name)
                     if not category:
                         category = self.category_manager.create_category(category_name)
-                    self.category_manager.add_category_to_document(
-                        document.id, category.id
-                    )
+                    self.category_manager.add_category_to_document(document.id, category.id)
 
             # Store chapters from advanced processing
             structure_info = results.get("structure_analysis", {})
@@ -392,18 +369,12 @@ class DocumentProcessor(BaseProcessor):
             for chapter_data in hierarchy:
                 chapter_record = DocumentChapter(
                     document_id=document.id,
-                    chapter_title=chapter_data.get("title", "")[
-                        :255
-                    ],  # Limit to 255 chars
+                    chapter_title=chapter_data.get("title", "")[:255],  # Limit to 255 chars
                     chapter_path=chapter_data.get("path", ""),
                     level=chapter_data.get("level", 1),
                     word_count=chapter_data.get("word_count", 0),
-                    content=chapter_data.get(
-                        "content_preview", chapter_data.get("title", "")
-                    ),
-                    section_type="chapter"
-                    if chapter_data.get("level", 1) == 1
-                    else "section",
+                    content=chapter_data.get("content_preview", chapter_data.get("title", "")),
+                    section_type="chapter" if chapter_data.get("level", 1) == 1 else "section",
                 )
                 self.db.add(chapter_record)
 
@@ -440,9 +411,7 @@ class DocumentProcessor(BaseProcessor):
         except Exception as e:
             logger.error(f"Advanced document processing failed for {file_path}: {e}")
             # Fallback to standard processing
-            return self._process_document_standard(
-                file_path, filename, progress_callback
-            )
+            return self._process_document_standard(file_path, filename, progress_callback)
 
     def _process_document_standard(
         self,
@@ -503,9 +472,7 @@ class DocumentProcessor(BaseProcessor):
             except (FileNotFoundError, OSError):
                 # File not accessible, use content hash for reprocessing
                 file_hash = hashlib.sha256(doc_content.encode("utf-8")).hexdigest()
-                logger.info(
-                    f"File {file_path} not accessible, using content hash for reprocessing"
-                )
+                logger.info(f"File {file_path} not accessible, using content hash for reprocessing")
 
             document = Document(
                 filename=filename,
@@ -653,9 +620,7 @@ class DocumentProcessor(BaseProcessor):
                     if len(content) > 6000
                     else content[len(content) // 2 : len(content) // 2 + 1000]
                 ),  # Middle
-                content[-2000:]
-                if len(content) > 2000
-                else content[len(content) // 2 :],  # End
+                content[-2000:] if len(content) > 2000 else content[len(content) // 2 :],  # End
             ]
 
             # Try to detect language from each sample
@@ -690,9 +655,7 @@ class DocumentProcessor(BaseProcessor):
                 continue
 
             # Split by | and clean up
-            parts = [
-                p.strip() for p in line.split("|")[1:-1]
-            ]  # Skip first and last empty parts
+            parts = [p.strip() for p in line.split("|")[1:-1]]  # Skip first and last empty parts
 
             if len(parts) >= 3:
                 col1, col2, col3 = parts[0], parts[1], parts[2]
@@ -702,22 +665,14 @@ class DocumentProcessor(BaseProcessor):
                 title = None
 
                 # First priority: Main chapters with numbers in col1
-                if col1 and re.match(
-                    r"^\d+$", col1.strip()
-                ):  # Main chapter like "6", "7", "8"
+                if col1 and re.match(r"^\d+$", col1.strip()):  # Main chapter like "6", "7", "8"
                     chapter_num = col1.strip()
                     # Special handling for main chapter titles
-                    if (
-                        col3 and col3.strip() and col3.strip() != col2.strip()
-                    ):  # Avoid duplicates
+                    if col3 and col3.strip() and col3.strip() != col2.strip():  # Avoid duplicates
                         # Combine only for specific cases where col3 continues the title
-                        if (
-                            col3.strip() == "Queues"
-                        ):  # Chapter 6: "Stacks and" + "Queues"
+                        if col3.strip() == "Queues":  # Chapter 6: "Stacks and" + "Queues"
                             title = f"{col2} {col3}".strip()
-                        elif col3.strip().startswith(
-                            "Concatenating"
-                        ):  # Chapter 9: don't combine
+                        elif col3.strip().startswith("Concatenating"):  # Chapter 9: don't combine
                             title = col2
                         elif col3.strip() == "Lists":  # Chapters 7,8: don't combine
                             title = col2
@@ -728,9 +683,7 @@ class DocumentProcessor(BaseProcessor):
                         title = col2
 
                 # Second priority: Subsections with numbers in col2
-                elif col2 and re.match(
-                    r"^\d+\.\d+$", col2.strip()
-                ):  # Subsection like "2.1", "3.2"
+                elif col2 and re.match(r"^\d+\.\d+$", col2.strip()):  # Subsection like "2.1", "3.2"
                     chapter_num = col2.strip()
                     title = col3
 
@@ -743,9 +696,7 @@ class DocumentProcessor(BaseProcessor):
                     title_parts = col3.strip().split()
                     if title_parts and re.match(r"^\d+\.\d+\.\d+", title_parts[0]):
                         chapter_num = title_parts[0]
-                        title = (
-                            " ".join(title_parts[1:]) if len(title_parts) > 1 else col3
-                        )
+                        title = " ".join(title_parts[1:]) if len(title_parts) > 1 else col3
 
                 # Handle cases where deeper nesting appears in descriptions
                 if not chapter_num and col3:
@@ -762,9 +713,7 @@ class DocumentProcessor(BaseProcessor):
                     title = re.sub(r"\s*\d+\.\d+\.\d+.*$", "", title)
 
                     # Remove page numbers and extra dots
-                    title = re.sub(
-                        r"\s*\d+\s*$", "", title
-                    )  # Remove trailing page numbers
+                    title = re.sub(r"\s*\d+\s*$", "", title)  # Remove trailing page numbers
                     title = re.sub(r"\.\s*\.\s*\.", "", title)  # Remove multiple dots
                     title = re.sub(r"\.\s*$", "", title)  # Remove trailing dots
                     title = re.sub(r"\s+", " ", title)  # Normalize spaces
@@ -778,9 +727,7 @@ class DocumentProcessor(BaseProcessor):
                 deeper_entries = []
                 if col3:
                     # Look for patterns like "Mergesort . . . . 13.1.1 An Analysis"
-                    deeper_matches = re.findall(
-                        r"(\d+\.\d+\.\d+)\s+([^.\d]+(?:\s+[^.\d]+)*)", col3
-                    )
+                    deeper_matches = re.findall(r"(\d+\.\d+\.\d+)\s+([^.\d]+(?:\s+[^.\d]+)*)", col3)
                     for deeper_num, deeper_title in deeper_matches:
                         deeper_entries.append((deeper_num, deeper_title.strip()))
 
@@ -794,9 +741,7 @@ class DocumentProcessor(BaseProcessor):
                         deeper_title = re.sub(r"\s+", " ", deeper_title)
                         deeper_title = deeper_title.strip()
 
-                        if len(deeper_title) > 2 and not re.match(
-                            r"^[\d\s.]+$", deeper_title
-                        ):
+                        if len(deeper_title) > 2 and not re.match(r"^[\d\s.]+$", deeper_title):
                             toc_entries.append((deeper_num, deeper_title))
 
         # Remove duplicates based on chapter number - keep the first occurrence
@@ -903,9 +848,7 @@ class DocumentProcessor(BaseProcessor):
             if is_header and header_text and len(header_text) > 3:
                 # Save previous chapter if it exists
                 if current_chapter and chapter_content_lines:
-                    current_chapter["content"] = "\n".join(
-                        chapter_content_lines
-                    ).strip()
+                    current_chapter["content"] = "\n".join(chapter_content_lines).strip()
                     # Only add chapters with some content (relaxed for test compatibility)
                     if len(current_chapter["content"]) > 10:
                         chapters.append(current_chapter)
@@ -922,9 +865,7 @@ class DocumentProcessor(BaseProcessor):
             elif current_chapter and line_stripped:
                 # Add non-empty lines to current chapter content
                 # Skip table rows and other formatting
-                if not line_stripped.startswith("|") and not line_stripped.startswith(
-                    "|---"
-                ):
+                if not line_stripped.startswith("|") and not line_stripped.startswith("|---"):
                     chapter_content_lines.append(line)
 
         # Save the last chapter
@@ -1013,9 +954,7 @@ class DocumentProcessor(BaseProcessor):
             if is_header and header_text and len(header_text) > 3:
                 # Save previous chapter if it exists
                 if current_chapter and chapter_content_lines:
-                    current_chapter["content"] = "\n".join(
-                        chapter_content_lines
-                    ).strip()
+                    current_chapter["content"] = "\n".join(chapter_content_lines).strip()
                     # Only add chapters with some content (relaxed for test compatibility)
                     if len(current_chapter["content"]) > 10:
                         chapters.append(current_chapter)
@@ -1032,9 +971,7 @@ class DocumentProcessor(BaseProcessor):
             elif current_chapter and line_stripped:
                 # Add non-empty lines to current chapter content
                 # Skip table rows and other formatting
-                if not line_stripped.startswith("|") and not line_stripped.startswith(
-                    "|---"
-                ):
+                if not line_stripped.startswith("|") and not line_stripped.startswith("|---"):
                     chapter_content_lines.append(line)
 
         # Save the last chapter
@@ -1100,9 +1037,7 @@ class DocumentProcessor(BaseProcessor):
                 if (
                     line[0].isupper()  # Starts with capital
                     and not line.endswith(".")  # Not a sentence
-                    and not any(
-                        char.isdigit() for char in line[:10]
-                    )  # No early numbers
+                    and not any(char.isdigit() for char in line[:10])  # No early numbers
                     and sum(1 for c in line if c.isupper()) / len(line) < 0.5
                 ):  # Not ALL CAPS
                     # Additional heuristics for chapter-like content
@@ -1132,9 +1067,7 @@ class DocumentProcessor(BaseProcessor):
 
         # For scanned PDFs with no clear chapter structure, create synthetic chapters
         # based on document length and common technical content
-        if (
-            not chapters and len(content) > 1000
-        ):  # Any reasonable content but no chapters found
+        if not chapters and len(content) > 1000:  # Any reasonable content but no chapters found
             logger.info(
                 "No chapters found in scanned PDF, creating synthetic chapters for technical content"
             )
@@ -1151,18 +1084,14 @@ class DocumentProcessor(BaseProcessor):
                     for section in structure_analysis["sections"]:
                         chapters.append(
                             {
-                                "title": section.get(
-                                    "title", f"Chapter {len(chapters) + 1}"
-                                )[:255],
+                                "title": section.get("title", f"Chapter {len(chapters) + 1}")[:255],
                                 "content": section.get("title", ""),
                                 "path": str(len(chapters) + 1),
                                 "start_line": section.get("start_line", 0),
                                 "level": section.get("level", 1),
                             }
                         )
-                    logger.info(
-                        f"Created {len(chapters)} AI-analyzed chapters for scanned PDF"
-                    )
+                    logger.info(f"Created {len(chapters)} AI-analyzed chapters for scanned PDF")
                 else:
                     # Fallback to synthetic chapters
                     synthetic_chapters = [
@@ -1182,9 +1111,7 @@ class DocumentProcessor(BaseProcessor):
 
                     # Create chapters distributed throughout the document
                     content_length = len(content)
-                    num_synthetic = min(
-                        len(synthetic_chapters), max(3, content_length // 5000)
-                    )
+                    num_synthetic = min(len(synthetic_chapters), max(3, content_length // 5000))
                     for i in range(num_synthetic):
                         start_pos = (content_length * i) // num_synthetic
                         end_pos = (content_length * (i + 1)) // num_synthetic
@@ -1199,9 +1126,7 @@ class DocumentProcessor(BaseProcessor):
                                 "level": 1,
                             }
                         )
-                    logger.info(
-                        f"Created {len(chapters)} synthetic chapters for technical content"
-                    )
+                    logger.info(f"Created {len(chapters)} synthetic chapters for technical content")
             except Exception as e:
                 logger.warning(f"Advanced chapter detection failed: {e}")
                 # Continue with empty chapters list
@@ -1299,6 +1224,65 @@ class DocumentProcessor(BaseProcessor):
 
         return chunks
 
+    def _extract_meaningful_content_for_analysis(self, full_content: str) -> str:
+        """
+        Extract meaningful content for analysis by skipping table of contents and boilerplate.
+
+        Args:
+            full_content: Full document content
+
+        Returns:
+            Meaningful content sample for analysis
+        """
+        if not full_content or len(full_content) < 1000:
+            return full_content[:2000] if full_content else ""
+
+        lines = full_content.split("\n")
+        content_start_idx = 0
+
+        # Skip table of contents (look for patterns that indicate TOC)
+        for i, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                continue
+
+            # Skip lines that look like TOC entries
+            if "|" in line and (
+                "Overview" in line or "Contents" in line or re.match(r"^\|\s*\d+", line)
+            ):
+                continue
+
+            # Look for actual content patterns
+            if (
+                len(line) > 50  # Substantial line length
+                and not line.startswith("#")  # Not a header
+                and not re.match(r"^[\d\s\.\-]+$", line)  # Not just numbers/dots
+                and not line.lower().startswith(("contents", "table of contents", "chapter"))
+            ):
+                content_start_idx = i
+                break
+
+        # Extract content starting from the identified point
+        meaningful_content = "\n".join(lines[content_start_idx:])
+
+        # If content is still too short, use the original sampling approach
+        if len(meaningful_content) < 2000:
+            if len(full_content) > 10000:
+                # For long documents, sample from different sections
+                return (
+                    full_content[:3000]  # Beginning (might include TOC but better than nothing)
+                    + full_content[len(full_content) // 3 : len(full_content) // 3 + 3000]  # Middle
+                    + full_content[-3000:]  # End
+                )
+            else:
+                return full_content[:5000]
+
+        # Return a substantial sample from the meaningful content
+        if len(meaningful_content) > 8000:
+            return meaningful_content[:8000]
+        else:
+            return meaningful_content
+
     def _index_document(
         self,
         document: Document,
@@ -1321,9 +1305,7 @@ class DocumentProcessor(BaseProcessor):
                     "reading_time_minutes": document.reading_time_minutes,
                     "status": document.status,
                     "created_at": (
-                        document.upload_date.isoformat()
-                        if document.upload_date
-                        else None
+                        document.upload_date.isoformat() if document.upload_date else None
                     ),
                 }
 
