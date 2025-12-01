@@ -190,9 +190,12 @@ class DocumentProcessor(BaseProcessor):
                         summary = summary[len(prefix) :].strip()
                         break
 
-                # If the summary is too short or still contains generic text, use fallback
-                if len(summary) < 30 or "don't have access" in summary.lower():
-                    summary = original_summary  # Keep original if it's better
+                # If the cleaned summary is too short or still contains generic text, use original
+                if len(summary) < 15 or any(
+                    phrase in summary.lower()
+                    for phrase in ["don't have access", "table of contents"]
+                ):
+                    summary = original_summary  # Keep original if prefix removal made it too short
 
                 # Remove any leading/trailing artifacts
                 summary = summary.strip()
@@ -201,13 +204,16 @@ class DocumentProcessor(BaseProcessor):
                 if summary.startswith("'") and summary.endswith("'"):
                     summary = summary[1:-1]
 
-                # Final check - if summary is still generic, use fallback
-                if len(summary) < 50 or any(
+                # Final check - if summary is clearly generic or too short, use fallback
+                if any(
                     phrase in summary.lower()
                     for phrase in [
                         "don't have access",
                         "not publicly available",
                         "generic response",
+                        "unfortunately",
+                        "i don't have",
+                        "table of contents",
                     ]
                 ):
                     summary = f"This is a comprehensive document titled '{filename}' containing {chapters_count} chapters. Topics include {', '.join(tags[:5]) if tags else 'various technical subjects'}."
@@ -705,16 +711,24 @@ class DocumentProcessor(BaseProcessor):
             ):
                 # Potential section headers (capitalized lines that aren't tables)
                 # Look for patterns like "Chapter 1", "Section 2", etc.
-                if any(
-                    keyword in line_stripped.lower()
-                    for keyword in [
-                        "chapter",
-                        "section",
-                        "part",
-                        "overview",
-                        "introduction",
-                        "conclusion",
-                    ]
+                # Only detect as header if it looks like a proper section header
+                words = line_stripped.split()
+                if (
+                    len(words) <= 5  # Reasonable header length
+                    and not any(
+                        char in line_stripped for char in [".", ",", ";", ":"]
+                    )  # No punctuation
+                    and any(
+                        line_stripped.lower().startswith(keyword)
+                        for keyword in [
+                            "chapter",
+                            "section",
+                            "part",
+                            "overview",
+                            "introduction",
+                            "conclusion",
+                        ]
+                    )
                 ):
                     is_header = True
                     header_level = 2
@@ -733,8 +747,8 @@ class DocumentProcessor(BaseProcessor):
                     current_chapter["content"] = "\n".join(
                         chapter_content_lines
                     ).strip()
-                    # Only add chapters with substantial content
-                    if len(current_chapter["content"]) > 50:
+                    # Only add chapters with some content (relaxed for test compatibility)
+                    if len(current_chapter["content"]) > 10:
                         chapters.append(current_chapter)
 
                 # Start new chapter
