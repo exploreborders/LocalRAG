@@ -170,7 +170,7 @@ class DocumentProcessor(BaseProcessor):
             ).strip()
 
             # Clean up the summary - remove unwanted prefixes
-            if summary:
+            if summary and len(summary) > 20:  # Ensure we have meaningful content
                 # Remove common AI prefixes
                 prefixes_to_remove = [
                     "Here is a concise summary of the document in 2-3 sentences:",
@@ -178,12 +178,21 @@ class DocumentProcessor(BaseProcessor):
                     "Here is a summary of the document:",
                     "Summary:",
                     "Document summary:",
+                    "Based on the provided content,",
+                    "Based on the table of contents,",
+                    "Unfortunately, I don't have access to the document",
+                    "I don't have access to the document",
                 ]
 
+                original_summary = summary
                 for prefix in prefixes_to_remove:
                     if summary.lower().startswith(prefix.lower()):
                         summary = summary[len(prefix) :].strip()
                         break
+
+                # If the summary is too short or still contains generic text, use fallback
+                if len(summary) < 30 or "don't have access" in summary.lower():
+                    summary = original_summary  # Keep original if it's better
 
                 # Remove any leading/trailing artifacts
                 summary = summary.strip()
@@ -192,11 +201,28 @@ class DocumentProcessor(BaseProcessor):
                 if summary.startswith("'") and summary.endswith("'"):
                     summary = summary[1:-1]
 
-                # Return clean summary without structure info
-                return summary
-            else:
-                # Fallback summary
-                return f"Document about {', '.join(tags[:3]) if tags else 'various topics'}. {chapters_count} chapters detected."
+                # Final check - if summary is still generic, use fallback
+                if len(summary) < 50 or any(
+                    phrase in summary.lower()
+                    for phrase in [
+                        "don't have access",
+                        "not publicly available",
+                        "generic response",
+                    ]
+                ):
+                    summary = f"This is a comprehensive document titled '{filename}' containing {chapters_count} chapters. Topics include {', '.join(tags[:5]) if tags else 'various technical subjects'}."
+                else:
+                    # Return clean summary without structure info
+                    return summary
+
+            # Fallback summary with better content analysis
+            if content and len(content) > 100:
+                # Extract meaningful content for fallback
+                content_preview = content[:500].replace("\n", " ").strip()
+                if len(content_preview) > 50:
+                    return f"Document '{filename}' covers {content_preview[:200]}... Contains {chapters_count} chapters on topics including {', '.join(tags[:3]) if tags else 'technical subjects'}."
+
+            return f"Document '{filename}' with {chapters_count} chapters covering {', '.join(tags[:3]) if tags else 'various topics'}."
 
         except Exception as _e:  # noqa: F841
             # Fallback to basic summary
@@ -648,43 +674,85 @@ class DocumentProcessor(BaseProcessor):
         """Detect all chapters from the full document content."""
         chapters = []
 
-        # Look for ## headers (markdown) and extract content between headers
+        # Look for various header patterns and extract content between headers
         lines = content.split("\n")
         current_chapter = None
         chapter_content_lines = []
 
         for i, line in enumerate(lines):
-            if line.strip().startswith("##"):
+            line_stripped = line.strip()
+
+            # Check for various header patterns
+            is_header = False
+            header_level = 0
+            header_text = ""
+
+            if line_stripped.startswith("##"):
+                # Markdown headers
+                is_header = True
+                header_level = 2
+                header_text = line_stripped[2:].strip()
+            elif line_stripped.startswith("#"):
+                # Other markdown headers
+                is_header = True
+                header_level = 1
+                header_text = line_stripped[1:].strip()
+            elif (
+                len(line_stripped) > 0
+                and not line_stripped.startswith("|")
+                and not line_stripped.startswith("-")
+                and line_stripped[0].isupper()
+            ):
+                # Potential section headers (capitalized lines that aren't tables)
+                # Look for patterns like "Chapter 1", "Section 2", etc.
+                if any(
+                    keyword in line_stripped.lower()
+                    for keyword in [
+                        "chapter",
+                        "section",
+                        "part",
+                        "overview",
+                        "introduction",
+                        "conclusion",
+                    ]
+                ):
+                    is_header = True
+                    header_level = 2
+                    header_text = line_stripped
+                elif len(line_stripped.split()) <= 10 and not any(
+                    char in line_stripped for char in [".", ",", ":", ";"]
+                ):
+                    # Short capitalized lines that might be headers
+                    is_header = True
+                    header_level = 2
+                    header_text = line_stripped
+
+            if is_header and header_text and len(header_text) > 3:
                 # Save previous chapter if it exists
                 if current_chapter and chapter_content_lines:
                     current_chapter["content"] = "\n".join(
                         chapter_content_lines
                     ).strip()
-                    chapters.append(current_chapter)
+                    # Only add chapters with substantial content
+                    if len(current_chapter["content"]) > 50:
+                        chapters.append(current_chapter)
 
                 # Start new chapter
-                header_text = line.strip()[2:].strip()  # Remove ##
-                if header_text and len(header_text) > 3:
-                    # Extract just the title (first line, truncated to 255 chars)
-                    title_lines = header_text.split("\n")
-                    short_title = title_lines[0].strip()[:255]  # Limit to 255 chars
-
-                    current_chapter = {
-                        "title": short_title,
-                        "content": "",  # Will be filled with content between headers
-                        "path": f"section_{len(chapters) + 1}",
-                        "start_line": i,
-                        "level": 2,
-                    }
-                    chapter_content_lines = [
-                        header_text
-                    ]  # Include the header in content
-                else:
-                    current_chapter = None
-                    chapter_content_lines = []
-            elif current_chapter:
-                # Add line to current chapter content
-                chapter_content_lines.append(line)
+                current_chapter = {
+                    "title": header_text[:255],  # Limit to 255 chars
+                    "content": "",  # Will be filled with content between headers
+                    "path": f"section_{len(chapters) + 1}",
+                    "start_line": i,
+                    "level": header_level,
+                }
+                chapter_content_lines = [header_text]  # Include the header in content
+            elif current_chapter and line_stripped:
+                # Add non-empty lines to current chapter content
+                # Skip table rows and other formatting
+                if not line_stripped.startswith("|") and not line_stripped.startswith(
+                    "|---"
+                ):
+                    chapter_content_lines.append(line)
 
         # Save the last chapter
         if current_chapter and chapter_content_lines:
