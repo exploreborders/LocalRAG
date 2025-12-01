@@ -176,7 +176,6 @@ jobs:
   codeql:
     name: CodeQL Security Analysis
     runs-on: ubuntu-latest
-    needs: validate
 
     steps:
     - name: Checkout code
