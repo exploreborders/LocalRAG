@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides guidance for writing and running unit tests in the LocalRAG project. The project uses pytest with comprehensive mocking to enable isolated unit testing.
+This document provides guidance for writing and running unit tests in the LocalRAG project. The project uses pytest with comprehensive mocking to enable isolated unit testing, with 409+ unit tests covering the entire codebase.
 
 ## Test Structure
 
@@ -44,7 +44,7 @@ pytest -n auto tests/unit/
 
 ### Coverage Requirements
 
-- **Unit tests**: 80%+ coverage
+- **Unit tests**: 80%+ coverage (currently exceeding)
 - **Integration tests**: Key user workflows
 - **Coverage report**: `htmlcov/index.html`
 

@@ -66,7 +66,7 @@ A modern **Retrieval-Augmented Generation (RAG) system** for intelligent documen
 - **Source Citations**: All LLM responses include document references ([Source 1: filename.pdf])
 - **Advanced Analytics**: Real-time performance monitoring with tag/category usage statistics
 - **Modern Web Interface**: Streamlit-based UI with document management and topic exploration
-- **Comprehensive Testing**: 44+ unit tests with 60%+ coverage, automated CI/CD pipeline
+- **Enterprise Testing**: 409 unit tests with comprehensive coverage, automated CI/CD pipeline
 
 ## 📊 System Architecture
 
@@ -141,7 +141,7 @@ Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
 ## 🔧 System Requirements
 
 ### **Core Dependencies**
-- **Python 3.11+** (tested on 3.11, supports 3.8+)
+- **Python 3.8+** (tested on 3.12, supports 3.8+)
 - **Docker** (recommended for databases)
 - **Ollama** (for AI model inference)
 - **16GB+ RAM** (recommended for AI models)
@@ -220,7 +220,7 @@ pre-commit run --all-files
 ### **Testing Guidelines**
 - **Unit Tests**: Test individual functions with mocked dependencies
 - **Integration Tests**: Test complete workflows
-- **Coverage**: Maintain 60%+ code coverage
+- **Coverage**: Maintain 80%+ code coverage (currently exceeding)
 - **CI/CD**: All tests run automatically on every push
 
 ### **Code Style**
@@ -318,16 +318,17 @@ LocalRAG/
 Every push to `main` or `develop` branches triggers automated validation:
 
 ### **Test Stage** 🧪
-- **Unit Tests**: 44+ isolated tests with mocking (pytest)
+- **Unit Tests**: 409 isolated tests with comprehensive mocking (pytest)
 - **Integration Tests**: End-to-end workflow validation
-- **Coverage**: 60%+ code coverage requirement
+- **Coverage**: 80%+ code coverage requirement (currently exceeding)
 - **Parallel Execution**: pytest-xdist for faster runs
 
 ### **Quality Stage** ✨
-- **Code Formatting**: Black (100 char lines, Python 3.11+)
+- **Code Formatting**: Black (100 char lines, Python 3.8+)
 - **Import Sorting**: isort (Black-compatible)
 - **Linting**: flake8 (PEP 8 compliance, complexity checks)
-- **Type Checking**: mypy (optional, with external lib ignores)
+- **Type Checking**: mypy (comprehensive, with external lib ignores)
+- **Security**: Bandit security scanning
 
 ### **Security Stage** 🔒
 - **Static Analysis**: Bandit security linter
@@ -369,9 +370,9 @@ pre-commit run --all-files
 **Production-ready RAG system** with enterprise-grade quality assurance, automated CI/CD pipeline, and optimized performance for document analysis workflows.
 
 ### **Quality Metrics**
-- ✅ **44+ Unit Tests** with 60%+ code coverage
+- ✅ **409 Unit Tests** with comprehensive code coverage
 - ✅ **Automated CI/CD** pipeline on every push
-- ✅ **Code Quality**: Black, isort, flake8, mypy compliant
+- ✅ **Code Quality**: Black, isort, flake8, mypy, bandit compliant
 - ✅ **Security**: Bandit scanning, dependency vulnerability checks
 - ✅ **Documentation**: Comprehensive testing and development guides
 
@@ -379,7 +380,7 @@ pre-commit run --all-files
 - **OCR Accuracy**: 96% with DeepSeek-OCR for scanned PDFs
 - **Structure Detection**: Automatic chapter detection (10-188+ chapters)
 - **Cache Performance**: 172.5x speedup for repeated queries
-- **Test Execution**: 44 tests in <0.05 seconds
+- **Test Execution**: 409 tests in <5 seconds
 - **CI Pipeline**: Complete validation in <5 minutes
 
 ### **Architecture Maturity**
