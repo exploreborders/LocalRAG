@@ -469,6 +469,196 @@ class TestDocumentProcessor:
         assert result["success"] is False
         assert "failed to load" in result["error"].lower()
 
+    def test_detect_all_chapters_table_format_comprehensive(self, document_processor):
+        """Test comprehensive chapter detection from complex table format."""
+        content = """
+| 1   | Overview                     |                                 |
+| 2   | Basic Python                 |                                 |
+|     | 2.1 | Sequence, Selection, and   |                                 |
+|     | 2.2 | Expressions and Evaluation |                                 |
+|     | 2.3 | Variables, Types, and State|                                 |
+| 3   | Object-Oriented Programming  |                                 |
+| 4   | Testing                      |                                 |
+| 5   | Running Time Analysis        |                                 |
+| 6   | Stacks and                   | Queues                          |
+| 7   | Deques and Linked            | Lists                           |
+| 8   | Doubly-Linked                | Lists                           |
+| 9   | Recursion                    |                                 |
+"""
+
+        chapters = document_processor._detect_all_chapters(content)
+
+        # Should detect substantial TOC
+        assert len(chapters) >= 10
+
+        # Check main chapters - titles should NOT include numbers
+        main_chapters = [ch for ch in chapters if ch["level"] == 1]
+        assert len(main_chapters) >= 9
+
+        # Verify specific chapter titles (no numbers in title field)
+        chapter_titles = {ch["path"]: ch["title"] for ch in chapters}
+
+        assert "1" in chapter_titles
+        assert chapter_titles["1"] == "Overview"  # Not "1 Overview"
+
+        assert "2" in chapter_titles
+        assert chapter_titles["2"] == "Basic Python"  # Not "2 Basic Python"
+
+        assert "6" in chapter_titles
+        assert chapter_titles["6"] == "Stacks and Queues"  # Combined but no number prefix
+
+        assert "7" in chapter_titles
+        assert chapter_titles["7"] == "Deques and Linked"  # Not combined with "Lists"
+
+        assert "8" in chapter_titles
+        assert chapter_titles["8"] == "Doubly-Linked"  # Not combined with "Lists"
+
+        # Check subsections
+        assert "2.1" in chapter_titles
+        assert chapter_titles["2.1"] == "Sequence, Selection, and"
+
+        assert "2.2" in chapter_titles
+        assert chapter_titles["2.2"] == "Expressions and Evaluation"
+
+    def test_detect_all_chapters_title_number_separation(self, document_processor):
+        """Test that chapter numbers are in path field, not title field."""
+        content = """
+| 1   | Introduction                 |                                 |
+| 2   | Getting Started              |                                 |
+|     | 2.1 | First Steps                |                                 |
+| 3   | More Content                 |                                 |
+| 4   | Even More                    |                                 |
+| 5   | Advanced Topics              |                                 |
+| 10  | Final Chapter                |                                 |
+"""
+
+        chapters = document_processor._detect_all_chapters(content)
+
+        assert len(chapters) >= 6
+
+        # Verify no chapter numbers in titles
+        for chapter in chapters:
+            title = chapter["title"]
+            path = chapter["path"]
+
+            # Title should not start with the chapter number
+            if path.isdigit():
+                assert not title.startswith(path + " ")
+                assert not title.startswith(path + ".")
+            elif "." in path:
+                # For subsections, title shouldn't contain the full path
+                assert not title.startswith(path + " ")
+
+    def test_detect_all_chapters_subsection_detection(self, document_processor):
+        """Test that subsections (X.Y format) are properly detected."""
+        content = """
+| 1   | Main Chapter                 |                                 |
+|     | 1.1 | Subsection One            |                                 |
+|     | 1.2 | Subsection Two            |                                 |
+|     | 1.3 | Subsection Three          |                                 |
+| 2   | Another Chapter              |                                 |
+|     | 2.1 | More Subsections          |                                 |
+"""
+
+        chapters = document_processor._detect_all_chapters(content)
+
+        # Should detect main chapters and subsections
+        assert len(chapters) >= 6
+
+        # Check levels are correct
+        level_counts = {}
+        for chapter in chapters:
+            level = chapter["level"]
+            level_counts[level] = level_counts.get(level, 0) + 1
+
+        assert level_counts.get(1, 0) >= 2  # Main chapters
+        assert level_counts.get(2, 0) >= 4  # Subsections
+
+        # Verify subsection paths and titles
+        subsection_chapters = [ch for ch in chapters if ch["level"] == 2]
+        assert len(subsection_chapters) >= 4
+
+        # Check specific subsections
+        chapter_paths = {ch["path"]: ch["title"] for ch in chapters}
+        assert "1.1" in chapter_paths
+        assert "1.2" in chapter_paths
+        assert "2.1" in chapter_paths
+
+    def test_detect_all_chapters_title_combination_logic(self, document_processor):
+        """Test the special title combination logic for certain chapters."""
+        content = """
+| 1   | Introduction                 |                                 |
+| 2   | Getting Started              |                                 |
+| 3   | Basic Concepts               |                                 |
+| 4   | Intermediate Topics          |                                 |
+| 5   | Advanced Material            |                                 |
+| 6   | Stacks and                   | Queues                          |
+| 7   | Deques and Linked            | Lists                           |
+| 8   | Doubly-Linked                | Lists                           |
+| 9   | Recursion                    | Concatenating Doubly Linked    |
+| 10  | Final Chapter                |                                 |
+"""
+
+        chapters = document_processor._detect_all_chapters(content)
+
+        assert len(chapters) >= 10
+
+        chapter_titles = {ch["path"]: ch["title"] for ch in chapters}
+
+        # Chapter 6: Should combine "Stacks and" + "Queues"
+        assert chapter_titles.get("6") == "Stacks and Queues"
+
+        # Chapter 7: Should NOT combine with "Lists" (special case)
+        assert chapter_titles.get("7") == "Deques and Linked"
+
+        # Chapter 8: Should NOT combine with "Lists" (special case)
+        assert chapter_titles.get("8") == "Doubly-Linked"
+
+        # Chapter 9: Should NOT combine with "Concatenating Doubly Linked"
+        assert chapter_titles.get("9") == "Recursion"
+
+    def test_detect_all_chapters_hierarchical_structure(self, document_processor):
+        """Test that hierarchical chapter structure is maintained."""
+        content = """
+| 1   | Overview                     |                                 |
+| 2   | Basic Python                 |                                 |
+|     | 2.1 | Sequence, Selection, and   |                                 |
+|     | 2.2 | Expressions and Evaluation |                                 |
+|     | 2.3 | Variables, Types, and State|                                 |
+|     | 2.4 | Collections . . . . . . . .|                                 |
+|     |     | 2.4.1 Strings ( str ) . . .|                                 |
+|     |     | 2.4.2 Lists ( list ) . . . .|                                 |
+| 3   | Object-Oriented Programming  |                                 |
+"""
+
+        chapters = document_processor._detect_all_chapters(content)
+
+        assert len(chapters) >= 8
+
+        # Check hierarchical levels
+        levels_found = set(ch["level"] for ch in chapters)
+        assert 1 in levels_found  # Main chapters
+        assert 2 in levels_found  # Subsections
+        assert 3 in levels_found  # Sub-subsections
+
+        # Verify specific hierarchical relationships
+        chapter_data = {ch["path"]: ch for ch in chapters}
+
+        # Main chapters should have level 1
+        assert chapter_data["1"]["level"] == 1
+        assert chapter_data["2"]["level"] == 1
+        assert chapter_data["3"]["level"] == 1
+
+        # Subsections should have level 2
+        assert chapter_data["2.1"]["level"] == 2
+        assert chapter_data["2.2"]["level"] == 2
+        assert chapter_data["2.3"]["level"] == 2
+        assert chapter_data["2.4"]["level"] == 2
+
+        # Sub-subsections should have level 3
+        assert chapter_data["2.4.1"]["level"] == 3
+        assert chapter_data["2.4.2"]["level"] == 3
+
     def test_del_method(self, document_processor, mock_db_session):
         """Test cleanup in destructor."""
         document_processor.__del__()
