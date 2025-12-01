@@ -541,7 +541,7 @@ class DocumentProcessor(BaseProcessor):
                     chapter_title=chapter["title"],  # Short title (max 255 chars)
                     chapter_path=chapter["path"],
                     level=chapter.get("level", 1),
-                    word_count=len(chapter["title"].split()),
+                    word_count=len(chapter.get("content", chapter["title"]).split()),
                     content=chapter.get("content", chapter["title"]),  # Full content
                 )
                 self.db.add(chapter_record)

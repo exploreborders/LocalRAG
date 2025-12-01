@@ -788,9 +788,17 @@ def main():
 
                         if chapters:
                             for chapter in chapters:
+                                # Create hierarchical display with proper icons
+                                if chapter.level == 1:
+                                    icon = "📖"
+                                elif chapter.level == 2:
+                                    icon = "📄"
+                                else:
+                                    icon = "📑"
+
                                 level_indent = "  " * (chapter.level - 1)
                                 st.caption(
-                                    f"{level_indent}📄 {chapter.chapter_title} ({chapter.word_count} words)"
+                                    f"{level_indent}{icon} {chapter.chapter_title}"
                                 )
                             if len(chapters) == 10:
                                 st.caption("... and more chapters")
