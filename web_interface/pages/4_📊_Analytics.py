@@ -635,7 +635,7 @@ def main():
         st.markdown("### 📂 Category Analytics")
 
         try:
-            from src.core.document_manager import CategoryManager
+            from src.core.categorization.category_manager import CategoryManager
             from src.database.models import SessionLocal
 
             db = SessionLocal()

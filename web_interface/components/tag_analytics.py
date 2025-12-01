@@ -54,7 +54,7 @@ def render_tag_analytics():
     Render comprehensive tag analytics dashboard.
     """
     try:
-        from src.core.document_manager import TagManager
+        from src.core.tagging.tag_manager import TagManager
         from src.database.models import SessionLocal
 
         db = SessionLocal()
@@ -392,7 +392,7 @@ def render_tag_suggestions(
     st.subheader("🤖 AI Tag Suggestions")
 
     try:
-        from src.core.document_manager import TagManager
+        from src.core.tagging.tag_manager import TagManager
         from src.database.models import SessionLocal, Document, DocumentTagAssignment
 
         db = SessionLocal()

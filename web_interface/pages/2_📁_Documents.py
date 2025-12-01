@@ -35,12 +35,10 @@ os.environ["PYTHONPATH"] = current_pythonpath
 
 # Import system components
 try:
-    from src.core.document_manager import (
-        UploadProcessor,
-        DocumentProcessor,
-        TagManager,
-        CategoryManager,
-    )
+    from src.core.processing.upload_processor import UploadProcessor
+    from src.core.processing.document_processor import DocumentProcessor
+    from src.core.tagging.tag_manager import TagManager
+    from src.core.categorization.category_manager import CategoryManager
     from src.database.models import (
         SessionLocal,
         Document,

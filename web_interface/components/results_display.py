@@ -24,6 +24,14 @@ def render_results():
         render_topic_aware_results(results)
     elif results.get("type") == "rag":
         render_rag_results(results)
+    elif results.get("type") == "advanced":
+        render_advanced_search_results(results)
+    else:
+        # Default to RAG rendering for backward compatibility
+        render_rag_results(results)
+
+    # Render search suggestions for all result types
+    render_search_suggestions()
 
 
 def render_rag_results(results):
@@ -258,6 +266,215 @@ def render_topic_aware_results(results):
                     st.markdown("**Metadata:**")
                     for key, value in metadata.items():
                         st.write(f"- **{key}:** {value}")
+
+
+def render_advanced_search_results(results):
+    """Render advanced search results with analytics and hybrid scoring"""
+    result_data = results.get("result", {})
+
+    # Check if this is an advanced search result
+    if "analytics" in result_data:
+        render_advanced_search_analytics(result_data)
+        render_hybrid_search_results(result_data)
+    else:
+        # Fall back to regular rendering
+        render_rag_results(results)
+
+
+def render_advanced_search_analytics(result_data):
+    """Render search analytics and performance metrics"""
+    analytics = result_data.get("analytics", {})
+
+    with st.expander("📊 Search Analytics", expanded=False):
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            search_time = analytics.get("search_time", 0)
+            st.metric("Search Time", f"{search_time:.3f}s")
+
+        with col2:
+            total_results = analytics.get("total_results", 0)
+            st.metric("Total Results", total_results)
+
+        with col3:
+            query_complexity = analytics.get("query_complexity", 0)
+            complexity_label = (
+                "Low"
+                if query_complexity < 2
+                else "Medium"
+                if query_complexity < 4
+                else "High"
+            )
+            st.metric("Query Complexity", complexity_label)
+
+        with col4:
+            avg_score = analytics.get("performance_metrics", {}).get("avg_score", 0)
+            st.metric("Avg Relevance", f"{avg_score:.3f}")
+
+        # Result distribution
+        distribution = analytics.get("result_distribution", {})
+        if distribution:
+            st.markdown("**Result Distribution:**")
+            dist_col1, dist_col2, dist_col3 = st.columns(3)
+
+            with dist_col1:
+                unique_docs = distribution.get("unique_documents", 0)
+                st.metric("Unique Documents", unique_docs)
+
+            with dist_col2:
+                multi_chunk = distribution.get("documents_with_multiple_chunks", 0)
+                st.metric("Multi-chunk Docs", multi_chunk)
+
+            with dist_col3:
+                chapters_used = len(set())  # Would need to calculate from results
+                st.metric("Chapters Used", chapters_used)
+
+        # Top tags and categories
+        top_tags = distribution.get("top_tags", {})
+        top_cats = distribution.get("top_categories", {})
+
+        if top_tags or top_cats:
+            st.markdown("**Popular Tags & Categories in Results:**")
+            tag_cat_col1, tag_cat_col2 = st.columns(2)
+
+            with tag_cat_col1:
+                if top_tags:
+                    st.markdown("**Top Tags:**")
+                    for tag, count in list(top_tags.items())[:5]:
+                        st.write(f"• {tag} ({count})")
+
+            with tag_cat_col2:
+                if top_cats:
+                    st.markdown("**Top Categories:**")
+                    for cat, count in list(top_cats.items())[:5]:
+                        st.write(f"• {cat} ({count})")
+
+
+def render_hybrid_search_results(result_data):
+    """Render hybrid search results with vector/BM25 breakdown"""
+    results = result_data.get("results", [])
+
+    if not results:
+        st.info("No results found for your search.")
+        return
+
+    st.markdown("### 🔍 Advanced Search Results")
+
+    # Results summary
+    total_results = len(results)
+    st.info(f"Found {total_results} relevant results")
+
+    # Display results
+    for i, result in enumerate(results, 1):
+        score = result.get("score", 0)
+        vector_score = result.get("vector_score", 0)
+        bm25_score = result.get("bm25_score", 0)
+        document_title = result.get("document_title", "Unknown")
+        content = result.get("content", "")
+        tags = result.get("tags", [])
+        categories = result.get("categories", [])
+
+        # Score indicator
+        score_indicator = "🔥" if score > 0.8 else "⭐" if score > 0.6 else "📄"
+
+        with st.expander(
+            f"{score_indicator} Result {i}: {document_title} (Score: {score:.3f})"
+        ):
+            # Score breakdown
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Score", f"{score:.3f}")
+            with col2:
+                st.metric("Vector Similarity", f"{vector_score:.3f}")
+            with col3:
+                st.metric("Keyword Match", f"{bm25_score:.3f}")
+
+            # Content preview
+            st.markdown("**Content Preview:**")
+            content_preview = content[:300] + "..." if len(content) > 300 else content
+            st.write(content_preview)
+
+            # Tags and categories
+            meta_col1, meta_col2 = st.columns(2)
+            with meta_col1:
+                if tags:
+                    st.markdown(f"**🏷️ Tags:** {', '.join(tags)}")
+            with meta_col2:
+                if categories:
+                    st.markdown(f"**📂 Categories:** {', '.join(categories)}")
+
+            # Metadata
+            metadata = result.get("metadata", {})
+            if metadata:
+                st.markdown("**Additional Info:**")
+                for key, value in metadata.items():
+                    if key in ["chapter_title", "chapter_path", "author"]:
+                        st.write(f"• **{key.replace('_', ' ').title()}:** {value}")
+
+
+def render_search_suggestions():
+    """Render search suggestions and query expansion"""
+    if "current_results" not in st.session_state:
+        return
+
+    results = st.session_state.current_results
+    if not results or results.get("type") != "advanced":
+        return
+
+    result_data = results.get("result", {})
+    expanded_query = result_data.get("expanded_query", {})
+
+    if not expanded_query:
+        return
+
+    with st.expander("💡 Search Insights", expanded=False):
+        # Query expansion suggestions
+        expanded_tags = expanded_query.get("expanded_tags", [])
+        expanded_categories = expanded_query.get("expanded_categories", [])
+
+        if expanded_tags or expanded_categories:
+            st.markdown("**🔗 Query Expansion:**")
+            st.write("Your search was expanded using knowledge graph relationships:")
+
+            if expanded_tags:
+                st.write(f"• **Related Tags:** {', '.join(expanded_tags)}")
+            if expanded_categories:
+                st.write(f"• **Related Categories:** {', '.join(expanded_categories)}")
+
+        # Parsed query information
+        parsed_query = result_data.get("parsed_query", {})
+        if parsed_query:
+            st.markdown("**🔍 Query Analysis:**")
+
+            if parsed_query.get("phrase_terms"):
+                st.write(
+                    f"• **Phrase searches:** {', '.join(f'"{p}"' for p in parsed_query['phrase_terms'])}"
+                )
+
+            if parsed_query.get("field_queries"):
+                st.write("• **Field-specific searches:**")
+                for field, values in parsed_query["field_queries"].items():
+                    st.write(f"  - {field}: {', '.join(values)}")
+
+            if parsed_query.get("excluded_terms"):
+                st.write(
+                    f"• **Excluded terms:** {', '.join(parsed_query['excluded_terms'])}"
+                )
+
+        # Performance suggestions
+        analytics = result_data.get("analytics", {})
+        search_time = analytics.get("search_time", 0)
+
+        if search_time > 2.0:
+            st.warning(
+                "⚠️ Search took longer than usual. Consider simplifying your query or using more specific filters."
+            )
+
+        query_complexity = analytics.get("query_complexity", 0)
+        if query_complexity > 3.0:
+            st.info(
+                "💡 Your query is quite complex. Try breaking it into simpler parts for faster results."
+            )
 
 
 def render_no_results():
