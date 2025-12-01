@@ -1226,7 +1226,7 @@ class DocumentProcessor(BaseProcessor):
 
     def _extract_meaningful_content_for_analysis(self, full_content: str) -> str:
         """
-        Extract meaningful content for analysis by skipping table of contents and boilerplate.
+        Extract meaningful content for analysis by finding actual book content beyond TOC.
 
         Args:
             full_content: Full document content
@@ -1234,54 +1234,60 @@ class DocumentProcessor(BaseProcessor):
         Returns:
             Meaningful content sample for analysis
         """
-        if not full_content or len(full_content) < 1000:
-            return full_content[:2000] if full_content else ""
+        if not full_content:
+            return ""
 
+        if len(full_content) < 2000:
+            return full_content
+
+        # For longer documents, try to find content beyond TOC
+        # Look for patterns that indicate actual chapter content
+        content_parts = []
+
+        # Method 1: Look for chapter headers followed by substantial content
         lines = full_content.split("\n")
-        content_start_idx = 0
+        in_content_section = False
 
-        # Skip table of contents (look for patterns that indicate TOC)
-        for i, line in enumerate(lines):
+        for line in lines:
             line = line.strip()
             if not line:
                 continue
 
-            # Skip lines that look like TOC entries
-            if "|" in line and (
-                "Overview" in line or "Contents" in line or re.match(r"^\|\s*\d+", line)
-            ):
+            # Detect chapter headers (not TOC headers)
+            if (
+                line.startswith("#")
+                and len(line) > 15  # Substantial header
+                and not any(
+                    toc_word in line.lower() for toc_word in ["contents", "table of contents"]
+                )
+                and not re.match(r"^#\s*\d+\s*$", line)
+            ):  # Not just "# 1"
+                in_content_section = True
                 continue
 
-            # Look for actual content patterns
-            if (
-                len(line) > 50  # Substantial line length
-                and not line.startswith("#")  # Not a header
-                and not re.match(r"^[\d\s\.\-]+$", line)  # Not just numbers/dots
-                and not line.lower().startswith(("contents", "table of contents", "chapter"))
-            ):
-                content_start_idx = i
-                break
+            # If we're in a content section, collect substantial content
+            if in_content_section and len(line) > 30 and not line.startswith("|"):
+                content_parts.append(line)
+                if len(content_parts) >= 8:  # Got enough content samples
+                    break
 
-        # Extract content starting from the identified point
-        meaningful_content = "\n".join(lines[content_start_idx:])
-
-        # If content is still too short, use the original sampling approach
-        if len(meaningful_content) < 2000:
-            if len(full_content) > 10000:
-                # For long documents, sample from different sections
-                return (
-                    full_content[:3000]  # Beginning (might include TOC but better than nothing)
-                    + full_content[len(full_content) // 3 : len(full_content) // 3 + 3000]  # Middle
-                    + full_content[-3000:]  # End
-                )
+        # Method 2: If no chapter content found, use multi-section sampling
+        if len(content_parts) < 3:
+            if len(full_content) > 15000:
+                # Sample from beginning, middle, and end
+                content_parts = [
+                    full_content[5000:7000],  # Skip TOC, get early content
+                    full_content[len(full_content) // 3 : len(full_content) // 3 + 2000],  # Middle
+                    full_content[-4000:-2000],  # Near end
+                ]
             else:
-                return full_content[:5000]
+                # For medium documents, take a larger sample from the middle
+                start_pos = max(2000, len(full_content) // 4)
+                content_parts = [full_content[start_pos : start_pos + 4000]]
 
-        # Return a substantial sample from the meaningful content
-        if len(meaningful_content) > 8000:
-            return meaningful_content[:8000]
-        else:
-            return meaningful_content
+        # Join and return meaningful content
+        meaningful_content = " ".join(content_parts)
+        return meaningful_content[:8000] if len(meaningful_content) > 8000 else meaningful_content
 
     def _index_document(
         self,

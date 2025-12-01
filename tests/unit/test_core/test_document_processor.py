@@ -644,6 +644,11 @@ class TestDocumentProcessor:
         # Verify specific hierarchical relationships
         chapter_data = {ch["path"]: ch for ch in chapters}
 
+        # Verify all expected chapters are present
+        expected_paths = {"1", "2", "2.1", "2.2", "2.3", "2.4", "2.4.1", "2.4.2", "3"}
+        actual_paths = set(chapter_data.keys())
+        assert actual_paths == expected_paths
+
         # Main chapters should have level 1
         assert chapter_data["1"]["level"] == 1
         assert chapter_data["2"]["level"] == 1
@@ -684,9 +689,10 @@ class TestDocumentProcessor:
             assert chunk["metadata"]["chapter_title"] is not None
             assert chunk["metadata"]["chapter_path"] is not None
 
-        # Should have chunks assigned to different chapters
+        # Should have chunks assigned to all chapters
         chapter_titles = set(chunk["metadata"]["chapter_title"] for chunk in chunks)
-        assert len(chapter_titles) >= 2  # At least some different chapters
+        expected_titles = {"Chapter 1", "Chapter 2", "Chapter 3"}
+        assert chapter_titles == expected_titles  # All chapters should be represented
 
         # Verify chunk content is substantial
         for chunk in chunks:
@@ -736,6 +742,57 @@ class TestDocumentProcessor:
         # All chunks should be from Chapter 1
         chapter_titles = set(chunk["metadata"]["chapter_title"] for chunk in chunks)
         assert chapter_titles == {"Chapter 1"}
+
+    def test_extract_meaningful_content_for_analysis(self, document_processor):
+        """Test extraction of meaningful content by skipping TOC."""
+        # Content with TOC followed by actual content
+        content_with_toc = """
+## Contents
+
+| 1   | Overview                    |                                 |
+| 2   | Basic Python                 |                                 |
+| 3   | Data Structures              |                                 |
+
+# Chapter 1: Overview
+
+This book provides a comprehensive introduction to data structures in Python.
+Data structures are fundamental concepts in computer science.
+
+# Chapter 2: Basic Python
+
+Python is a powerful programming language that emphasizes readability.
+This chapter covers essential concepts for data structures.
+"""
+
+        meaningful_content = document_processor._extract_meaningful_content_for_analysis(
+            content_with_toc
+        )
+
+        # Should skip the TOC and find actual content
+        assert len(meaningful_content) > 100
+        assert "comprehensive introduction" in meaningful_content.lower()
+        assert "emphasizes readability" in meaningful_content.lower()
+
+        # Should contain actual content, not just TOC
+        assert "comprehensive introduction" in meaningful_content.lower()
+        assert "emphasizes readability" in meaningful_content.lower()
+
+    def test_extract_meaningful_content_short_document(self, document_processor):
+        """Test content extraction for short documents."""
+        short_content = "This is a short document with minimal content."
+
+        meaningful_content = document_processor._extract_meaningful_content_for_analysis(
+            short_content
+        )
+
+        # Should return the full content for short documents
+        assert meaningful_content == short_content
+
+    def test_extract_meaningful_content_empty(self, document_processor):
+        """Test content extraction for empty content."""
+        meaningful_content = document_processor._extract_meaningful_content_for_analysis("")
+
+        assert meaningful_content == ""
 
     def test_del_method(self, document_processor, mock_db_session):
         """Test cleanup in destructor."""
