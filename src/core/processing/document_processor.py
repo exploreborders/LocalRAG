@@ -1155,6 +1155,7 @@ class DocumentProcessor(BaseProcessor):
                     )
         else:
             # Chapter-aware chunking
+            chapter_chunks_created = 0
             for chapter in chapters:
                 chapter_content = chapter.get("content", "")
                 if len(chapter_content) > 500:  # Substantial chapter content
@@ -1174,6 +1175,45 @@ class DocumentProcessor(BaseProcessor):
                                     },
                                 }
                             )
+                            chapter_chunks_created += 1
+
+            # If no chunks were created from chapters (e.g., chapters have no content),
+            # fall back to simple chunking but assign chunks to chapters based on position
+            if chapter_chunks_created == 0 and len(content) > 1000:
+                logger.info(
+                    "No chapter content available, falling back to simple chunking with chapter assignment"
+                )
+                chunk_size = 1000
+                overlap = 200
+                content_length = len(content)
+                chapters_with_positions = []
+
+                # Estimate chapter positions (this is approximate)
+                for i, chapter in enumerate(chapters):
+                    # Divide content roughly by number of chapters
+                    start_pos = (content_length * i) // len(chapters)
+                    end_pos = (
+                        (content_length * (i + 1)) // len(chapters)
+                        if i < len(chapters) - 1
+                        else content_length
+                    )
+                    chapters_with_positions.append((chapter, start_pos, end_pos))
+
+                for chapter, start_pos, end_pos in chapters_with_positions:
+                    chapter_content = content[start_pos:end_pos]
+                    if len(chapter_content) > 200:  # Only process substantial sections
+                        for i in range(0, len(chapter_content), chunk_size - overlap):
+                            chunk_content = chapter_content[i : i + chunk_size]
+                            if len(chunk_content.strip()) > 100:
+                                chunks.append(
+                                    {
+                                        "content": chunk_content,
+                                        "metadata": {
+                                            "chapter_title": chapter["title"],
+                                            "chapter_path": chapter["path"],
+                                        },
+                                    }
+                                )
 
         return chunks
 
