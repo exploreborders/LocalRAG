@@ -353,10 +353,26 @@ def reprocess_documents():
                 status_text.text(f"🔄 Reprocessing {doc.filename}...")
                 progress_bar.progress(int((i / len(docs)) * 100))
 
-                # Reprocess with enhanced processor - force reprocessing even if document exists
-                result = processor.process_single_file(
-                    doc.filepath, doc.filename, doc.file_hash, force_enrichment=True
+                # Reprocess with enhanced processor using stored content
+                from src.core.processing.document_processor import DocumentProcessor
+
+                doc_processor = DocumentProcessor()
+
+                # Use stored content for reprocessing instead of file path
+                result = doc_processor._process_document_standard(
+                    doc.filepath, doc.filename, content=doc.full_content
                 )
+
+                # Format result to match expected structure
+                if result.get("success"):
+                    result["chunks_created"] = result.get("chunks_count", 0)
+                    result["chapters_created"] = len(result.get("chapters", []))
+                    result["filename"] = doc.filename
+                else:
+                    result = {
+                        "success": False,
+                        "error": result.get("error", "Reprocessing failed"),
+                    }
 
                 if result["success"]:
                     successful_reprocess += 1
@@ -1254,13 +1270,29 @@ def main():
                                 int((i / len(selected_doc_ids)) * 100)
                             )
 
-                            # Reprocess with enhanced processor
-                            result = processor.process_single_file(
-                                doc.filepath,
-                                doc.filename,
-                                doc.file_hash,
-                                force_enrichment=True,
+                            # Reprocess with enhanced processor using stored content
+                            from src.core.processing.document_processor import (
+                                DocumentProcessor,
                             )
+
+                            doc_processor = DocumentProcessor()
+
+                            result = doc_processor._process_document_standard(
+                                doc.filepath, doc.filename, content=doc.full_content
+                            )
+
+                            # Format result to match expected structure
+                            if result.get("success"):
+                                result["chunks_created"] = result.get("chunks_count", 0)
+                                result["chapters_created"] = len(
+                                    result.get("chapters", [])
+                                )
+                                result["filename"] = doc.filename
+                            else:
+                                result = {
+                                    "success": False,
+                                    "error": result.get("error", "Reprocessing failed"),
+                                }
 
                             if result["success"]:
                                 successful_reprocess += 1
