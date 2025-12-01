@@ -20,9 +20,6 @@ for path in [ROOT, SRC, WEB]:
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-# Ensure PYTHONPATH includes these paths
-import os
-
 current_pythonpath = os.environ.get("PYTHONPATH", "")
 paths_to_add = [str(ROOT), str(SRC), str(WEB)]
 for path in paths_to_add:
@@ -1213,6 +1210,8 @@ def main():
                     progress_bar.progress(int(progress))
 
                 # Get embedding model from settings
+                from utils.session_manager import load_settings
+
                 settings = load_settings()
                 embedding_model = settings.get("retrieval", {}).get(
                     "embedding_model", "embeddinggemma:latest"
