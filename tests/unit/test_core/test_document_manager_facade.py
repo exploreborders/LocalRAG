@@ -65,10 +65,14 @@ class TestDocumentManagerFacade:
     def test_category_operations_delegation(self, document_manager):
         """Test that category operations are properly delegated."""
         # Mock the category manager methods
-        document_manager.category_manager.get_category_by_name.return_value = MagicMock()
+        document_manager.category_manager.get_category_by_name.return_value = (
+            MagicMock()
+        )
         document_manager.category_manager.create_category.return_value = MagicMock()
         document_manager.category_manager.add_category_to_document.return_value = True
-        document_manager.category_manager.remove_category_from_document.return_value = True
+        document_manager.category_manager.remove_category_from_document.return_value = (
+            True
+        )
         document_manager.category_manager.get_document_categories.return_value = []
         document_manager.category_manager.get_category_hierarchy.return_value = []
         document_manager.category_manager.get_root_categories.return_value = []
@@ -89,7 +93,9 @@ class TestDocumentManagerFacade:
     def test_document_processing_delegation(self, document_manager):
         """Test that document processing is properly delegated."""
         expected_result = {"success": True, "document_id": 1}
-        document_manager.document_processor.process_document.return_value = expected_result
+        document_manager.document_processor.process_document.return_value = (
+            expected_result
+        )
 
         result = document_manager.process_document("/tmp/test.pdf")
 
@@ -157,8 +163,12 @@ class TestDocumentManagerFacade:
         mock_document.filepath = "/tmp/test.pdf"
 
         # Mock database queries
-        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_document
-        mock_db_session.query.return_value.filter.return_value.delete.return_value = None
+        mock_db_session.query.return_value.filter.return_value.first.return_value = (
+            mock_document
+        )
+        mock_db_session.query.return_value.filter.return_value.delete.return_value = (
+            None
+        )
         mock_db_session.query.return_value.filter.return_value.all.return_value = []
         mock_db_session.query.return_value.filter.return_value.count.return_value = 0
 
@@ -170,8 +180,10 @@ class TestDocumentManagerFacade:
         ):
             # Mock Elasticsearch
             mock_es = MagicMock()
+            mock_options = MagicMock()
             mock_es_class.return_value = mock_es
             mock_es.ping.return_value = True
+            mock_es.options.return_value = mock_options
 
             manager = DocumentManager(mock_db_session)
             result = manager.delete_document(1)
@@ -181,8 +193,9 @@ class TestDocumentManagerFacade:
             mock_remove.assert_called_once_with("/tmp/test.pdf")
 
             # Verify Elasticsearch cleanup was called
-            mock_es.delete.assert_called_once_with(index="documents", id="1", ignore=[404])
-            mock_es.delete_by_query.assert_called_once()
+            mock_es.options.assert_called_with(ignore_status=[404])
+            mock_options.delete.assert_called_once_with(index="documents", id="1")
+            mock_options.delete_by_query.assert_called_once()
 
     def test_delete_document_not_found(self, mock_db_session):
         """Test deletion of non-existent document."""
@@ -204,7 +217,9 @@ class TestDocumentManagerFacade:
         mock_document.id = 1
         mock_document.filepath = "/tmp/test.pdf"
 
-        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_document
+        mock_db_session.query.return_value.filter.return_value.first.return_value = (
+            mock_document
+        )
         mock_db_session.commit.side_effect = Exception("Database error")
 
         with patch("os.path.exists", return_value=True):

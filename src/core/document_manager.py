@@ -65,7 +65,9 @@ class DocumentManager:
         """Get all tags for a document."""
         return self.tag_manager.get_document_tags(document_id)
 
-    def suggest_tags_for_document(self, document_id: int, max_suggestions: int = 5) -> List[str]:
+    def suggest_tags_for_document(
+        self, document_id: int, max_suggestions: int = 5
+    ) -> List[str]:
         """Suggest tags for a document using AI."""
         return self.tag_manager.suggest_tags_for_document(document_id, max_suggestions)
 
@@ -103,7 +105,9 @@ class DocumentManager:
 
     def remove_category_from_document(self, document_id: int, category_id: int) -> bool:
         """Remove a category from a document."""
-        return self.category_manager.remove_category_from_document(document_id, category_id)
+        return self.category_manager.remove_category_from_document(
+            document_id, category_id
+        )
 
     def get_document_categories(self, document_id: int) -> List[DocumentCategory]:
         """Get all categories for a document."""
@@ -137,7 +141,9 @@ class DocumentManager:
         """
         try:
             # Get document info before deletion
-            document = self.db.query(Document).filter(Document.id == document_id).first()
+            document = (
+                self.db.query(Document).filter(Document.id == document_id).first()
+            )
             if not document:
                 return False
 
@@ -153,13 +159,14 @@ class DocumentManager:
                 )
                 if es.ping():
                     # Delete document metadata
-                    es.delete(index="documents", id=str(document_id), ignore=[404])
+                    es.options(ignore_status=[404]).delete(
+                        index="documents", id=str(document_id)
+                    )
 
                     # Delete all chunks for this document
-                    es.delete_by_query(
+                    es.options(ignore_status=[404]).delete_by_query(
                         index="chunks",
                         body={"query": {"term": {"document_id": document_id}}},
-                        ignore=[404],
                     )
             except Exception as e:
                 logger.warning(
@@ -170,12 +177,16 @@ class DocumentManager:
             # Delete embeddings (references chunks)
             self.db.query(DocumentEmbedding).filter(
                 DocumentEmbedding.chunk_id.in_(
-                    self.db.query(DocumentChunk.id).filter(DocumentChunk.document_id == document_id)
+                    self.db.query(DocumentChunk.id).filter(
+                        DocumentChunk.document_id == document_id
+                    )
                 )
             ).delete()
 
             # Delete chunks
-            self.db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).delete()
+            self.db.query(DocumentChunk).filter(
+                DocumentChunk.document_id == document_id
+            ).delete()
 
             # Delete chapters
             self.db.query(DocumentChapter).filter(
@@ -183,7 +194,9 @@ class DocumentManager:
             ).delete()
 
             # Delete topic relationships
-            self.db.query(DocumentTopic).filter(DocumentTopic.document_id == document_id).delete()
+            self.db.query(DocumentTopic).filter(
+                DocumentTopic.document_id == document_id
+            ).delete()
 
             # Delete tag relationships
             self.db.query(DocumentTagAssignment).filter(
@@ -196,7 +209,9 @@ class DocumentManager:
             ).delete()
 
             # Delete processing jobs
-            self.db.query(ProcessingJob).filter(ProcessingJob.document_id == document_id).delete()
+            self.db.query(ProcessingJob).filter(
+                ProcessingJob.document_id == document_id
+            ).delete()
 
             # Finally delete the document
             self.db.query(Document).filter(Document.id == document_id).delete()
@@ -255,13 +270,17 @@ class DocumentManager:
                     index="documents",
                     body={"query": {"match_all": {}}, "size": 10000, "_source": ["id"]},
                 )
-                es_document_ids = {int(hit["_source"]["id"]) for hit in es_docs["hits"]["hits"]}
+                es_document_ids = {
+                    int(hit["_source"]["id"]) for hit in es_docs["hits"]["hits"]
+                }
 
                 # Remove orphaned documents from index
                 orphaned_docs = es_document_ids - db_document_ids
                 for doc_id in orphaned_docs:
                     try:
-                        es.delete(index="documents", id=str(doc_id), ignore=[404])
+                        es.options(ignore_status=[404]).delete(
+                            index="documents", id=str(doc_id)
+                        )
                         results["orphaned_documents_removed"] += 1
                     except Exception as e:
                         results["errors"].append(
@@ -272,12 +291,18 @@ class DocumentManager:
                 missing_docs = db_document_ids - es_document_ids
                 for doc_id in missing_docs:
                     try:
-                        doc = self.db.query(Document).filter(Document.id == doc_id).first()
+                        doc = (
+                            self.db.query(Document)
+                            .filter(Document.id == doc_id)
+                            .first()
+                        )
                         if doc:
                             self._reindex_document(doc)
                             results["documents_indexed"] += 1
                     except Exception as e:
-                        results["errors"].append(f"Failed to re-index document {doc_id}: {e}")
+                        results["errors"].append(
+                            f"Failed to re-index document {doc_id}: {e}"
+                        )
 
             except Exception as e:
                 results["errors"].append(f"Error synchronizing documents index: {e}")
@@ -295,17 +320,17 @@ class DocumentManager:
                     },
                 )
                 es_chunk_doc_ids = {
-                    int(hit["_source"]["document_id"]) for hit in es_chunks["hits"]["hits"]
+                    int(hit["_source"]["document_id"])
+                    for hit in es_chunks["hits"]["hits"]
                 }
 
                 # Remove chunks for non-existent documents
                 orphaned_chunk_docs = es_chunk_doc_ids - db_document_ids
                 for doc_id in orphaned_chunk_docs:
                     try:
-                        es.delete_by_query(
+                        es.options(ignore_status=[404]).delete_by_query(
                             index="chunks",
                             body={"query": {"term": {"document_id": doc_id}}},
-                            ignore=[404],
                         )
                         results["orphaned_chunks_removed"] += 1
                     except Exception as e:
@@ -331,7 +356,11 @@ class DocumentManager:
 
                             if es_chunk_count == 0:
                                 # Re-index chunks for this document
-                                doc = self.db.query(Document).filter(Document.id == doc_id).first()
+                                doc = (
+                                    self.db.query(Document)
+                                    .filter(Document.id == doc_id)
+                                    .first()
+                                )
                                 if doc:
                                     self._reindex_document_chunks(doc)
                                     results["chunks_indexed"] += chunk_count
@@ -368,7 +397,9 @@ class DocumentManager:
                 "key_topics": document.key_topics,
                 "reading_time_minutes": document.reading_time_minutes,
                 "status": document.status,
-                "created_at": (document.upload_date.isoformat() if document.upload_date else None),
+                "created_at": (
+                    document.upload_date.isoformat() if document.upload_date else None
+                ),
             }
 
             es.index(index="documents", id=str(document.id), body=doc_data)
@@ -388,7 +419,9 @@ class DocumentManager:
 
             # Get all chunks for this document
             chunks = (
-                self.db.query(DocumentChunk).filter(DocumentChunk.document_id == document.id).all()
+                self.db.query(DocumentChunk)
+                .filter(DocumentChunk.document_id == document.id)
+                .all()
             )
 
             for chunk in chunks:
