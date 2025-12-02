@@ -16,7 +16,6 @@ from src.utils.progress_tracker import (
 # pytest fixtures imported automatically
 
 
-
 class TestProgressInfo:
     """Test the ProgressInfo dataclass."""
 

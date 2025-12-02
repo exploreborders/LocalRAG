@@ -95,20 +95,14 @@ def get_system_metrics():
 
         # Core document metrics
         total_docs = db.query(Document).count()
-        processed_docs = (
-            db.query(Document).filter(Document.status == "processed").count()
-        )
+        processed_docs = db.query(Document).filter(Document.status == "processed").count()
         total_chunks = db.query(DocumentChunk).count()
         total_chapters = db.query(DocumentChapter).count()
         total_embeddings = db.query(DocumentEmbedding).count()
 
         # AI enrichment metrics
-        docs_with_summary = (
-            db.query(Document).filter(Document.document_summary.isnot(None)).count()
-        )
-        docs_with_topics = (
-            db.query(Document).filter(Document.key_topics.isnot(None)).count()
-        )
+        docs_with_summary = db.query(Document).filter(Document.document_summary.isnot(None)).count()
+        docs_with_topics = db.query(Document).filter(Document.key_topics.isnot(None)).count()
         docs_with_reading_time = (
             db.query(Document).filter(Document.reading_time_minutes.isnot(None)).count()
         )
@@ -130,11 +124,7 @@ def get_system_metrics():
 
         # Topic and tag counts
         total_topics = db.query(DocumentTopic).distinct(DocumentTopic.topic_id).count()
-        total_tags = (
-            db.query(DocumentTagAssignment)
-            .distinct(DocumentTagAssignment.tag_id)
-            .count()
-        )
+        total_tags = db.query(DocumentTagAssignment).distinct(DocumentTagAssignment.tag_id).count()
         total_categories = (
             db.query(DocumentCategoryAssignment)
             .distinct(DocumentCategoryAssignment.category_id)
@@ -143,9 +133,7 @@ def get_system_metrics():
 
         # File size calculation (from stored content length in database)
         total_size_bytes = 0
-        docs_with_content = (
-            db.query(Document).filter(Document.full_content.isnot(None)).all()
-        )
+        docs_with_content = db.query(Document).filter(Document.full_content.isnot(None)).all()
         for doc in docs_with_content:
             # Estimate file size from content length (rough approximation)
             content_size = len(doc.full_content or "")
@@ -167,14 +155,10 @@ def get_system_metrics():
                 "ai_ready_count": docs_with_summary + docs_with_topics,
                 # Content breakdown
                 "doc_types": dict(
-                    (row.content_type, row.count)
-                    for row in doc_types
-                    if row.content_type
+                    (row.content_type, row.count) for row in doc_types if row.content_type
                 ),
                 "languages": dict(
-                    (row.detected_language, row.count)
-                    for row in languages
-                    if row.detected_language
+                    (row.detected_language, row.count) for row in languages if row.detected_language
                 ),
                 # Organization
                 "total_topics": total_topics,
@@ -349,9 +333,7 @@ def initialize_system_if_needed():
             cache_settings = settings.get("cache", {})
 
             # Initialize retriever
-            st.session_state.retriever = DatabaseRetriever(
-                embedding_model, embedding_backend
-            )
+            st.session_state.retriever = DatabaseRetriever(embedding_model, embedding_backend)
 
             # Try to initialize RAG pipeline
             try:
@@ -382,9 +364,7 @@ def main():
     # Initialize system if needed
     initialize_system_if_needed()
 
-    st.markdown(
-        '<h1 class="page-header">📊 Analytics Dashboard</h1>', unsafe_allow_html=True
-    )
+    st.markdown('<h1 class="page-header">📊 Analytics Dashboard</h1>', unsafe_allow_html=True)
     st.markdown("Comprehensive performance monitoring for your Local RAG system")
 
     # Get current metrics
@@ -552,9 +532,7 @@ def main():
 
             if tag_stats:
                 st.markdown("**Most Used Tags:**")
-                tag_cols = st.columns(
-                    min(len(tag_stats[:10]), 5)
-                )  # Max 5 tags per row, top 10
+                tag_cols = st.columns(min(len(tag_stats[:10]), 5))  # Max 5 tags per row, top 10
 
                 for i, (tag_name, tag_color, usage_count) in enumerate(tag_stats[:10]):
                     col_idx = i % 5
@@ -571,9 +549,7 @@ def main():
                     st.markdown("**Tag Usage Distribution:**")
                     chart_data = pd.DataFrame(
                         {
-                            "Tag": [
-                                stat[0] for stat in tag_stats[:15]
-                            ],  # Top 15 for chart
+                            "Tag": [stat[0] for stat in tag_stats[:15]],  # Top 15 for chart
                             "Documents": [stat[2] for stat in tag_stats[:15]],
                         }
                     )
@@ -655,9 +631,7 @@ def main():
                 cat_stats.sort(key=lambda x: x["document_count"], reverse=True)
 
                 st.markdown("**Most Used Categories:**")
-                cat_cols = st.columns(
-                    min(len(cat_stats), 4)
-                )  # Max 4 categories per row
+                cat_cols = st.columns(min(len(cat_stats), 4))  # Max 4 categories per row
 
                 for i, cat in enumerate(cat_stats[:8]):  # Show top 8
                     col_idx = i % 4
@@ -694,9 +668,7 @@ def main():
                             for cat in categories:
                                 indent = "  " * level
                                 doc_count = cat.get("document_count", 0)
-                                st.caption(
-                                    f"{indent}📁 {cat['name']} ({doc_count} docs)"
-                                )
+                                st.caption(f"{indent}📁 {cat['name']} ({doc_count} docs)")
                                 if cat.get("children"):
                                     display_tree_summary(cat["children"], level + 1)
 
@@ -810,9 +782,7 @@ def main():
                         greedy_modularity_communities,
                     )
 
-                    communities = list(
-                        greedy_modularity_communities(G, weight="weight")
-                    )
+                    communities = list(greedy_modularity_communities(G, weight="weight"))
                     community_map = {}
                     for i, comm in enumerate(communities):
                         for node in comm:
@@ -849,9 +819,7 @@ def main():
                     edge_widths = [2] * len(G.edges())
 
                 # Use average edge width for the trace (Plotly doesn't support per-edge widths in multi-edge traces)
-                avg_edge_width = (
-                    sum(edge_widths) / len(edge_widths) if edge_widths else 2
-                )
+                avg_edge_width = sum(edge_widths) / len(edge_widths) if edge_widths else 2
 
                 edge_trace = go.Scatter(
                     x=edge_x,
@@ -897,15 +865,9 @@ def main():
 
                     # Hover text with centrality measures
                     hover_text = f"{node}<br>"
-                    hover_text += (
-                        f"Degree Centrality: {degree_centrality.get(node, 0):.3f}<br>"
-                    )
-                    hover_text += (
-                        f"Betweenness: {betweenness_centrality.get(node, 0):.3f}<br>"
-                    )
-                    hover_text += (
-                        f"Closeness: {closeness_centrality.get(node, 0):.3f}<br>"
-                    )
+                    hover_text += f"Degree Centrality: {degree_centrality.get(node, 0):.3f}<br>"
+                    hover_text += f"Betweenness: {betweenness_centrality.get(node, 0):.3f}<br>"
+                    hover_text += f"Closeness: {closeness_centrality.get(node, 0):.3f}<br>"
                     hover_text += f"Community: {comm_id}"
                     node_hover_text.append(hover_text)
 
@@ -933,12 +895,8 @@ def main():
                         showlegend=False,
                         hovermode="closest",
                         margin=dict(b=0, l=0, r=0, t=0),
-                        xaxis=dict(
-                            showgrid=False, zeroline=False, showticklabels=False
-                        ),
-                        yaxis=dict(
-                            showgrid=False, zeroline=False, showticklabels=False
-                        ),
+                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                         height=500,
                         title="Knowledge Graph Network (with Centrality & Communities)",
                     ),
@@ -971,14 +929,10 @@ def main():
 
                 with analytics_col3:
                     st.markdown("**👥 Communities:**")
-                    st.write(
-                        f"• {len(set(community_map.values()))} communities detected"
-                    )
+                    st.write(f"• {len(set(community_map.values()))} communities detected")
                     for comm_id in sorted(set(community_map.values())):
                         comm_size = sum(
-                            1
-                            for node in community_map
-                            if community_map[node] == comm_id
+                            1 for node in community_map if community_map[node] == comm_id
                         )
                         st.write(f"• Community {comm_id}: {comm_size} tags")
 
@@ -1046,12 +1000,8 @@ def main():
                         showlegend=False,
                         hovermode="closest",
                         margin=dict(b=0, l=0, r=0, t=0),
-                        xaxis=dict(
-                            showgrid=False, zeroline=False, showticklabels=False
-                        ),
-                        yaxis=dict(
-                            showgrid=False, zeroline=False, showticklabels=False
-                        ),
+                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                         height=400,
                     ),
                 )
@@ -1065,9 +1015,7 @@ def main():
                     st.dataframe(
                         rel_df[["source", "target", "type", "strength", "evidence"]],
                         column_config={
-                            "strength": st.column_config.NumberColumn(
-                                "Strength", format="%.2f"
-                            ),
+                            "strength": st.column_config.NumberColumn("Strength", format="%.2f"),
                             "evidence": st.column_config.NumberColumn("Evidence Count"),
                         },
                     )
@@ -1086,9 +1034,7 @@ def main():
     # System Health Status
     st.markdown("### 🔧 System Health")
 
-    status_col1, status_col2, status_col3, status_col4, status_col5, status_col6 = (
-        st.columns(6)
-    )
+    status_col1, status_col2, status_col3, status_col4, status_col5, status_col6 = st.columns(6)
 
     with status_col1:
         db_connected = metrics.get("database_connected", False)
@@ -1229,9 +1175,9 @@ def main():
         # Recent query metrics
         recent_queries = history[-10:]  # Last 10 queries
         if recent_queries:
-            avg_time = sum(
-                item.get("processing_time", 0) for item in recent_queries
-            ) / len(recent_queries)
+            avg_time = sum(item.get("processing_time", 0) for item in recent_queries) / len(
+                recent_queries
+            )
             total_queries = len(history)
 
             perf_col1, perf_col2, perf_col3, perf_col4 = st.columns(4)
@@ -1243,15 +1189,11 @@ def main():
                 st.metric("Avg Response", f"{avg_time:.2f}s")
 
             with perf_col3:
-                min_time = min(
-                    item.get("processing_time", 0) for item in recent_queries
-                )
+                min_time = min(item.get("processing_time", 0) for item in recent_queries)
                 st.metric("Fastest", f"{min_time:.2f}s")
 
             with perf_col4:
-                max_time = max(
-                    item.get("processing_time", 0) for item in recent_queries
-                )
+                max_time = max(item.get("processing_time", 0) for item in recent_queries)
                 st.metric("Slowest", f"{max_time:.2f}s")
 
         # Query mode breakdown
@@ -1354,9 +1296,7 @@ def main():
 
                     st.markdown(f"**Query:** {item.get('query', '')}")
                     st.markdown(f"**Mode:** {item.get('mode', 'unknown').title()}")
-                    st.markdown(
-                        f"**Response Time:** {item.get('processing_time', 0):.2f}s"
-                    )
+                    st.markdown(f"**Response Time:** {item.get('processing_time', 0):.2f}s")
 
                     # Get existing feedback
                     existing = st.session_state.get(feedback_key, {})
@@ -1491,9 +1431,7 @@ def main():
                     "ai_enrichment": {
                         "docs_with_summary": metrics.get("docs_with_summary", 0),
                         "docs_with_topics": metrics.get("docs_with_topics", 0),
-                        "docs_with_reading_time": metrics.get(
-                            "docs_with_reading_time", 0
-                        ),
+                        "docs_with_reading_time": metrics.get("docs_with_reading_time", 0),
                         "ai_ready_count": metrics.get("ai_ready_count", 0),
                     },
                     "content_breakdown": {
