@@ -344,9 +344,9 @@ class UploadProcessor(BaseProcessor):
                     content_for_analysis, existing_doc.filename, suggested_tags
                 )
 
-                # Generate new summary
+                # Generate new summary using stored full content for better results
                 document_summary = doc_processor._generate_document_summary(
-                    content_for_analysis,
+                    existing_doc.full_content,  # Use stored full content for better summarization
                     existing_doc.filename,
                     suggested_tags,
                     processing_result.get("chapters_detected", 0),
