@@ -3,12 +3,15 @@
 Documents Page - File Management and Library
 """
 
+import logging
 import os
 import sys
 import time
 from pathlib import Path
 
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 # Find project root (two levels up from /web_interface/pages/)
 ROOT = Path(__file__).resolve().parents[2]
@@ -167,7 +170,9 @@ def list_documents():
                     "name": doc.filename,
                     "size": 0,  # Size not stored in DB
                     "modified": doc.last_modified,
-                    "extension": doc.filename.split(".")[-1] if "." in doc.filename else "",
+                    "extension": doc.filename.split(".")[-1]
+                    if "." in doc.filename
+                    else "",
                     "detected_language": doc.detected_language or "unknown",
                     "status": doc.status,
                     # AI-enriched metadata
@@ -180,7 +185,8 @@ def list_documents():
                     "chapter_count": chapter_count,
                     "chunk_count": chunk_count,
                     "has_chapters": chapter_count > 0,
-                    "has_topics": doc.key_topics is not None and len(doc.key_topics) > 0,
+                    "has_topics": doc.key_topics is not None
+                    and len(doc.key_topics) > 0,
                 }
             )
 
@@ -217,7 +223,9 @@ def process_uploaded_files(uploaded_files):
 
     if large_files:
         st.warning(f"⚠️ Large files detected: {', '.join(large_files)}")
-        st.info("💡 Large files may take longer to process. Consider splitting them if possible.")
+        st.info(
+            "💡 Large files may take longer to process. Consider splitting them if possible."
+        )
         if total_size_mb > 200:  # Very large total
             st.error(
                 "🚫 Total upload size exceeds recommended limit (200MB). Please upload smaller files or in batches."
@@ -237,7 +245,9 @@ def process_uploaded_files(uploaded_files):
     from utils.session_manager import load_settings
 
     settings = load_settings()
-    embedding_model = settings.get("retrieval", {}).get("embedding_model", "embeddinggemma:latest")
+    embedding_model = settings.get("retrieval", {}).get(
+        "embedding_model", "embeddinggemma:latest"
+    )
 
     # Initialize upload processor
     processor = UploadProcessor(embedding_model=embedding_model)
@@ -268,7 +278,9 @@ def process_uploaded_files(uploaded_files):
 
         # Display results
         if results["successful_uploads"] > 0:
-            st.success(f"✅ Successfully processed {results['successful_uploads']} file(s)")
+            st.success(
+                f"✅ Successfully processed {results['successful_uploads']} file(s)"
+            )
             st.info(
                 f"📊 Created {results['total_chunks']} chunks and {results['total_chapters']} chapters"
             )
@@ -281,7 +293,9 @@ def process_uploaded_files(uploaded_files):
                             f"✅ {result['filename']}: {result['chunks_created']} chunks, {result['chapters_created']} chapters"
                         )
                     else:
-                        st.error(f"❌ {result['filename']}: {result.get('error', 'Unknown error')}")
+                        st.error(
+                            f"❌ {result['filename']}: {result.get('error', 'Unknown error')}"
+                        )
 
         if results["failed_uploads"] > 0:
             st.warning(f"⚠️ {results['failed_uploads']} file(s) failed to process")
@@ -321,7 +335,9 @@ def reprocess_documents():
         # Use UploadProcessor for reprocessing
         processor = UploadProcessor(embedding_model=embedding_model)
 
-        status_text.text("🔄 Starting reprocessing with enhanced structure extraction...")
+        status_text.text(
+            "🔄 Starting reprocessing with enhanced structure extraction..."
+        )
 
         # Get all existing documents
         docs = processor.db.query(Document).all()
@@ -342,8 +358,12 @@ def reprocess_documents():
                 progress_bar.progress(int((i / len(docs)) * 100))
 
                 # Clear existing chapters before reprocessing to avoid duplicates
-                db.query(DocumentChapter).filter(DocumentChapter.document_id == doc.id).delete()
-                db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).delete()
+                db.query(DocumentChapter).filter(
+                    DocumentChapter.document_id == doc.id
+                ).delete()
+                db.query(DocumentChunk).filter(
+                    DocumentChunk.document_id == doc.id
+                ).delete()
                 db.commit()
 
                 # Use structure extractor directly on stored content for proper chapter titles
@@ -353,7 +373,9 @@ def reprocess_documents():
                 try:
                     extractor = StructureExtractor()
                     if extractor.is_available():
-                        structure_data = extractor.extract_structure(doc.full_content, doc.filename)
+                        structure_data = extractor.extract_structure(
+                            doc.full_content, doc.filename
+                        )
 
                         # Create proper chapters from structure analysis
                         for chapter_data in structure_data.get("hierarchy", []):
@@ -367,21 +389,27 @@ def reprocess_documents():
                                     "content_preview", chapter_data.get("title", "")
                                 ),
                                 section_type=(
-                                    "chapter" if chapter_data.get("level", 1) == 1 else "section"
+                                    "chapter"
+                                    if chapter_data.get("level", 1) == 1
+                                    else "section"
                                 ),
                             )
                             db.add(chapter_record)
                             chapters_created += 1
 
                         db.commit()
-                        print(f"Created {chapters_created} chapters using structure extractor")
+                        print(
+                            f"Created {chapters_created} chapters using structure extractor"
+                        )
                     else:
                         print(
                             "Structure extractor not available, falling back to standard processing"
                         )
                         chapters_created = 0
                 except Exception as e:
-                    print(f"Structure extraction failed: {e}, falling back to standard processing")
+                    print(
+                        f"Structure extraction failed: {e}, falling back to standard processing"
+                    )
                     chapters_created = 0
 
                 # If structure extraction was successful, skip document processor chapter creation
@@ -395,7 +423,9 @@ def reprocess_documents():
                     import os
                     import tempfile
 
-                    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+                    with tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".txt", delete=False
+                    ) as f:
                         f.write(doc.full_content)
                         temp_path = f.name
 
@@ -417,7 +447,9 @@ def reprocess_documents():
                                 .filter(DocumentChapter.document_id == doc.id)
                                 .all()
                             )
-                            if not good_chapters:  # If they were deleted, we need to recreate them
+                            if (
+                                not good_chapters
+                            ):  # If they were deleted, we need to recreate them
                                 # This shouldn't happen, but just in case
                                 pass
 
@@ -438,7 +470,9 @@ def reprocess_documents():
                     import os
                     import tempfile
 
-                    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+                    with tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".txt", delete=False
+                    ) as f:
                         f.write(doc.full_content)
                         temp_path = f.name
 
@@ -474,7 +508,9 @@ def reprocess_documents():
                     total_chunks += result["chunks_created"]
                     total_chapters += result["chapters_created"]
                 else:
-                    st.warning(f"⚠️ Failed to reprocess {doc.filename}: {result['error']}")
+                    st.warning(
+                        f"⚠️ Failed to reprocess {doc.filename}: {result['error']}"
+                    )
 
             except Exception as e:
                 st.error(f"❌ Error reprocessing {doc.filename}: {e}")
@@ -484,7 +520,9 @@ def reprocess_documents():
         status_text.empty()
 
         if successful_reprocess > 0:
-            st.success(f"✅ Successfully reprocessed {successful_reprocess} document(s)")
+            st.success(
+                f"✅ Successfully reprocessed {successful_reprocess} document(s)"
+            )
             st.info(f"📊 Created {total_chunks} chunks and {total_chapters} chapters")
 
             # Update session state to force reinitialization
@@ -516,20 +554,23 @@ def clear_all_documents():
         doc_count = db.query(Document).count()
         db.close()
 
-        if doc_count == 0:
-            st.info("ℹ️ No documents to clear")
-            return
-
-        # Confirmation dialog
+        # Always show confirmation dialog, even if no documents in database
+        # (there might be orphaned data in Elasticsearch)
         st.markdown("---")
         st.error("⚠️ **DANGER ZONE**")
-        st.warning(
-            f"You are about to delete **{doc_count} document(s)** and all associated data. This action cannot be undone!"
-        )
+
+        if doc_count > 0:
+            st.warning(
+                f"You are about to delete **{doc_count} document(s)** and all associated data. This action cannot be undone!"
+            )
+        else:
+            st.warning(
+                "You are about to clear all data. This will remove any orphaned search indices and cannot be undone!"
+            )
 
         col1, col2 = st.columns([1, 1])
         with col1:
-            confirm_clear = st.button("🗑️ YES, DELETE ALL DOCUMENTS", type="primary")
+            confirm_clear = st.button("🗑️ YES, CLEAR ALL DATA", type="primary")
         with col2:
             cancel_clear = st.button("❌ Cancel")
 
@@ -541,6 +582,12 @@ def clear_all_documents():
             # Create progress tracking
             progress_bar = st.progress(0)
             status_text = st.empty()
+
+            # Debug: Show that we got here
+            st.success("🗑️ Starting document deletion process...")
+            print(
+                "DEBUG: clear_all_documents - confirm_clear is True, starting deletion"
+            )
 
             try:
                 status_text.text("🗑️ Starting document deletion...")
@@ -563,23 +610,49 @@ def clear_all_documents():
 
                 # Clear Elasticsearch indices
                 try:
+                    print("DEBUG: Starting Elasticsearch cleanup")
                     from elasticsearch import Elasticsearch
 
                     es = Elasticsearch(
                         hosts=[{"host": "localhost", "port": 9200, "scheme": "http"}],
                         verify_certs=False,
                     )
+                    print(f"DEBUG: ES client created, ping: {es.ping()}")
                     if es.ping():
-                        # Delete all rag_* indices
-                        indices = es.cat.indices(index="rag_*", format="json")
-                        for idx in indices:
-                            index_name = idx["index"]
-                            es.indices.delete(index=index_name, ignore_unavailable=True)
+                        print("DEBUG: ES is responding")
+                        # Delete document-related indices
+                        indices_to_delete = ["documents", "chunks"]
+                        for index_name in indices_to_delete:
+                            exists = es.indices.exists(index=index_name)
+                            print(f"DEBUG: Index {index_name} exists: {exists}")
+                            if exists:
+                                print(
+                                    f"DEBUG: Deleting Elasticsearch index: {index_name}"
+                                )
+                                result = es.indices.delete(
+                                    index=index_name, ignore_unavailable=True
+                                )
+                                print(
+                                    f"DEBUG: Delete result for {index_name}: {result}"
+                                )
+                                try:
+                                    logger.info(
+                                        f"Deleted Elasticsearch index: {index_name}"
+                                    )
+                                except Exception:
+                                    pass  # Logger not critical for functionality
+                                st.info(f"🗑️ Deleted Elasticsearch index: {index_name}")
+                            else:
+                                print(f"DEBUG: Index {index_name} does not exist")
                         status_text.text("🗑️ Cleared Elasticsearch indices...")
                         progress_bar.progress(40)
                     else:
-                        st.warning("⚠️ Elasticsearch not available, skipping index cleanup")
+                        print("DEBUG: ES not responding")
+                        st.warning(
+                            "⚠️ Elasticsearch not available, skipping index cleanup"
+                        )
                 except Exception as e:
+                    print(f"DEBUG: ES cleanup error: {e}")
                     st.warning(f"⚠️ Could not clear Elasticsearch: {e}")
 
                 # Clear database (manual cascade delete for safety)
@@ -717,7 +790,9 @@ def show_clear_documents_dialog():
 
 def main():
     """Main page content"""
-    st.markdown('<h1 class="page-header">📁 Document Management</h1>', unsafe_allow_html=True)
+    st.markdown(
+        '<h1 class="page-header">📁 Document Management</h1>', unsafe_allow_html=True
+    )
     st.markdown("Upload, manage, and process your document library")
 
     # File upload section
@@ -836,7 +911,9 @@ def main():
 
                     with meta_col2:
                         if doc.get("reading_time_minutes"):
-                            st.metric("⏱️ Reading Time", f"{doc['reading_time_minutes']} min")
+                            st.metric(
+                                "⏱️ Reading Time", f"{doc['reading_time_minutes']} min"
+                            )
 
                         if doc.get("chapter_count", 0) > 0:
                             st.metric("📚 Chapters", doc["chapter_count"])
@@ -896,9 +973,7 @@ def main():
                                 level_indent = "  " * (chapter.level - 1)
                                 # Clean up title by removing trailing dots and extra spaces
                                 clean_title = chapter.chapter_title.rstrip(". ").strip()
-                                structure_text += (
-                                    f"{level_indent}{chapter.chapter_path} {clean_title}\n"
-                                )
+                                structure_text += f"{level_indent}{chapter.chapter_path} {clean_title}\n"
 
                             # Display as a single code block
                             st.code(structure_text.strip(), language=None)
@@ -936,7 +1011,9 @@ def main():
                     # Display current tags with improved styling
                     if current_tags:
                         st.markdown("**Current Tags:**")
-                        tag_cols = st.columns(min(len(current_tags), 4))  # Max 4 tags per row
+                        tag_cols = st.columns(
+                            min(len(current_tags), 4)
+                        )  # Max 4 tags per row
                         for i, tag in enumerate(current_tags):
                             col_idx = i % 4
                             with tag_cols[col_idx]:
@@ -951,9 +1028,14 @@ def main():
                         st.caption("🏷️ No tags assigned yet")
 
                     # AI Tag Suggestions
-                    if doc.get("full_content") and len(doc["full_content"].strip()) > 100:
+                    if (
+                        doc.get("full_content")
+                        and len(doc["full_content"].strip()) > 100
+                    ):
                         with st.expander("🤖 AI Tag Suggestions", expanded=False):
-                            render_tag_suggestions(doc["id"], doc["full_content"], doc["filename"])
+                            render_tag_suggestions(
+                                doc["id"], doc["full_content"], doc["filename"]
+                            )
 
                     # Tag management - compact layout
                     st.markdown("**Manage Tags:**")
@@ -979,16 +1061,22 @@ def main():
                                     tag_manager = TagManager(db)
 
                                     # Check if tag exists
-                                    existing_tag = tag_manager.get_tag_by_name(new_tag.strip())
+                                    existing_tag = tag_manager.get_tag_by_name(
+                                        new_tag.strip()
+                                    )
                                     if not existing_tag:
                                         # Create new tag with AI-generated unique color
-                                        existing_tag = tag_manager.create_tag_with_ai_color(
-                                            new_tag.strip()
+                                        existing_tag = (
+                                            tag_manager.create_tag_with_ai_color(
+                                                new_tag.strip()
+                                            )
                                         )
 
                                     # Add tag to document
                                     if existing_tag:
-                                        tag_manager.add_tag_to_document(doc["id"], existing_tag.id)
+                                        tag_manager.add_tag_to_document(
+                                            doc["id"], existing_tag.id
+                                        )
                                         st.success(f"🏷️ '{new_tag}' added!")
                                         st.rerun()
                                     else:
@@ -1012,7 +1100,9 @@ def main():
 
                                 # Remove all tags from document
                                 for tag in current_tags:
-                                    tag_manager.remove_tag_from_document(doc["id"], tag["id"])
+                                    tag_manager.remove_tag_from_document(
+                                        doc["id"], tag["id"]
+                                    )
 
                                 db.close()
                                 st.success("🗑️ All tags removed!")
@@ -1039,7 +1129,9 @@ def main():
                         st.markdown("**Current Categories:**")
                         for category in current_categories:
                             # Build hierarchy path using category manager
-                            hierarchy_path = cat_manager.get_category_hierarchy_path(category.id)
+                            hierarchy_path = cat_manager.get_category_hierarchy_path(
+                                category.id
+                            )
                             path_str = " > ".join(hierarchy_path)
                             st.markdown(f"📁 {path_str}")
                     else:
@@ -1086,12 +1178,16 @@ def main():
                                     cat_manager = CategoryManager(db)
 
                                     # Get category object
-                                    category_obj = cat_manager.get_category_by_name(new_category)
+                                    category_obj = cat_manager.get_category_by_name(
+                                        new_category
+                                    )
                                     if category_obj:
                                         if cat_manager.add_category_to_document(
                                             doc["id"], category_obj.id
                                         ):
-                                            st.success(f"✅ Category '{new_category}' added!")
+                                            st.success(
+                                                f"✅ Category '{new_category}' added!"
+                                            )
                                             st.rerun()
                                         else:
                                             st.warning(
@@ -1129,7 +1225,9 @@ def main():
                                             removed_count += 1
 
                                     db.close()
-                                    st.success(f"✅ Removed {removed_count} categories!")
+                                    st.success(
+                                        f"✅ Removed {removed_count} categories!"
+                                    )
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"❌ Error removing categories: {e}")
@@ -1205,7 +1303,9 @@ def main():
                         else:
                             st.warning("⚠️ Please select both a tag and documents")
                 else:
-                    st.info("No tags available. Create tags first by tagging individual documents.")
+                    st.info(
+                        "No tags available. Create tags first by tagging individual documents."
+                    )
 
             except Exception as e:
                 st.warning(f"Could not load bulk tagging: {e}")
@@ -1246,7 +1346,9 @@ def main():
                                 cat_manager = CategoryManager(db)
 
                                 # Get category object
-                                cat_obj = cat_manager.get_category_by_name(bulk_category)
+                                cat_obj = cat_manager.get_category_by_name(
+                                    bulk_category
+                                )
                                 applied_count = 0
 
                                 for doc_option in selected_docs_for_cat:
@@ -1254,7 +1356,9 @@ def main():
                                     doc_id = int(doc_option.split("(")[-1].rstrip(")"))
 
                                     # Apply category
-                                    if cat_manager.add_category_to_document(doc_id, cat_obj.id):
+                                    if cat_manager.add_category_to_document(
+                                        doc_id, cat_obj.id
+                                    ):
                                         applied_count += 1
 
                                 db.close()
@@ -1336,12 +1440,18 @@ def main():
                     for i, doc_id in enumerate(selected_doc_ids):
                         try:
                             # Get document details
-                            doc = db_session.query(Document).filter(Document.id == doc_id).first()
+                            doc = (
+                                db_session.query(Document)
+                                .filter(Document.id == doc_id)
+                                .first()
+                            )
                             if not doc:
                                 continue
 
                             status_text.text(f"🔄 Reprocessing {doc.filename}...")
-                            progress_bar.progress(int((i / len(selected_doc_ids)) * 100))
+                            progress_bar.progress(
+                                int((i / len(selected_doc_ids)) * 100)
+                            )
 
                             # Reprocess with enhanced processor using stored content
                             from src.core.processing.document_processor import (
@@ -1357,7 +1467,9 @@ def main():
                             # Format result to match expected structure
                             if result.get("success"):
                                 result["chunks_created"] = result.get("chunks_count", 0)
-                                result["chapters_created"] = len(result.get("chapters", []))
+                                result["chapters_created"] = len(
+                                    result.get("chapters", [])
+                                )
                                 result["filename"] = doc.filename
                             else:
                                 result = {
@@ -1389,7 +1501,9 @@ def main():
                         f"✅ Successfully reprocessed {successful_reprocess}/{len(selected_for_reprocess)} document(s)"
                     )
                     if total_chunks > 0 or total_chapters > 0:
-                        st.info(f"📊 Created {total_chunks} chunks and {total_chapters} chapters")
+                        st.info(
+                            f"📊 Created {total_chunks} chunks and {total_chapters} chapters"
+                        )
 
                     # Update session state to force reinitialization
                     if "system_initialized" in st.session_state:
@@ -1409,8 +1523,12 @@ def main():
     try:
         db = SessionLocal()
         total_docs = db.query(Document).count()
-        processed_docs = db.query(Document).filter(Document.status == "processed").count()
-        needs_review_docs = db.query(Document).filter(Document.status == "needs_review").count()
+        processed_docs = (
+            db.query(Document).filter(Document.status == "processed").count()
+        )
+        needs_review_docs = (
+            db.query(Document).filter(Document.status == "needs_review").count()
+        )
         error_docs = db.query(Document).filter(Document.status == "error").count()
 
         col1, col2, col3, col4 = st.columns(4)
@@ -1468,7 +1586,9 @@ def main():
             with cat_col3:
                 # Get existing categories for parent selection
                 root_cats = cat_manager.get_root_categories()
-                parent_options = ["(None - Root Category)"] + [cat.name for cat in root_cats]
+                parent_options = ["(None - Root Category)"] + [
+                    cat.name for cat in root_cats
+                ]
                 selected_parent = st.selectbox(
                     "Parent Category",
                     parent_options,
@@ -1481,13 +1601,17 @@ def main():
                     try:
                         parent_id = None
                         if selected_parent != "(None - Root Category)":
-                            parent_cat = cat_manager.get_category_by_name(selected_parent)
+                            parent_cat = cat_manager.get_category_by_name(
+                                selected_parent
+                            )
                             if parent_cat:
                                 parent_id = parent_cat.id
 
                         category = cat_manager.create_category(
                             name=new_cat_name.strip(),
-                            description=new_cat_desc.strip() if new_cat_desc.strip() else None,
+                            description=new_cat_desc.strip()
+                            if new_cat_desc.strip()
+                            else None,
                             parent_id=parent_id,
                         )
                         st.success(f"✅ Category '{category.name}' created!")
@@ -1519,7 +1643,9 @@ def main():
                     type="secondary",
                 ):
                     try:
-                        cat_name = cat_to_delete.split(" (")[0]  # Extract name before count
+                        cat_name = cat_to_delete.split(" (")[
+                            0
+                        ]  # Extract name before count
                         category = cat_manager.get_category_by_name(cat_name)
                         if category:
                             if cat_manager.delete_category(category.id):
@@ -1545,7 +1671,9 @@ def main():
                         for cat in categories:
                             indent = "  " * level
                             doc_count = cat.get("document_count", 0)
-                            st.markdown(f"{indent}📁 **{cat['name']}** ({doc_count} documents)")
+                            st.markdown(
+                                f"{indent}📁 **{cat['name']}** ({doc_count} documents)"
+                            )
                             if cat.get("description"):
                                 st.caption(f"{indent}  {cat['description']}")
 
@@ -1574,7 +1702,9 @@ def main():
                     stat_data = {
                         "Category": [stat["name"] for stat in usage_stats],
                         "Documents": [stat["document_count"] for stat in usage_stats],
-                        "Description": [stat.get("description", "") for stat in usage_stats],
+                        "Description": [
+                            stat.get("description", "") for stat in usage_stats
+                        ],
                     }
 
                     import pandas as pd
@@ -1587,8 +1717,12 @@ def main():
                         st.markdown("**Usage Distribution:**")
                         chart_data = pd.DataFrame(
                             {
-                                "Category": [stat["name"] for stat in usage_stats[:10]],  # Top 10
-                                "Documents": [stat["document_count"] for stat in usage_stats[:10]],
+                                "Category": [
+                                    stat["name"] for stat in usage_stats[:10]
+                                ],  # Top 10
+                                "Documents": [
+                                    stat["document_count"] for stat in usage_stats[:10]
+                                ],
                             }
                         )
                         st.bar_chart(chart_data.set_index("Category"), height=300)
@@ -1652,13 +1786,19 @@ def main():
 
         # Get comprehensive document statistics
         total_docs = db.query(Document).count()
-        processed_docs = db.query(Document).filter(Document.status == "processed").count()
+        processed_docs = (
+            db.query(Document).filter(Document.status == "processed").count()
+        )
         total_chunks = db.query(DocumentChunk).count()
         total_chapters = db.query(DocumentChapter).count()
 
         # AI enrichment statistics
-        docs_with_summary = db.query(Document).filter(Document.document_summary.isnot(None)).count()
-        docs_with_topics = db.query(Document).filter(Document.key_topics.isnot(None)).count()
+        docs_with_summary = (
+            db.query(Document).filter(Document.document_summary.isnot(None)).count()
+        )
+        docs_with_topics = (
+            db.query(Document).filter(Document.key_topics.isnot(None)).count()
+        )
 
         db.close()
 
@@ -1722,25 +1862,16 @@ def main():
                 verify_certs=False,
             )
             if es.ping():
-                # Get index stats for our documents index
+                # Get chunk count from chunks index (this is what gets searched)
                 try:
-                    index_info = es.cat.indices(index="documents", format="json")
-                    if index_info and len(index_info) > 0:
-                        total_docs = int(index_info[0].get("docs.count", 0))
-                        st.success(f"✅ Connected - {total_docs} documents indexed")
+                    if es.indices.exists(index="chunks"):
+                        stats = es.count(index="chunks")
+                        total_chunks = stats.get("count", 0)
+                        st.success(f"✅ Connected - {total_chunks} chunks indexed")
                     else:
-                        st.warning("⚠️ Connected but no documents index found")
+                        st.warning("⚠️ Connected but no chunks index found")
                 except Exception:
-                    # Try alternative approach
-                    try:
-                        if es.indices.exists(index="documents"):
-                            stats = es.count(index="documents")
-                            total_docs = stats.get("count", 0)
-                            st.success(f"✅ Connected - {total_docs} documents indexed")
-                        else:
-                            st.warning("⚠️ Connected but no documents index found")
-                    except Exception:
-                        st.warning("⚠️ Connected but unable to check index status")
+                    st.warning("⚠️ Connected but unable to check chunk index status")
             else:
                 st.error("❌ Not responding")
         except Exception as e:

@@ -1258,7 +1258,7 @@ class DocumentProcessor(BaseProcessor):
                 if (
                     len(line) > 20
                     and not line.startswith("|")
-                    and not "|" in line[:50]  # Avoid TOC table rows
+                    and "|" not in line[:50]  # Avoid TOC table rows
                     and not line.lower().startswith(("chapter", "contents"))
                 ):
                     clean_lines.append(line)

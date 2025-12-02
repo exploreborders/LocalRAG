@@ -7,13 +7,14 @@ Tests progress tracking, callbacks, sub-operations, and batch processing.
 import time
 from unittest.mock import MagicMock
 
-import pytest
-
 from src.utils.progress_tracker import (
     BatchProgressTracker,
     ProgressInfo,
     ProgressTracker,
 )
+
+# pytest fixtures imported automatically
+
 
 
 class TestProgressInfo:

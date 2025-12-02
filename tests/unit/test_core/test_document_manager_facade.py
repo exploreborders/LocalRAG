@@ -146,3 +146,70 @@ class TestDocumentManagerFacade:
 
         # Could extend this to test tag/category assignment after processing
         # but that would require more complex mocking
+
+    def test_delete_document_success(self, mock_db_session):
+        """Test successful document deletion with index cleanup."""
+        from unittest.mock import MagicMock, patch
+
+        # Create a mock document
+        mock_document = MagicMock()
+        mock_document.id = 1
+        mock_document.filepath = "/tmp/test.pdf"
+
+        # Mock database queries
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_document
+        mock_db_session.query.return_value.filter.return_value.delete.return_value = None
+        mock_db_session.query.return_value.filter.return_value.all.return_value = []
+        mock_db_session.query.return_value.filter.return_value.count.return_value = 0
+
+        # Mock file operations and Elasticsearch
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("os.remove") as mock_remove,
+            patch("elasticsearch.Elasticsearch") as mock_es_class,
+        ):
+            # Mock Elasticsearch
+            mock_es = MagicMock()
+            mock_es_class.return_value = mock_es
+            mock_es.ping.return_value = True
+
+            manager = DocumentManager(mock_db_session)
+            result = manager.delete_document(1)
+
+            assert result is True
+            mock_db_session.commit.assert_called_once()
+            mock_remove.assert_called_once_with("/tmp/test.pdf")
+
+            # Verify Elasticsearch cleanup was called
+            mock_es.delete.assert_called_once_with(index="documents", id="1", ignore=[404])
+            mock_es.delete_by_query.assert_called_once()
+
+    def test_delete_document_not_found(self, mock_db_session):
+        """Test deletion of non-existent document."""
+        mock_db_session.query.return_value.filter.return_value.first.return_value = None
+
+        manager = DocumentManager(mock_db_session)
+        result = manager.delete_document(999)
+
+        assert result is False
+        mock_db_session.commit.assert_not_called()
+
+    def test_delete_document_with_error(self, mock_db_session):
+        """Test document deletion with database error."""
+        from unittest.mock import patch
+
+        # Document import not needed for these tests
+
+        mock_document = MagicMock()
+        mock_document.id = 1
+        mock_document.filepath = "/tmp/test.pdf"
+
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_document
+        mock_db_session.commit.side_effect = Exception("Database error")
+
+        with patch("os.path.exists", return_value=True):
+            manager = DocumentManager(mock_db_session)
+            result = manager.delete_document(1)
+
+            assert result is False
+            mock_db_session.rollback.assert_called_once()

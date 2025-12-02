@@ -1195,8 +1195,6 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
 
             # Detect potential headers (more flexible for OCR text)
             if len(line) < 200:  # Reasonable header length
-                line_lower = line.lower()
-
                 # Look for chapter/section indicators
                 is_header = False
                 level = 2  # Default to section level

@@ -104,6 +104,17 @@ class DatabaseRetriever:
             filters=filters,
         )
 
+        # If no results from enhanced search, try basic search without expansion
+        if not results:
+            logger.info(f"No results with enhanced search, trying basic search for: {query}")
+            results = self.hybrid_search(
+                query=query,
+                top_k=top_k,
+                expanded_tags=[],  # No expansion
+                expanded_categories=[],  # No expansion
+                filters=filters,
+            )
+
         return results
 
     def _build_enhanced_context(self, query: str, filters: Dict[str, Any]) -> Dict[str, Any]:
@@ -123,12 +134,42 @@ class DatabaseRetriever:
 
         # If no explicit filters, try to infer from query
         if not tag_names and not category_names:
-            # Simple keyword extraction (could be enhanced with NLP)
+            # Enhanced keyword extraction from the actual query
             query_lower = query.lower()
-            # This is a simplified approach - in production, use NLP for better extraction
             potential_tags = []
 
-            # Look for common academic/technical terms
+            # Extract meaningful multi-word terms (like "Object-Oriented Programming")
+            import re
+
+            # Handle "what is X" patterns - extract X as the main term
+            if query_lower.startswith(
+                ("what is", "what are", "explain", "define", "tell me about")
+            ):
+                # Remove question words and extract the main subject
+                clean_query = re.sub(
+                    r"^(what is|what are|explain|define|tell me about)\s+",
+                    "",
+                    query_lower,
+                )
+                # Extract the main subject (everything until end or common delimiters)
+                subject = clean_query.strip()
+                if subject and len(subject) > 3:  # Not too short
+                    potential_tags.insert(0, subject.title())  # Put at beginning for priority
+
+            # Find sequences of capitalized words (potential technical terms)
+            # More flexible pattern that handles hyphenated terms
+            capitalized_phrases = re.findall(r"\b[A-Z][a-z]+(?:[- ][A-Z][a-z]+)+\b", query)
+            for phrase in capitalized_phrases:
+                if len(phrase.replace("-", " ").split()) >= 2:  # At least 2 words
+                    potential_tags.append(phrase)
+
+            # Look for hyphenated technical terms (like "Object-Oriented")
+            hyphenated_terms = re.findall(r"\b[a-zA-Z]+-[a-zA-Z]+\b", query)
+            for term in hyphenated_terms:
+                if len(term) > 6:  # Substantial terms only
+                    potential_tags.append(term)
+
+            # Also look for common technical/academic terms
             academic_terms = [
                 "research",
                 "study",
@@ -136,21 +177,37 @@ class DatabaseRetriever:
                 "method",
                 "theory",
                 "model",
-            ]
-            technical_terms = [
-                "algorithm",
-                "implementation",
+                "programming",
+                "language",
                 "system",
                 "framework",
                 "architecture",
+                "algorithm",
+                "implementation",
+                "design",
+                "development",
+                "oriented",
             ]
 
-            for term in academic_terms + technical_terms:
+            for term in academic_terms:
                 if term in query_lower:
                     potential_tags.append(term.title())
 
+            # Extract noun phrases from the original query (not cleaned)
+            words = query.split()
+            for i in range(len(words) - 1):
+                if len(words[i]) > 3 and len(words[i + 1]) > 3:  # Skip short words
+                    phrase = f"{words[i]} {words[i + 1]}"
+                    # Avoid common stop word combinations
+                    if not any(
+                        stop in phrase.lower() for stop in ["is a", "what is", "how to", "the way"]
+                    ):
+                        potential_tags.append(phrase.title())
+
+            # Remove duplicates and limit
+            potential_tags = list(set(potential_tags))  # Remove duplicates
             if potential_tags:
-                tag_names = potential_tags[:3]  # Limit to avoid over-expansion
+                tag_names = potential_tags[:5]  # Allow more tags for better matching
 
         # Expand context using knowledge graph
         expanded_context = self.knowledge_graph.expand_query_context(
@@ -199,47 +256,64 @@ class DatabaseRetriever:
             filters or {},
         )
 
-        # Execute search
+        # Execute search with adaptive sizing
         try:
             es_client = self._get_es_client()
-            response = es_client.search(
-                index="chunks",
-                body=es_query,
-                size=top_k * 2,  # Get more results for reranking
-            )
 
-            # Process results
+            # Start with a reasonable size and increase if needed
+            current_size = max(top_k * 3, 20)  # Start with at least 20 results
+            max_size = 200  # Don't exceed this to avoid performance issues
             results = []
-            for hit in response["hits"]["hits"]:
-                source = hit["_source"]
-                score = hit["_score"]
 
-                # Get document metadata
-                doc_id = source.get("document_id")
-                document = self.db.query(Document).filter(Document.id == doc_id).first()
+            while len(results) < top_k and current_size <= max_size:
+                response = es_client.search(
+                    index="chunks",
+                    body=es_query,
+                    size=current_size,
+                )
 
-                if document:
-                    result = {
-                        "chunk_id": hit["_id"],
-                        "content": source.get("content", ""),
-                        "score": score,
-                        "document_title": document.filename,
-                        "document_id": doc_id,
-                        "tags": [
-                            tag_assignment.tag.name
-                            for tag_assignment in document.tags
-                            if tag_assignment.tag
-                        ],
-                        "categories": [
-                            cat_assignment.category.name
-                            for cat_assignment in document.categories
-                            if cat_assignment.category
-                        ],
-                        "metadata": source.get("metadata", {}),
-                        "chapter_title": source.get("metadata", {}).get("chapter_title"),
-                        "chapter_path": source.get("metadata", {}).get("chapter_path"),
-                    }
-                    results.append(result)
+                # Process results
+                for hit in response["hits"]["hits"]:
+                    source = hit["_source"]
+                    score = hit["_score"]
+
+                    # Get document metadata
+                    doc_id = source.get("document_id")
+                    document = self.db.query(Document).filter(Document.id == doc_id).first()
+
+                    if document:
+                        result = {
+                            "chunk_id": hit["_id"],
+                            "content": source.get("content", ""),
+                            "score": score,
+                            "document_title": document.filename,
+                            "document_id": doc_id,
+                            "tags": [
+                                tag_assignment.tag.name
+                                for tag_assignment in document.tags
+                                if tag_assignment.tag
+                            ],
+                            "categories": [
+                                cat_assignment.category.name
+                                for cat_assignment in document.categories
+                                if cat_assignment.category
+                            ],
+                            "metadata": source.get("metadata", {}),
+                            "chapter_title": source.get("metadata", {}).get("chapter_title"),
+                            "chapter_path": source.get("metadata", {}).get("chapter_path"),
+                        }
+                        results.append(result)
+
+                        # Stop if we have enough results
+                        if len(results) >= top_k:
+                            break
+
+                # If we still don't have enough results, increase the search size
+                if len(results) < top_k:
+                    current_size = min(current_size * 2, max_size)
+                    logger.info(
+                        f"Insufficient results ({len(results)} < {top_k}), expanding search to {current_size} results"
+                    )
 
             # Rerank and return top_k
             return self._rerank_results(results, query, top_k)
@@ -436,6 +510,19 @@ class RAGPipelineDB:
             retrieved_docs = self.retriever.retrieve_with_knowledge_graph(
                 question, top_k=top_k, filters=filters
             )
+
+            # If no results found, try a simpler search approach
+            if not retrieved_docs:
+                logger.info(
+                    f"No results found with enhanced search, trying fallback for: {question}"
+                )
+                # Try with minimal filters to get any relevant content
+                fallback_docs = self.retriever.retrieve_with_knowledge_graph(
+                    question, top_k=top_k, filters={}
+                )
+                if fallback_docs:
+                    retrieved_docs = fallback_docs
+                    logger.info(f"Fallback search found {len(fallback_docs)} results")
 
             if not retrieved_docs:
                 result = {

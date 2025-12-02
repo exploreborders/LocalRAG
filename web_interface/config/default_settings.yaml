@@ -2,15 +2,15 @@ interface:
   theme: light
   max_results_display: 5
 retrieval:
-   chunk_size: 1000
-   chunk_overlap: 200
-   k_retrieval: 3
-   embedding_model: embeddinggemma:latest
-   embedding_backend: ollama
+  chunk_size: 1000
+  chunk_overlap: 200
+  k_retrieval: 6
+  embedding_model: embeddinggemma:latest
+  embedding_backend: ollama
 generation:
   model: llama3.2
-  temperature: 0.7
-  max_tokens: 500
+  temperature: 0.4
+  max_tokens: 1500
   ollama_host: http://localhost:11434
   ollama_port: 11434
 system:
