@@ -7,7 +7,7 @@ for tag display and management.
 
 import hashlib
 import random
-from typing import Any, Dict, List, Optional, Set
+from typing import List, Optional, Set
 
 
 class TagColorManager:
@@ -104,7 +104,9 @@ class TagColorManager:
         color_index = hash_int % len(self.PROFESSIONAL_PALETTE)
         return self.PROFESSIONAL_PALETTE[color_index]
 
-    def get_similar_color(self, base_color: str, used_colors: Optional[Set[str]] = None) -> str:
+    def get_similar_color(
+        self, base_color: str, used_colors: Optional[Set[str]] = None
+    ) -> str:
         """
         Find a visually similar but distinct color.
 
