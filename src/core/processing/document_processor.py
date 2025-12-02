@@ -128,7 +128,7 @@ class DocumentProcessor(BaseProcessor):
         Generate an AI-powered document summary.
 
         Args:
-            content: Document content sample
+            content: Full document content
             filename: Document filename
             tags: Generated tags
             chapters_count: Number of chapters detected
@@ -137,11 +137,14 @@ class DocumentProcessor(BaseProcessor):
             AI-generated document summary
         """
         try:
+            # Extract meaningful content for summarization (skip TOC, find actual content)
+            meaningful_content = self._extract_meaningful_content_for_analysis(content)
+
             # Create a comprehensive summary prompt
             summary_prompt = f"""
             Create a concise but informative summary of this document in 2-3 sentences.
 
-            Content preview: {content[:2000]}
+            Content preview: {meaningful_content[:3000]}
             Tags: {", ".join(tags[:5])}  # Limit tags for prompt
 
             Focus on:
@@ -151,7 +154,6 @@ class DocumentProcessor(BaseProcessor):
             - Target audience and skill level
             - Overall structure and approach
 
-            If this appears to be a table of contents or outline, look for the actual content that follows.
             Summary should be professional and informative. Do not mention the filename.
             """
 
@@ -294,11 +296,8 @@ class DocumentProcessor(BaseProcessor):
             with open(file_path, "rb") as f:
                 file_hash = hashlib.sha256(f.read()).hexdigest()
 
-            # Generate tags using AI - extract meaningful content, skipping TOC
-            full_content = results.get("extracted_content", "")
-
-            # Try to find actual content by skipping table of contents
-            content_for_analysis = self._extract_meaningful_content_for_analysis(full_content)
+            # Generate tags using AI - use full document content for comprehensive analysis
+            content_for_analysis = doc_content  # Use full content for better AI analysis
             suggested_tags_data = self.tag_suggester.suggest_tags(
                 content_for_analysis, filename or os.path.basename(file_path)
             )
@@ -1240,39 +1239,47 @@ class DocumentProcessor(BaseProcessor):
         if len(full_content) < 2000:
             return full_content
 
-        # For longer documents, try to find content beyond TOC
-        # Look for patterns that indicate actual chapter content
+        # For longer documents, sample from known content areas
         content_parts = []
 
-        # Method 1: Look for chapter headers followed by substantial content
-        lines = full_content.split("\n")
-        in_content_section = False
+        # Direct sampling: skip TOC and get content from chapters
+        # Sample from Chapter 1 area
+        chapter1_pos = full_content.find("Chapter 1")
+        if chapter1_pos != -1:
+            start_pos = chapter1_pos
+            end_pos = min(len(full_content), start_pos + 2500)
+            chapter1_content = full_content[start_pos:end_pos]
+            # Clean up the content (remove headers, TOC artifacts)
+            lines = chapter1_content.split("\n")
+            clean_lines = []
+            for line in lines:
+                line = line.strip()
+                # Skip TOC-like lines and very short lines
+                if (
+                    len(line) > 20
+                    and not line.startswith("|")
+                    and not "|" in line[:50]  # Avoid TOC table rows
+                    and not line.lower().startswith(("chapter", "contents"))
+                ):
+                    clean_lines.append(line)
+            if clean_lines:
+                content_parts.append(" ".join(clean_lines[:10]))  # First 10 substantial lines
 
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
+        # Sample from middle of document
+        if len(full_content) > 50000:
+            middle_start = len(full_content) // 2
+            middle_content = full_content[middle_start : middle_start + 2000]
+            # Clean middle content too
+            middle_lines = [
+                line.strip()
+                for line in middle_content.split("\n")
+                if len(line.strip()) > 20 and not line.strip().startswith("|")
+            ]
+            if middle_lines:
+                content_parts.append(" ".join(middle_lines[:5]))
 
-            # Detect chapter headers (not TOC headers)
-            if (
-                line.startswith("#")
-                and len(line) > 15  # Substantial header
-                and not any(
-                    toc_word in line.lower() for toc_word in ["contents", "table of contents"]
-                )
-                and not re.match(r"^#\s*\d+\s*$", line)
-            ):  # Not just "# 1"
-                in_content_section = True
-                continue
-
-            # If we're in a content section, collect substantial content
-            if in_content_section and len(line) > 30 and not line.startswith("|"):
-                content_parts.append(line)
-                if len(content_parts) >= 8:  # Got enough content samples
-                    break
-
-        # Method 2: If no chapter content found, use multi-section sampling
-        if len(content_parts) < 3:
+        # If we still don't have enough content, fall back to multi-section sampling
+        if len(content_parts) < 2:
             if len(full_content) > 15000:
                 # Sample from beginning, middle, and end
                 content_parts = [
