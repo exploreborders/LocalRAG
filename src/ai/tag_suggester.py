@@ -61,14 +61,18 @@ class AITagSuggester:
                 },
             }
 
-            response = requests.post(f"{self.base_url}/api/generate", json=payload, timeout=30)
+            response = requests.post(
+                f"{self.base_url}/api/generate", json=payload, timeout=30
+            )
 
             if response.status_code == 200:
                 result = response.json()
                 response_text = result.get("response", "")
                 return str(response_text).strip()
             else:
-                logger.error(f"LLM call failed: {response.status_code} - {response.text}")
+                logger.error(
+                    f"LLM call failed: {response.status_code} - {response.text}"
+                )
                 return ""
 
         except Exception as e:
@@ -101,7 +105,9 @@ class AITagSuggester:
         analysis_content = self._prepare_content(document_content)
 
         # Generate tag suggestions
-        raw_suggestions = self._generate_tag_suggestions(analysis_content, document_title)
+        raw_suggestions = self._generate_tag_suggestions(
+            analysis_content, document_title
+        )
 
         # Parse and clean suggestions
         parsed_tags = self._parse_tag_response(raw_suggestions)
@@ -215,7 +221,9 @@ class AITagSuggester:
 
         return unique_tags
 
-    def _filter_existing_tags(self, suggestions: List[str], existing_tags: List[str]) -> List[str]:
+    def _filter_existing_tags(
+        self, suggestions: List[str], existing_tags: List[str]
+    ) -> List[str]:
         """
         Filter out tags that already exist.
 
@@ -325,35 +333,6 @@ class AITagSuggester:
 
         return confidence
 
-    def get_tag_suggestions_for_documents(
-        self, documents: List[Dict[str, Any]], max_per_document: int = 3
-    ) -> Dict[int, List[Dict[str, Any]]]:
-        """
-        Generate tag suggestions for multiple documents.
-
-        Args:
-            documents: List of document dicts with 'id', 'content', 'title', 'existing_tags'
-            max_per_document: Maximum suggestions per document
-
-        Returns:
-            Dict mapping document_id to list of tag suggestions
-        """
-        results = {}
-
-        for doc in documents:
-            doc_id = doc["id"]
-            content = doc.get("content", "")
-            title = doc.get("title", "")
-            existing_tags = doc.get("existing_tags", [])
-
-            suggestions = self.suggest_tags(content, title, existing_tags, max_per_document)
-
-            if suggestions:
-                results[doc_id] = suggestions
-
-        return results
-
-    def analyze_tag_patterns(self, document_content: str) -> Dict[str, Any]:
         """
         Analyze document content to understand tagging patterns and themes.
 

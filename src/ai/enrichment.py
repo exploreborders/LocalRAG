@@ -32,7 +32,9 @@ class AIEnrichmentService:
             try:
                 from langchain_ollama import OllamaLLM
 
-                self.llm_client = OllamaLLM(model="llama3.2:latest")  # Use available model
+                self.llm_client = OllamaLLM(
+                    model="llama3.2:latest"
+                )  # Use available model
             except ImportError:
                 print("⚠️ Ollama LLM not available for AI enrichment")
                 self.llm_client = None
@@ -189,7 +191,9 @@ class AIEnrichmentService:
         topics = topics[:4]  # Limit to 4 topics
 
         # AI-powered category classification
-        category_data = self._classify_document_category(analysis_content, filename, tags, topics)
+        category_data = self._classify_document_category(
+            analysis_content, filename, tags, topics
+        )
 
         # Estimate reading time (rough calculation: 200 words per minute)
         word_count = len(re.findall(r"\w+", content))
@@ -277,7 +281,9 @@ class AIEnrichmentService:
         """
 
         subcategory_response = self._call_llm(subcategory_prompt, max_tokens=50).strip()
-        subcategories = [s.strip() for s in subcategory_response.split(",") if s.strip()]
+        subcategories = [
+            s.strip() for s in subcategory_response.split(",") if s.strip()
+        ]
 
         # Clean subcategory names - extract actual category names
         cleaned_subcategories = []
@@ -301,7 +307,9 @@ class AIEnrichmentService:
         Return format: Category1:0.8, Category2:0.6
         """
 
-        alternatives_response = self._call_llm(alternatives_prompt, max_tokens=40).strip()
+        alternatives_response = self._call_llm(
+            alternatives_prompt, max_tokens=40
+        ).strip()
         alternatives = []
         for alt in alternatives_response.split(","):
             if ":" in alt:
@@ -310,7 +318,9 @@ class AIEnrichmentService:
                     score_val = float(score.strip())
                     cleaned_cat = self._clean_category_name(cat.strip())
                     if cleaned_cat:
-                        alternatives.append({"category": cleaned_cat, "confidence": score_val})
+                        alternatives.append(
+                            {"category": cleaned_cat, "confidence": score_val}
+                        )
                 except ValueError:
                     continue
 
@@ -381,7 +391,9 @@ class AIEnrichmentService:
             "these",
             "those",
         ]
-        if len(cleaned.split()) <= 1 or any(word in cleaned.lower() for word in skip_words):
+        if len(cleaned.split()) <= 1 or any(
+            word in cleaned.lower() for word in skip_words
+        ):
             return ""
 
         # Capitalize properly (title case for category names)
@@ -410,8 +422,12 @@ class AIEnrichmentService:
                 "ai_enriched": True,
                 "word_count": enrichment_data.get("word_count"),
                 "ai_generated_at": enrichment_data.get("generated_at"),
-                "ai_category_confidence": enrichment_data.get("category_confidence", 0.0),
-                "ai_alternative_categories": enrichment_data.get("alternative_categories", []),
+                "ai_category_confidence": enrichment_data.get(
+                    "category_confidence", 0.0
+                ),
+                "ai_alternative_categories": enrichment_data.get(
+                    "alternative_categories", []
+                ),
             }
         )
         document.custom_metadata = custom_metadata
@@ -446,7 +462,9 @@ class AIEnrichmentService:
 
                 # Add category to document if not already assigned
                 if category:
-                    self.category_manager.add_category_to_document(document.id, category.id)
+                    self.category_manager.add_category_to_document(
+                        document.id, category.id
+                    )
 
                     # Create subcategories if provided
                     parent_id = category.id
@@ -461,7 +479,9 @@ class AIEnrichmentService:
                                 parent_id=parent_id,
                             )
                         if subcat:
-                            self.category_manager.add_category_to_document(document.id, subcat.id)
+                            self.category_manager.add_category_to_document(
+                                document.id, subcat.id
+                            )
 
             except Exception as e:
                 print(f"Warning: Failed to add AI categories: {e}")
@@ -489,32 +509,6 @@ class AIEnrichmentService:
         except Exception as e:
             print(f"LLM call failed: {e}")
             return "Error generating response"
-
-    def get_document_summary(self, document_id: int) -> Optional[str]:
-        """
-        Get AI-generated summary for a document.
-
-        Args:
-            document_id: Document ID
-
-        Returns:
-            Summary text or None if not available
-        """
-        document = self.db.query(Document).filter(Document.id == document_id).first()
-        return document.document_summary if document else None
-
-    def get_document_topics(self, document_id: int) -> List[str]:
-        """
-        Get AI-extracted topics for a document.
-
-        Args:
-            document_id: Document ID
-
-        Returns:
-            List of topics
-        """
-        document = self.db.query(Document).filter(Document.id == document_id).first()
-        return document.key_topics if document and document.key_topics else []
 
     def batch_enrich_documents(
         self, document_ids: List[int], force: bool = False
@@ -547,55 +541,3 @@ class AIEnrichmentService:
             "failed": failed,
             "results": results,
         }
-
-    def find_similar_documents(self, document_id: int, limit: int = 5) -> List[Dict[str, Any]]:
-        """
-        Find documents similar to the given document based on AI-generated topics and tags.
-
-        Args:
-            document_id: Source document ID
-            limit: Maximum number of similar documents to return
-
-        Returns:
-            List of similar documents with similarity scores
-        """
-        document = self.db.query(Document).filter(Document.id == document_id).first()
-        if not document:
-            return []
-
-        # Get source document's tags and topics
-        source_tags = [tag.name for tag in document.tags]
-        source_topics = []
-        if document.custom_metadata:
-            source_topics = document.custom_metadata.get("topics", [])
-
-        # Find documents with overlapping tags/topics
-        similar_docs = []
-        all_docs = self.db.query(Document).filter(Document.id != document_id).all()
-
-        for doc in all_docs:
-            score = 0
-            doc_tags = [tag.name for tag in doc.tags]
-            doc_topics = []
-            if doc.custom_metadata:
-                doc_topics = doc.custom_metadata.get("topics", [])
-
-            # Calculate similarity score
-            tag_overlap = len(set(source_tags) & set(doc_tags))
-            topic_overlap = len(set(source_topics) & set(doc_topics))
-
-            score = tag_overlap * 2 + topic_overlap * 3  # Weight topics higher
-
-            if score > 0:
-                similar_docs.append(
-                    {
-                        "document": doc,
-                        "score": score,
-                        "shared_tags": list(set(source_tags) & set(doc_tags)),
-                        "shared_topics": list(set(source_topics) & set(doc_topics)),
-                    }
-                )
-
-        # Sort by score and return top results
-        similar_docs.sort(key=lambda x: x["score"], reverse=True)
-        return similar_docs[:limit]
