@@ -440,7 +440,7 @@ class UploadProcessor(BaseProcessor):
                                 document_id=existing_doc.id,
                                 content=content,
                                 chunk_index=i,  # Use sequential index starting from 0
-                                embedding_model="nomic-ai/nomic-embed-text-v1.5",
+                                embedding_model=self.embedding_model,
                                 chapter_path=chunk_data.get("chapter_path"),
                                 chapter_title=chunk_data.get("chapter_title"),
                             )
@@ -519,7 +519,7 @@ class UploadProcessor(BaseProcessor):
                                         doc_embedding = DocumentEmbedding(
                                             chunk_id=chunk.id,
                                             embedding=embedding.tolist(),
-                                            embedding_model="nomic-ai/nomic-embed-text-v1.5",
+                                            embedding_model=self.embedding_model,
                                         )
                                         self.db.add(doc_embedding)
                                     except Exception as embed_error:

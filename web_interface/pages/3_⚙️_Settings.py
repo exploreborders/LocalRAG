@@ -477,10 +477,10 @@ def main():
                     old_embedding_model = (
                         st.session_state.get("settings", {})
                         .get("retrieval", {})
-                        .get("embedding_model", "nomic-ai/nomic-embed-text-v1.5")
+                        .get("embedding_model", "embeddinggemma:latest")
                     )
                     current_embedding_model = settings.get("retrieval", {}).get(
-                        "embedding_model", "nomic-ai/nomic-embed-text-v1.5"
+                        "embedding_model", "embeddinggemma:latest"
                     )
                     if current_embedding_model != old_embedding_model:
                         st.warning(

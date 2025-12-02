@@ -529,7 +529,7 @@ class DocumentProcessor(BaseProcessor):
                     document_id=document.id,
                     chunk_index=i,
                     content=chunk_data["content"],
-                    embedding_model="nomic-ai/nomic-embed-text-v1.5",
+                    embedding_model=config.models.embedding_model,
                     chapter_title=metadata.get("chapter_title"),
                     chapter_path=metadata.get("chapter_path"),
                 )
@@ -541,7 +541,7 @@ class DocumentProcessor(BaseProcessor):
                     embedding_record = DocumentEmbedding(
                         chunk_id=chunk.id,
                         embedding=embeddings_array[i].tolist(),
-                        embedding_model="nomic-ai/nomic-embed-text-v1.5",
+                        embedding_model=config.models.embedding_model,
                     )
                     self.db.add(embedding_record)
 
