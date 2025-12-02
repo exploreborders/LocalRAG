@@ -45,9 +45,7 @@ class TestDocumentManagementIntegration:
 
         sys.path.insert(
             0,
-            os.path.join(
-                os.path.dirname(__file__), "..", "..", "web_interface", "pages"
-            ),
+            os.path.join(os.path.dirname(__file__), "..", "..", "web_interface", "pages"),
         )
 
         # Import the function dynamically to avoid import issues
@@ -108,9 +106,7 @@ class TestDocumentManagementIntegration:
 
             # Mock ES search to return orphaned chunks
             mock_es.search.return_value = {
-                "hits": {
-                    "hits": [{"_source": {"document_id": 999}}]
-                }  # Non-existent document
+                "hits": {"hits": [{"_source": {"document_id": 999}}]}  # Non-existent document
             }
 
             manager = DocumentManager(mock_db_session)
@@ -120,9 +116,7 @@ class TestDocumentManagementIntegration:
             assert results["orphaned_chunks_removed"] > 0
             mock_options.delete_by_query.assert_called()
 
-    def test_synchronize_indices_reindexes_missing_documents(
-        self, mock_db_session, mock_document
-    ):
+    def test_synchronize_indices_reindexes_missing_documents(self, mock_db_session, mock_document):
         """Test that synchronize_indices re-indexes documents missing from ES."""
         # Setup mock database with one document
         mock_db_session.query.return_value.all.return_value = [mock_document]
@@ -140,21 +134,13 @@ class TestDocumentManagementIntegration:
             results = manager.synchronize_indices()
 
             # Verify document was re-indexed
-            assert (
-                results["documents_indexed"] >= 0
-            )  # May be 0 if reindexing fails gracefully
+            assert results["documents_indexed"] >= 0  # May be 0 if reindexing fails gracefully
 
-    def test_delete_document_with_es_cleanup(
-        self, mock_db_session, mock_document, temp_file
-    ):
+    def test_delete_document_with_es_cleanup(self, mock_db_session, mock_document, temp_file):
         """Test individual document deletion with Elasticsearch cleanup."""
         # Setup mock database queries
-        mock_db_session.query.return_value.filter.return_value.first.return_value = (
-            mock_document
-        )
-        mock_db_session.query.return_value.filter.return_value.delete.return_value = (
-            None
-        )
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_document
+        mock_db_session.query.return_value.filter.return_value.delete.return_value = None
         mock_db_session.query.return_value.filter.return_value.all.return_value = []
         mock_db_session.query.return_value.filter.return_value.count.return_value = 0
 
@@ -193,9 +179,7 @@ class TestDocumentManagementIntegration:
 
     def test_delete_document_with_database_error(self, mock_db_session, mock_document):
         """Test document deletion with database error."""
-        mock_db_session.query.return_value.filter.return_value.first.return_value = (
-            mock_document
-        )
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_document
         mock_db_session.commit.side_effect = Exception("Database error")
 
         with patch("os.path.exists", return_value=True):

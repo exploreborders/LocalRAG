@@ -65,14 +65,10 @@ class TestDocumentManagerFacade:
     def test_category_operations_delegation(self, document_manager):
         """Test that category operations are properly delegated."""
         # Mock the category manager methods
-        document_manager.category_manager.get_category_by_name.return_value = (
-            MagicMock()
-        )
+        document_manager.category_manager.get_category_by_name.return_value = MagicMock()
         document_manager.category_manager.create_category.return_value = MagicMock()
         document_manager.category_manager.add_category_to_document.return_value = True
-        document_manager.category_manager.remove_category_from_document.return_value = (
-            True
-        )
+        document_manager.category_manager.remove_category_from_document.return_value = True
         document_manager.category_manager.get_document_categories.return_value = []
         document_manager.category_manager.get_category_hierarchy.return_value = []
         document_manager.category_manager.get_root_categories.return_value = []
@@ -93,9 +89,7 @@ class TestDocumentManagerFacade:
     def test_document_processing_delegation(self, document_manager):
         """Test that document processing is properly delegated."""
         expected_result = {"success": True, "document_id": 1}
-        document_manager.document_processor.process_document.return_value = (
-            expected_result
-        )
+        document_manager.document_processor.process_document.return_value = expected_result
 
         result = document_manager.process_document("/tmp/test.pdf")
 
@@ -163,12 +157,8 @@ class TestDocumentManagerFacade:
         mock_document.filepath = "/tmp/test.pdf"
 
         # Mock database queries
-        mock_db_session.query.return_value.filter.return_value.first.return_value = (
-            mock_document
-        )
-        mock_db_session.query.return_value.filter.return_value.delete.return_value = (
-            None
-        )
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_document
+        mock_db_session.query.return_value.filter.return_value.delete.return_value = None
         mock_db_session.query.return_value.filter.return_value.all.return_value = []
         mock_db_session.query.return_value.filter.return_value.count.return_value = 0
 
@@ -217,9 +207,7 @@ class TestDocumentManagerFacade:
         mock_document.id = 1
         mock_document.filepath = "/tmp/test.pdf"
 
-        mock_db_session.query.return_value.filter.return_value.first.return_value = (
-            mock_document
-        )
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_document
         mock_db_session.commit.side_effect = Exception("Database error")
 
         with patch("os.path.exists", return_value=True):
