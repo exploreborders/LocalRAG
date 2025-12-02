@@ -13,8 +13,6 @@ from src.utils.progress_tracker import (
     BatchProgressTracker,
     ProgressInfo,
     ProgressTracker,
-    create_progress_callback,
-    track_progress,
 )
 
 
@@ -113,26 +111,6 @@ class TestProgressTracker:
         tracker.update(increment=False)  # Should not increment
         assert tracker.current_step == 3
 
-    def test_start_sub_operation(self):
-        """Test starting sub-operations."""
-        tracker = ProgressTracker("main", 10)
-        sub_tracker = tracker.start_sub_operation("sub", 5)
-
-        assert "sub" in tracker.sub_operations
-        assert tracker.sub_operations["sub"] == sub_tracker
-        assert sub_tracker.operation == "main:sub"
-        assert sub_tracker.total_steps == 5
-
-    def test_complete_sub_operation(self):
-        """Test completing sub-operations."""
-        tracker = ProgressTracker("main", 10)
-        tracker.start_sub_operation("sub", 5)
-
-        assert "sub" in tracker.sub_operations
-
-        tracker.complete_sub_operation("sub")
-        assert "sub" not in tracker.sub_operations
-
     def test_get_progress_info(self):
         """Test getting progress information."""
         tracker = ProgressTracker("test", 10)
@@ -148,12 +126,10 @@ class TestProgressTracker:
         """Test resetting the progress tracker."""
         tracker = ProgressTracker("test", 10)
         tracker.current_step = 5
-        tracker.start_sub_operation("sub", 5)
 
         tracker.reset()
 
         assert tracker.current_step == 0
-        assert tracker.sub_operations == {}
 
     def test_callback_error_handling(self):
         """Test that callback errors don't break progress tracking."""
@@ -229,56 +205,3 @@ class TestBatchProgressTracker:
 
 class TestProgressUtilities:
     """Test progress utility functions."""
-
-    def test_create_progress_callback(self):
-        """Test creating a progress callback."""
-        callback = create_progress_callback("test_operation")
-
-        # Callback should be callable
-        assert callable(callback)
-
-        # Test the callback
-        info = ProgressInfo(
-            operation="test_operation",
-            current=50.0,
-            estimated_time_remaining=5.0,
-        )
-
-        # Should not raise exception
-        callback(info)
-
-    def test_track_progress_context_manager(self):
-        """Test the track_progress context manager."""
-        callback = MagicMock()
-
-        with track_progress("test_operation", 10, callback) as tracker:
-            assert isinstance(tracker, ProgressTracker)
-            assert tracker.operation == "test_operation"
-            assert tracker.total_steps == 10
-
-            # Check initial callback
-            assert callback.call_count == 1
-            args = callback.call_args[0][0]
-            assert "Starting test_operation" in args.message
-
-        # Check completion callback
-        assert callback.call_count == 2
-        args = callback.call_args[0][0]
-        assert "Completed test_operation" in args.message
-
-    def test_track_progress_exception_handling(self):
-        """Test exception handling in track_progress."""
-        callback = MagicMock()
-
-        with pytest.raises(ValueError):
-            with track_progress("test_operation", 10, callback) as _:
-                # Check initial callback
-                assert callback.call_count == 1
-
-                # Raise exception
-                raise ValueError("Test error")
-
-        # Check error callback
-        assert callback.call_count == 2
-        args = callback.call_args[0][0]
-        assert "Failed test_operation: Test error" in args.message

@@ -181,43 +181,6 @@ class TestTagColorManager:
         assert manager.validate_hex_color("#12345") is False  # Wrong length
         assert manager.validate_hex_color("not-a-color") is False
 
-    def test_get_category_colors(self):
-        """Test getting semantic category colors."""
-        manager = TagColorManager()
-
-        categories = manager.get_category_colors()
-        assert isinstance(categories, dict)
-        assert "academic" in categories
-        assert "medical" in categories
-        assert categories["academic"] == "#007bff"  # Blue
-
-    def test_suggest_colors_for_tags(self):
-        """Test suggesting colors for multiple tags."""
-        manager = TagColorManager()
-
-        tags = ["academic", "medical", "technical"]
-        suggestions = manager.suggest_colors_for_tags(tags)
-
-        assert len(suggestions) == 3
-        assert all(tag in suggestions for tag in tags)
-        assert all(color in manager.PROFESSIONAL_PALETTE for color in suggestions.values())
-
-        # Should have unique colors
-        colors = list(suggestions.values())
-        assert len(set(colors)) == len(colors)
-
-    def test_suggest_colors_for_tags_with_duplicates(self):
-        """Test color uniqueness when hash collisions occur."""
-        manager = TagColorManager()
-
-        # Create tags that might hash to similar values
-        tags = ["tag1", "tag2", "tag3", "tag4", "tag5"]
-        suggestions = manager.suggest_colors_for_tags(tags)
-
-        # Should still have unique colors
-        colors = list(suggestions.values())
-        assert len(set(colors)) == len(colors)
-
     def test_hex_to_hue(self):
         """Test hex to hue conversion."""
         manager = TagColorManager()
@@ -243,27 +206,6 @@ class TestTagColorManager:
 
         hue = manager._hex_to_hue("#gggggg")
         assert hue == 0.0
-
-    def test_get_color_info(self):
-        """Test getting detailed color information."""
-        manager = TagColorManager()
-
-        info = manager.get_color_info("#007bff")
-        assert info["hex"] == "#007bff"
-        assert "contrast_text" in info
-        assert "hue" in info
-        assert "is_reserved" in info
-        assert isinstance(info["hue"], float)
-
-    def test_get_color_info_reserved(self):
-        """Test color info for reserved colors."""
-        manager = TagColorManager()
-
-        info = manager.get_color_info("#dc3545")  # Red (important/reserved)
-        assert info["is_reserved"] is True
-
-        info = manager.get_color_info("#007bff")  # Blue (not reserved)
-        assert info["is_reserved"] is False
 
     def test_generate_color_edge_cases(self):
         """Test color generation with edge cases."""
@@ -330,25 +272,6 @@ class TestTagColorManager:
         assert manager.validate_hex_color("#123") is True
         assert manager.validate_hex_color("#ABCDEF") is True
 
-    def test_suggest_colors_for_tags_edge_cases(self):
-        """Test color suggestion with edge cases."""
-        manager = TagColorManager()
-
-        # Test with empty list
-        suggestions = manager.suggest_colors_for_tags([])
-        assert suggestions == {}
-
-        # Test with single tag
-        suggestions = manager.suggest_colors_for_tags(["single"])
-        assert len(suggestions) == 1
-        assert "single" in suggestions
-
-        # Test with duplicate tags
-        suggestions = manager.suggest_colors_for_tags(["tag1", "tag1", "tag2"])
-        assert len(suggestions) == 2  # Should not duplicate colors for same tag
-        colors = list(suggestions.values())
-        assert len(set(colors)) == len(colors)  # All colors should be unique
-
     def test_hex_to_hue_edge_cases(self):
         """Test hex to hue conversion with edge cases."""
         manager = TagColorManager()
@@ -362,22 +285,6 @@ class TestTagColorManager:
         assert manager._hex_to_hue("invalid") == 0.0
         assert manager._hex_to_hue("#gggggg") == 0.0
         assert manager._hex_to_hue("#12") == 0.0
-
-    def test_get_color_info_comprehensive(self):
-        """Test comprehensive color information retrieval."""
-        manager = TagColorManager()
-
-        info = manager.get_color_info("#dc3545")  # Red (important/reserved)
-
-        assert info["hex"] == "#dc3545"
-        assert info["is_reserved"] is True
-        assert "contrast_text" in info
-        assert "hue" in info
-        assert isinstance(info["hue"], float)
-
-        # Test non-reserved color
-        info = manager.get_color_info("#007bff")  # Blue
-        assert info["is_reserved"] is False
 
     def test_color_palette_comprehensive(self):
         """Test comprehensive color palette functionality."""
@@ -394,19 +301,3 @@ class TestTagColorManager:
         # All colors should be valid hex
         for color in palette + palette_with_bg:
             assert manager.validate_hex_color(color)
-
-    def test_semantic_colors_mapping(self):
-        """Test semantic color mappings."""
-        manager = TagColorManager()
-
-        categories = manager.get_category_colors()
-
-        # Should have expected categories
-        expected_categories = ["academic", "medical", "technical", "business"]
-        for category in expected_categories:
-            assert category in categories
-            assert manager.validate_hex_color(categories[category])
-
-        # Should be consistent
-        categories2 = manager.get_category_colors()
-        assert categories == categories2

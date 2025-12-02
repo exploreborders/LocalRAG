@@ -15,8 +15,6 @@ from src.utils.rate_limiter import (
     CircuitBreakerOpen,
     RateLimiter,
     RateLimitInfo,
-    rate_limit_context,
-    rate_limited,
 )
 
 
@@ -339,87 +337,3 @@ class TestCircuitBreaker:
 
 class TestRateLimiterDecorators:
     """Test rate limiter decorators and context managers."""
-
-    def test_rate_limited_decorator_success(self):
-        """Test rate limited decorator with successful calls."""
-        limiter = RateLimiter(requests_per_minute=10)
-
-        @rate_limited(limiter, tokens=1, wait=False)
-        def test_func():
-            return "success"
-
-        result = test_func()
-        assert result == "success"
-
-    def test_rate_limited_decorator_rate_limited(self):
-        """Test rate limited decorator when rate limited."""
-        limiter = RateLimiter(requests_per_minute=1)
-        limiter.acquire()  # Use up the token
-
-        @rate_limited(limiter, tokens=1, wait=False)
-        def test_func():
-            return "success"
-
-        with pytest.raises(RuntimeError, match="Rate limit exceeded"):
-            test_func()
-
-    def test_rate_limited_decorator_with_wait(self):
-        """Test rate limited decorator with waiting."""
-        limiter = RateLimiter(burst_limit=1, burst_window_seconds=1)
-
-        @rate_limited(limiter, tokens=1, wait=True, timeout=1.0)
-        def test_func():
-            return "success"
-
-        # First call should succeed
-        result1 = test_func()
-        assert result1 == "success"
-
-        # Second call should wait and succeed after burst reset
-        result2 = test_func()
-        assert result2 == "success"
-
-    def test_rate_limit_context_success(self):
-        """Test rate limit context manager success."""
-        limiter = RateLimiter(requests_per_minute=10)
-
-        with rate_limit_context(limiter, tokens=1, wait=False):
-            assert True  # Should not raise
-
-    def test_rate_limit_context_rate_limited(self):
-        """Test rate limit context manager when rate limited."""
-        limiter = RateLimiter(requests_per_minute=1)
-        limiter.acquire()  # Use up token
-
-        with pytest.raises(RuntimeError, match="Rate limit exceeded"):
-            with rate_limit_context(limiter, tokens=1, wait=False):
-                pass
-
-    def test_adaptive_rate_limiter_integration(self):
-        """Test adaptive rate limiter with decorator."""
-        limiter = AdaptiveRateLimiter(requests_per_minute=10)
-
-        @rate_limited(limiter, tokens=1, wait=False)
-        def test_func():
-            return "success"
-
-        # Successful call
-        result = test_func()
-        assert result == "success"
-
-        # Check that success was recorded
-        assert limiter.success_count == 1
-
-    def test_adaptive_rate_limiter_failure_recording(self):
-        """Test adaptive rate limiter failure recording."""
-        limiter = AdaptiveRateLimiter(requests_per_minute=10)
-
-        @rate_limited(limiter, tokens=1, wait=False)
-        def failing_func():
-            raise ValueError("test error")
-
-        # This should record a failure
-        with pytest.raises(ValueError):
-            failing_func()
-
-        assert limiter.failure_count == 1

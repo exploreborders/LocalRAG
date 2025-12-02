@@ -10,7 +10,6 @@ import pytest
 from src.utils.file_security import (
     FileSecurityError,
     FileUploadValidator,
-    create_secure_upload_validator,
 )
 
 
@@ -212,36 +211,6 @@ class TestFileUploadValidator:
 
             # Verify content was saved
             assert saved_path.read_bytes() == content
-
-    def test_get_file_info_success(self):
-        """Test getting file information."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            validator = FileUploadValidator(temp_dir)
-
-            # Create a test file
-            test_file = Path(temp_dir) / "test.pdf"
-            content = b"PDF content"
-            test_file.write_bytes(content)
-
-            file_info = validator.get_file_info(str(test_file))
-
-            assert isinstance(file_info, dict)
-            assert "filename" in file_info
-            assert "size" in file_info
-            assert "modified" in file_info
-            assert "mime_type" in file_info
-            assert file_info["size"] == len(content)
-            assert file_info["filename"] == "test.pdf"
-
-
-def test_create_secure_upload_validator():
-    """Test creation of secure upload validator."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        validator = create_secure_upload_validator(temp_dir, 50)  # 50MB limit
-
-        assert isinstance(validator, FileUploadValidator)
-        assert validator.upload_dir == Path(temp_dir).resolve()
-        assert validator.max_file_size == 50 * 1024 * 1024  # 50MB in bytes
 
 
 class TestFileSecurityError:

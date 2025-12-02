@@ -5,9 +5,7 @@ Rate limiting utilities for API calls and resource-intensive operations.
 import logging
 import threading
 import time
-from contextlib import contextmanager
 from dataclasses import dataclass
-from functools import wraps
 from typing import Any, Callable, Dict, Optional, Type, TypeVar
 
 logger = logging.getLogger(__name__)
@@ -229,84 +227,6 @@ default_rate_limiter = RateLimiter()
 adaptive_rate_limiter = AdaptiveRateLimiter()
 
 
-def rate_limited(
-    limiter: Optional[RateLimiter] = None,
-    tokens: int = 1,
-    wait: bool = True,
-    timeout: Optional[float] = 30.0,
-):
-    """
-    Decorator for rate limiting function calls.
-
-    Args:
-        limiter: Rate limiter instance to use
-        tokens: Number of tokens the function consumes
-        wait: Whether to wait for tokens if not available
-        timeout: Maximum time to wait for tokens
-    """
-    limiter = limiter or default_rate_limiter
-
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        @wraps(func)
-        def wrapper(*args, **kwargs) -> T:
-            if wait:
-                if not limiter.wait_for_tokens(tokens, timeout):
-                    raise TimeoutError(f"Rate limit timeout waiting for {tokens} tokens")
-            else:
-                if not limiter.acquire(tokens):
-                    raise RuntimeError(f"Rate limit exceeded for {tokens} tokens")
-
-            try:
-                result = func(*args, **kwargs)
-                if isinstance(limiter, AdaptiveRateLimiter):
-                    limiter.record_success()
-                return result
-            except Exception:
-                if isinstance(limiter, AdaptiveRateLimiter):
-                    limiter.record_failure()
-                raise
-
-        return wrapper
-
-    return decorator
-
-
-@contextmanager
-def rate_limit_context(
-    limiter: Optional[RateLimiter] = None,
-    tokens: int = 1,
-    wait: bool = True,
-    timeout: Optional[float] = 30.0,
-):
-    """
-    Context manager for rate limiting blocks of code.
-
-    Args:
-        limiter: Rate limiter instance to use
-        tokens: Number of tokens to acquire
-        wait: Whether to wait for tokens
-        timeout: Maximum time to wait
-    """
-    limiter = limiter or default_rate_limiter
-
-    if wait:
-        if not limiter.wait_for_tokens(tokens, timeout):
-            raise TimeoutError(f"Rate limit timeout waiting for {tokens} tokens")
-    else:
-        if not limiter.acquire(tokens):
-            raise RuntimeError(f"Rate limit exceeded for {tokens} tokens")
-
-    try:
-        yield
-    except Exception:
-        if isinstance(limiter, AdaptiveRateLimiter):
-            limiter.record_failure()
-        raise
-    else:
-        if isinstance(limiter, AdaptiveRateLimiter):
-            limiter.record_success()
-
-
 class CircuitBreaker:
     """
     Circuit breaker pattern for handling repeated failures.
@@ -400,44 +320,3 @@ class CircuitBreakerOpen(Exception):
 
 # Global circuit breaker instances
 default_circuit_breaker = CircuitBreaker()
-
-
-def with_circuit_breaker(
-    breaker: Optional[CircuitBreaker] = None,
-    expected_exception: Type[Exception] = Exception,
-):
-    """
-    Decorator for circuit breaker protection.
-
-    Args:
-        breaker: Circuit breaker instance to use
-        expected_exception: Exception type to catch
-    """
-    breaker = breaker or default_circuit_breaker
-    breaker.expected_exception = expected_exception
-
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        @wraps(func)
-        def wrapper(*args, **kwargs) -> T:
-            return breaker.call(func, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-def get_rate_limiter(name: str = "default") -> RateLimiter:
-    """Get a named rate limiter instance."""
-    limiters = {
-        "default": default_rate_limiter,
-        "adaptive": adaptive_rate_limiter,
-    }
-    return limiters.get(name, default_rate_limiter)
-
-
-def get_circuit_breaker(name: str = "default") -> CircuitBreaker:
-    """Get a named circuit breaker instance."""
-    breakers = {
-        "default": default_circuit_breaker,
-    }
-    return breakers.get(name, default_circuit_breaker)

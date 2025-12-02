@@ -307,10 +307,3 @@ config = ConfigManager()
 def get_config() -> ConfigManager:
     """Get the global configuration instance."""
     return config
-
-
-def reload_config() -> ConfigManager:
-    """Reload configuration from environment variables."""
-    global config
-    config = ConfigManager()
-    return config

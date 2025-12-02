@@ -203,38 +203,6 @@ def _get_embedding_cache_key(text: str, model_key: str) -> str:
     return f"embedding:{hashlib.sha256(content).hexdigest()}"
 
 
-def get_available_models(backend="ollama"):
-    """
-    Get list of available models for the specified backend.
-
-    Args:
-        backend (str): Backend to get models for
-
-    Returns:
-        list: List of available model names
-    """
-    if backend == "ollama":
-        if OLLAMA_AVAILABLE:
-            try:
-                # Get installed models from Ollama
-                result = ollama.list()
-                return [model["name"] for model in result["models"]]
-            except Exception as e:
-                logger.warning(f"Failed to get Ollama models: {e}")
-                return ["embeddinggemma:latest"]  # fallback
-        else:
-            return ["embeddinggemma:latest"]  # fallback
-    elif backend == "sentence-transformers":
-        # Return some common sentence-transformers models
-        return [
-            "nomic-ai/nomic-embed-text-v1.5",
-            "google/embeddinggemma-300m",
-            "sentence-transformers/all-MiniLM-L6-v2",
-        ]
-    else:
-        return []
-
-
 class EmbeddingCache:
     """
     Cache manager for embeddings with multiple backend support.

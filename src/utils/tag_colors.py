@@ -218,39 +218,6 @@ class TagColorManager:
         except ValueError:
             return False
 
-    def get_category_colors(self) -> Dict[str, str]:
-        """
-        Get semantic colors for different categories.
-
-        Returns:
-            Dict mapping category names to colors
-        """
-        return self.SEMANTIC_COLORS.copy()
-
-    def suggest_colors_for_tags(self, tags: List[str]) -> Dict[str, str]:
-        """
-        Suggest colors for a list of tags, ensuring visual distinction.
-
-        Args:
-            tags: List of tag names
-
-        Returns:
-            Dict mapping tag names to suggested colors
-        """
-        suggestions = {}
-        used_colors: set[str] = set()
-
-        for tag in tags:
-            color = self.generate_color(tag)
-            # Ensure uniqueness
-            while color in used_colors and len(used_colors) < len(self.PROFESSIONAL_PALETTE):
-                color = self.get_similar_color(color, used_colors)
-
-            suggestions[tag] = color
-            used_colors.add(color)
-
-        return suggestions
-
     def _hex_to_hue(self, hex_color: str) -> float:
         """
         Convert hex color to hue value (0-360).
@@ -286,21 +253,3 @@ class TagColorManager:
             return hue
         except (ValueError, IndexError):
             return 0.0
-
-    def get_color_info(self, color: str) -> Dict[str, Any]:
-        """
-        Get detailed information about a color.
-
-        Args:
-            color: Hex color code
-
-        Returns:
-            Dict with color information
-        """
-        return {
-            "hex": color,
-            "contrast_text": self.get_contrast_color(color),
-            "hue": self._hex_to_hue(color),
-            "is_reserved": color in self.RESERVED_COLORS.values(),
-            "category": None,  # Could be enhanced to detect category
-        }

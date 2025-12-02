@@ -4,7 +4,6 @@ Progress tracking utilities for long-running operations.
 
 import logging
 import time
-from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional
 
@@ -107,26 +106,6 @@ class ProgressTracker:
             except Exception as e:
                 logger.warning(f"Progress callback failed: {e}")
 
-    def start_sub_operation(self, name: str, total_steps: int = 100) -> "ProgressTracker":
-        """
-        Start tracking a sub-operation.
-
-        Args:
-            name: Name of the sub-operation
-            total_steps: Total steps for the sub-operation
-
-        Returns:
-            ProgressTracker for the sub-operation
-        """
-        sub_tracker = ProgressTracker(f"{self.operation}:{name}", total_steps)
-        self.sub_operations[name] = sub_tracker
-        return sub_tracker
-
-    def complete_sub_operation(self, name: str) -> None:
-        """Mark a sub-operation as completed."""
-        if name in self.sub_operations:
-            del self.sub_operations[name]
-
     def get_progress_info(self) -> ProgressInfo:
         """Get current progress information."""
         progress = min((self.current_step / self.total_steps) * 100, 100)
@@ -143,59 +122,6 @@ class ProgressTracker:
         self.current_step = 0
         self.start_time = time.time()
         self.sub_operations.clear()
-
-
-@contextmanager
-def track_progress(operation: str, total_steps: int = 100, callback: Optional[Callable] = None):
-    """
-    Context manager for progress tracking.
-
-    Args:
-        operation: Name of the operation
-        total_steps: Total number of steps
-        callback: Optional progress callback
-
-    Yields:
-        ProgressTracker instance
-    """
-    tracker = ProgressTracker(operation, total_steps)
-    if callback:
-        tracker.add_callback(callback)
-
-    tracker.update(0, f"Starting {operation}")
-    try:
-        yield tracker
-        tracker.update(total_steps, f"Completed {operation}")
-    except Exception as e:
-        tracker.update(message=f"Failed {operation}: {e}")
-        raise
-    finally:
-        logger.info(f"Progress tracking completed for {operation}")
-
-
-def create_progress_callback(operation: str) -> Callable[[ProgressInfo], None]:
-    """
-    Create a standard progress callback that logs progress.
-
-    Args:
-        operation: Operation name for logging
-
-    Returns:
-        Progress callback function
-    """
-
-    def callback(info: ProgressInfo) -> None:
-        elapsed = info.elapsed_time
-        eta_str = ""
-        if info.estimated_time_remaining:
-            eta_str = f" (ETA: {info.estimated_time_remaining:.1f}s)"
-
-        logger.info(
-            f"{operation}: {info.current:.1f}% - {info.message} "
-            f"(elapsed: {elapsed:.1f}s{eta_str})"
-        )
-
-    return callback
 
 
 class BatchProgressTracker:

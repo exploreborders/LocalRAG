@@ -346,11 +346,3 @@ def test_get_config():
 
     config = get_config()
     assert isinstance(config, ConfigManager)
-
-
-def test_reload_config():
-    """Test reloading configuration."""
-    from src.utils.config_manager import reload_config
-
-    config = reload_config()
-    assert isinstance(config, ConfigManager)

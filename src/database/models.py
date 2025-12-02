@@ -339,17 +339,3 @@ DATABASE_URL = os.getenv(
 )
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def get_db():
-    """
-    Dependency function to get database session.
-
-    Yields:
-        Session: SQLAlchemy database session
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
