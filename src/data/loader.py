@@ -984,16 +984,32 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
             # Extract hierarchical structure using iterate_items
             hierarchy = []
             headers_found = []
+            level_counters = [0] * 7  # Index 0 unused, 1-6 for header levels
 
             for item, level in docling_document.iterate_items():
                 if isinstance(item, (SectionHeaderItem, TitleItem)):
                     # This is a header/section title
                     title = item.text.strip() if hasattr(item, "text") else str(item)
                     if title and len(title) < 100:  # Skip very long titles
+                        # Generate proper hierarchical path
+                        if level <= 6:  # Ensure level is within bounds
+                            level_counters[level] += 1
+                            # Reset counters for deeper levels
+                            for deeper_level in range(level + 1, 7):
+                                level_counters[deeper_level] = 0
+
+                            # Build path from level 1 to current level
+                            path_parts = []
+                            for l in range(1, level + 1):
+                                path_parts.append(str(level_counters[l]))
+                            path = ".".join(path_parts)
+                        else:
+                            path = title[:50]  # Fallback for invalid levels
+
                         chapter_data = {
                             "title": title,
                             "level": level,
-                            "path": f"{'/'.join([''] * level)}{title[:50]}",  # Limit path length
+                            "path": path,
                             "word_count": len(title.split()),
                             "content_preview": title,
                         }
@@ -1033,7 +1049,7 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                         chapter_data = {
                             "title": title,
                             "level": level,
-                            "path": f"{'/'.join([''] * level)}{title}",  # Simple path generation
+"path": path,  # Proper hierarchical path generation
                             "word_count": len(title.split()),
                             "content_preview": title,  # For now, use title as preview
                         }
@@ -1097,7 +1113,7 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                         chapter_data = {
                             "title": title,
                             "level": level,
-                            "path": f"{'/'.join([''] * level)}{title}",  # Simple path generation
+"path": path,  # Proper hierarchical path generation
                             "word_count": len(title.split()),
                             "content_preview": title,  # For now, use title as preview
                         }
