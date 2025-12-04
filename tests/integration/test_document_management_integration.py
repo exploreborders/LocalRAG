@@ -63,6 +63,12 @@ class TestDocumentManagementIntegration:
         # Mock empty database
         mock_db_session.query.return_value.count.return_value = 0
 
+        # Mock SessionLocal for the function
+        mock_session = MagicMock()
+        mock_session.query.return_value.count.return_value = 0
+        mock_session.query.return_value.all.return_value = []
+        mock_session.query.return_value.delete.return_value = None
+
         # Mock Streamlit functions
         with (
             patch("streamlit.info"),
@@ -76,6 +82,7 @@ class TestDocumentManagementIntegration:
             patch("streamlit.success"),
             patch("streamlit.rerun"),
             patch("streamlit.session_state", new_callable=dict),
+            patch("src.database.models.SessionLocal", return_value=mock_session),
             patch("elasticsearch.Elasticsearch") as mock_es_class,
         ):
             # Setup mocks
