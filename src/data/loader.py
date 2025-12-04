@@ -49,7 +49,7 @@ except ImportError:
         )
 
 
-def extract_text_with_ocr(pdf_path: str) -> str:
+def extract_text_with_ocr(pdf_path: str) -> str:  # noqa: C901
     """
     Extract text from scanned PDF using comprehensive OCR processing.
 
@@ -986,11 +986,33 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
             headers_found = []
             level_counters = [0] * 7  # Index 0 unused, 1-6 for header levels
 
+            # Track seen titles to avoid duplicates and prefer complete titles
+            seen_titles = set()
+
             for item, level in docling_document.iterate_items():
                 if isinstance(item, (SectionHeaderItem, TitleItem)):
                     # This is a header/section title
                     title = item.text.strip() if hasattr(item, "text") else str(item)
                     if title and len(title) < 100:  # Skip very long titles
+                        # Skip titles that look like TOC entries (incomplete sentences)
+                        if (
+                            len(title) < 10
+                            or title.endswith(",")
+                            or title.endswith(" and")
+                            or title.endswith(" to")
+                            or title.endswith(" with")
+                        ):
+                            continue  # Skip likely TOC entries
+
+                        # Skip if we already have a similar but longer title (prefer complete titles)
+                        similar_found = False
+                        for seen_title in seen_titles:
+                            if title in seen_title and len(seen_title) > len(title) + 5:
+                                similar_found = True
+                                break
+                        if similar_found:
+                            continue
+
                         # Generate proper hierarchical path
                         if level <= 6:  # Ensure level is within bounds
                             level_counters[level] += 1
@@ -1000,8 +1022,8 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
 
                             # Build path from level 1 to current level
                             path_parts = []
-                            for l in range(1, level + 1):
-                                path_parts.append(str(level_counters[l]))
+                            for lvl in range(1, level + 1):
+                                path_parts.append(str(level_counters[lvl]))
                             path = ".".join(path_parts)
                         else:
                             path = title[:50]  # Fallback for invalid levels
@@ -1015,56 +1037,57 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                         }
                         hierarchy.append(chapter_data)
                         headers_found.append(title)
-
-            structure["hierarchy"] = hierarchy
-            structure["sections"] = hierarchy
-            structure["estimated_chapters"] = len(hierarchy)
-            structure["headers_found"] = headers_found[:10]
-
-            logger.info(
-                f"Extracted {len(hierarchy)} hierarchical items from Docling document"
-            )
-
-            return structure
-
-        except Exception as e:
-            logger.warning(f"Failed to extract Docling structure: {e}")
-            return {
-                "hierarchy": [],
-                "sections": [],
-                "estimated_chapters": 1,
-                "headers_found": [],
-                "content_sections": [],
-            }
-
-            # Extract hierarchical structure using iterate_items
-            hierarchy = []
-            headers_found = []
-
-            for item, level in docling_document.iterate_items():
-                if isinstance(item, (SectionHeaderItem, TitleItem)):
-                    # This is a header/section title
-                    title = item.text.strip() if hasattr(item, "text") else str(item)
-                    if title:
-                        chapter_data = {
-                            "title": title,
-                            "level": level,
-"path": path,  # Proper hierarchical path generation
-                            "word_count": len(title.split()),
-                            "content_preview": title,  # For now, use title as preview
-                        }
-                        hierarchy.append(chapter_data)
-                        headers_found.append(title)
+                        seen_titles.add(title)
 
                 elif isinstance(item, TextItem):
-                    # This is content text - could be associated with the last header
-                    if hierarchy and not hierarchy[-1].get("content_preview"):
-                        # If the last header doesn't have content, add this as preview
-                        content_preview = (
-                            item.text.strip()[:200] if hasattr(item, "text") else ""
+                    # Check if this text item contains a chapter header that Docling missed
+                    text_content = item.text.strip() if hasattr(item, "text") else ""
+                    if text_content:
+                        # Check for "Chapter X" patterns that might not be recognized as headers
+                        chapter_match = re.match(
+                            r"^(?:#+\s*)?Chapter\s+(\d+)(?:\s+(.+))?$",
+                            text_content,
+                            re.IGNORECASE,
                         )
-                        if content_preview:
-                            hierarchy[-1]["content_preview"] = content_preview
+                        if chapter_match:
+                            # This is a chapter header - treat it as level 1
+                            chapter_num = int(chapter_match.group(1))
+                            chapter_title = (
+                                chapter_match.group(2).strip()
+                                if chapter_match.group(2)
+                                else f"Chapter {chapter_num}"
+                            )
+                            full_title = f"Chapter {chapter_num}" + (
+                                f" {chapter_title}"
+                                if chapter_title != f"Chapter {chapter_num}"
+                                else ""
+                            )
+
+                            # Skip if we already have this chapter
+                            if full_title not in seen_titles:
+                                # Use chapter number as the path for main chapters
+                                path = str(chapter_num)
+
+                                chapter_data = {
+                                    "title": full_title,
+                                    "level": 1,
+                                    "path": path,
+                                    "word_count": len(full_title.split()),
+                                    "content_preview": full_title,
+                                }
+                                hierarchy.append(chapter_data)
+                                headers_found.append(full_title)
+                                seen_titles.add(full_title)
+                                logger.debug(
+                                    f"Detected missed chapter header: {full_title}"
+                                )
+                        else:
+                            # This is regular content text - could be associated with the last header
+                            if hierarchy and not hierarchy[-1].get("content_preview"):
+                                # If the last header doesn't have content, add this as preview
+                                content_preview = text_content[:200]
+                                if content_preview:
+                                    hierarchy[-1]["content_preview"] = content_preview
 
             structure["hierarchy"] = hierarchy
             structure["sections"] = hierarchy  # For compatibility
@@ -1101,46 +1124,6 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
                 "content_sections": [],
             }
 
-            # Extract hierarchical structure using iterate_items
-            hierarchy = []
-            headers_found = []
-
-            for item, level in docling_document.iterate_items():
-                if isinstance(item, (SectionHeaderItem, TitleItem)):
-                    # This is a header/section title
-                    title = item.text.strip() if hasattr(item, "text") else str(item)
-                    if title:
-                        chapter_data = {
-                            "title": title,
-                            "level": level,
-"path": path,  # Proper hierarchical path generation
-                            "word_count": len(title.split()),
-                            "content_preview": title,  # For now, use title as preview
-                        }
-                        hierarchy.append(chapter_data)
-                        headers_found.append(title)
-
-                elif isinstance(item, TextItem):
-                    # This is content text - could be associated with the last header
-                    if hierarchy and not hierarchy[-1].get("content_preview"):
-                        # If the last header doesn't have content, add this as preview
-                        content_preview = (
-                            item.text.strip()[:200] if hasattr(item, "text") else ""
-                        )
-                        if content_preview:
-                            hierarchy[-1]["content_preview"] = content_preview
-
-            structure["hierarchy"] = hierarchy
-            structure["sections"] = hierarchy  # For compatibility
-            structure["estimated_chapters"] = len(hierarchy)
-            structure["headers_found"] = headers_found[:10]  # Limit to first 10
-
-            logger.info(
-                f"Extracted {len(hierarchy)} hierarchical items from Docling document"
-            )
-
-            return structure
-
         except Exception as e:
             logger.warning(f"Failed to extract Docling structure: {e}")
             return {
@@ -1164,26 +1147,59 @@ OUTPUT: Clean, structured text with proper German formatting. Preserve all techn
         }
 
         # Find all headers in markdown
-        header_pattern = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
         headers = []
         level_counters = [0] * 7  # Index 0 unused, 1-6 for header levels
 
+        # Find all headers in markdown - handle both regular headers and "Chapter X" patterns
+        header_pattern = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
+        all_matches = []
+
         for match in header_pattern.finditer(markdown_content):
-            level = len(match.group(1))  # Number of # characters
+            level = len(match.group(1))
             title = match.group(2).strip()
 
             if title:
+                # Check if this is a "Chapter X" style header
+                chapter_match = re.match(
+                    r"Chapter\s+(\d+)(?:\s+(.+))?", title, re.IGNORECASE
+                )
+                if chapter_match:
+                    # Extract chapter number and title
+                    chapter_num = int(chapter_match.group(1))
+                    chapter_title = (
+                        chapter_match.group(2).strip()
+                        if chapter_match.group(2)
+                        else f"Chapter {chapter_num}"
+                    )
+                    # Use the chapter number as the path, not the header level
+                    all_matches.append(
+                        (match.start(), chapter_num, chapter_title, True)
+                    )  # True = is chapter header
+                else:
+                    # Regular header
+                    all_matches.append((match.start(), level, title, False))
+
+        # Sort by position in document and process
+        all_matches.sort(key=lambda x: x[0])
+
+        for _, level, title in all_matches:
+            if title:
+                # Initialize counters if needed
+                for lvl in range(1, level + 1):
+                    if lvl not in level_counters:
+                        level_counters[lvl] = 0
+
                 # Increment current level counter
                 level_counters[level] += 1
 
-                # Reset counters for deeper levels
+                # Reset counters for deeper levels when we encounter a new header at current level
                 for deeper_level in range(level + 1, 7):
                     level_counters[deeper_level] = 0
 
                 # Build path from level 1 to current level
                 path_parts = []
-                for l in range(1, level + 1):
-                    path_parts.append(str(level_counters[l]))
+                for lvl in range(1, level + 1):
+                    path_parts.append(str(level_counters[lvl]))
                 path = ".".join(path_parts)
 
                 headers.append(

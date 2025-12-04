@@ -5,11 +5,9 @@ This script handles all initialization steps automatically.
 """
 
 import os
-import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 
 def run_command(cmd, description, cwd=None, timeout=300):
@@ -205,7 +203,9 @@ def main():
 
     # Note: App service startup is skipped in automated setup due to long build times
     # Start it manually later with: docker-compose up -d rag_app
-    print("ℹ️ Databases are ready! Start the app manually with: docker-compose up -d rag_app")
+    print(
+        "ℹ️ Databases are ready! Start the app manually with: docker-compose up -d rag_app"
+    )
 
     # Run tests
     if not run_tests():

@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 
-def check_database_readiness():
+def check_database_readiness():  # noqa: C901
     """Check if database is ready for enhanced architecture."""
     print("🔍 Database Readiness Check for Enhanced Knowledge Graph Architecture")
     print("=" * 70)
@@ -54,10 +54,15 @@ def check_database_readiness():
 
     # Check for required methods in key files
     required_methods = {
-        "src/core/knowledge_graph.py": ["expand_query_context", "find_documents_by_relationships"],
+        "src/core/knowledge_graph.py": [
+            "expand_query_context",
+            "find_documents_by_relationships",
+        ],
         "src/ai/enrichment.py": ["_classify_document_category"],
-        "src/core/retrieval.py": ["retrieve_with_topic_boost"],
-        "src/core/retrieval.py": ["query"],  # RAG pipeline method
+        "src/core/retrieval.py": [
+            "retrieve_with_topic_boost",
+            "query",
+        ],  # RAG pipeline method
     }
 
     print("\n📋 Checking for enhanced methods:")
@@ -84,7 +89,12 @@ def check_database_readiness():
 
     # Check database connection requirements
     print("\n🗄️  Database Connection Requirements:")
-    required_env_vars = ["POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB", "POSTGRES_USER"]
+    required_env_vars = [
+        "POSTGRES_HOST",
+        "POSTGRES_PORT",
+        "POSTGRES_DB",
+        "POSTGRES_USER",
+    ]
     missing_vars = []
 
     for var in required_env_vars:
@@ -136,7 +146,7 @@ def check_database_readiness():
 
 if __name__ == "__main__":
     success = check_database_readiness()
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     if success:
         print("🎉 STATUS: READY FOR DATABASE ENHANCEMENT")
     else:

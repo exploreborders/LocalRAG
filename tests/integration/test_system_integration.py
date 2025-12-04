@@ -76,9 +76,7 @@ class TestSystemIntegration:
         """Test that embeddings can be created."""
         from src.core.embeddings import create_embeddings
 
-        with patch(
-            "src.core.embeddings._encode_with_sentence_transformers"
-        ) as mock_encode:
+        with patch("src.core.embeddings._encode_with_sentence_transformers") as mock_encode:
             mock_encode.return_value = [0.1, 0.2, 0.3]
 
             embeddings, model = create_embeddings(["test text"])

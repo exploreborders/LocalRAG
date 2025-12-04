@@ -13,7 +13,7 @@ from pathlib import Path
 # Add src directory to path
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text  # noqa: E402
 
 # Database connection
 DATABASE_URL = os.getenv(

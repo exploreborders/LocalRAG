@@ -100,7 +100,7 @@ def main():
 
     # Check if streamlit is installed
     try:
-        import streamlit
+        import streamlit  # noqa: F401
     except ImportError:
         print("❌ Streamlit not found. Please install it:")
         print("   pip install streamlit")

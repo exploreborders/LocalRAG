@@ -5,7 +5,6 @@ Final verification script to check that all database columns are populated.
 
 import os
 import sys
-from pathlib import Path
 
 # Add src directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))

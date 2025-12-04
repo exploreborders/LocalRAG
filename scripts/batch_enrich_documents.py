@@ -10,8 +10,8 @@ from pathlib import Path
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from ai.enrichment import AIEnrichmentService
-from database.models import Document, SessionLocal
+from ai.enrichment import AIEnrichmentService  # noqa: E402
+from database.models import Document, SessionLocal  # noqa: E402
 
 
 def main():
@@ -31,7 +31,9 @@ def main():
         failed = 0
 
         for i, doc in enumerate(documents, 1):
-            print(f"\n📄 Processing document {i}/{len(documents)}: {doc.filename[:50]}...")
+            print(
+                f"\n📄 Processing document {i}/{len(documents)}: {doc.filename[:50]}..."
+            )
 
             # Check if already enriched
             if doc.document_summary and doc.key_topics:

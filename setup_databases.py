@@ -6,7 +6,6 @@ This script helps you set up and manage PostgreSQL and Elasticsearch databases
 for both local development and Docker environments.
 """
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +15,7 @@ def run_command(cmd, description):
     """Run a shell command and print status."""
     print(f"🔄 {description}...")
     try:
-        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+        subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
         print(f"✅ {description} completed successfully")
         return True
     except subprocess.CalledProcessError as e:

@@ -12,8 +12,8 @@ import sys
 # Add src directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from src.ai_enrichment import AIEnrichmentService
-from src.database.models import DocumentCategory, SessionLocal
+from src.ai_enrichment import AIEnrichmentService  # noqa: E402
+from src.database.models import DocumentCategory, SessionLocal  # noqa: E402
 
 
 def clean_existing_categories():

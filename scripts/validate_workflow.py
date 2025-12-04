@@ -4,7 +4,6 @@ GitHub Actions Workflow Validator
 Validates the CI/CD workflow configuration
 """
 
-import os
 from pathlib import Path
 
 import yaml
@@ -118,7 +117,9 @@ def validate_workflow():
         needs = validate_job.get("needs", [])
         expected_needs = ["test", "quality", "security", "docs"]
         if not all(need in needs for need in expected_needs):
-            print(f"❌ Validate job missing dependencies. Expected: {expected_needs}, Got: {needs}")
+            print(
+                f"❌ Validate job missing dependencies. Expected: {expected_needs}, Got: {needs}"
+            )
             return False
 
         codeql_job = jobs.get("codeql", {})
