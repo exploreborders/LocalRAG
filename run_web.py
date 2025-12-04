@@ -56,9 +56,7 @@ def setup_package_path():
     # Set PYTHONPATH environment variable
     current_pythonpath = os.environ.get("PYTHONPATH", "")
     if current_pythonpath:
-        os.environ["PYTHONPATH"] = (
-            f"{str(project_root)}:{str(src_path)}:{current_pythonpath}"
-        )
+        os.environ["PYTHONPATH"] = f"{str(project_root)}:{str(src_path)}:{current_pythonpath}"
     else:
         os.environ["PYTHONPATH"] = f"{str(project_root)}:{str(src_path)}"
 

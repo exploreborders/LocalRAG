@@ -31,9 +31,7 @@ def main():
         failed = 0
 
         for i, doc in enumerate(documents, 1):
-            print(
-                f"\n📄 Processing document {i}/{len(documents)}: {doc.filename[:50]}..."
-            )
+            print(f"\n📄 Processing document {i}/{len(documents)}: {doc.filename[:50]}...")
 
             # Check if already enriched
             if doc.document_summary and doc.key_topics:

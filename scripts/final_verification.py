@@ -55,9 +55,7 @@ def check_database_population():
 
         # Check chapters
         print("\n📖 CHAPTERS:")
-        chapter_count = db.execute(
-            text("SELECT COUNT(*) FROM document_chapters")
-        ).scalar()
+        chapter_count = db.execute(text("SELECT COUNT(*) FROM document_chapters")).scalar()
         print(f"  Total chapters: {chapter_count}")
 
         if chapter_count > 0:
@@ -90,21 +88,15 @@ def check_database_population():
             text("SELECT COUNT(*) FROM document_chunks WHERE section_type IS NOT NULL")
         ).scalar()
         relevance_chunks = db.execute(
-            text(
-                "SELECT COUNT(*) FROM document_chunks WHERE content_relevance IS NOT NULL"
-            )
+            text("SELECT COUNT(*) FROM document_chunks WHERE content_relevance IS NOT NULL")
         ).scalar()
 
         print(f"  Total chunks: {total_chunks}")
         print(
             f"  With chapter_title: {chapter_chunks} ({chapter_chunks / total_chunks * 100:.1f}%)"
         )
-        print(
-            f"  With chapter_path: {path_chunks} ({path_chunks / total_chunks * 100:.1f}%)"
-        )
-        print(
-            f"  With section_type: {type_chunks} ({type_chunks / total_chunks * 100:.1f}%)"
-        )
+        print(f"  With chapter_path: {path_chunks} ({path_chunks / total_chunks * 100:.1f}%)")
+        print(f"  With section_type: {type_chunks} ({type_chunks / total_chunks * 100:.1f}%)")
         print(
             f"  With content_relevance: {relevance_chunks} ({relevance_chunks / total_chunks * 100:.1f}%)"
         )
@@ -160,17 +152,13 @@ def check_database_population():
             if chapter_count == 0:
                 print("    - No chapters in document_chapters table")
             if chapter_chunks < total_chunks:
-                print(
-                    f"    - {total_chunks - chapter_chunks} chunks missing chapter_title"
-                )
+                print(f"    - {total_chunks - chapter_chunks} chunks missing chapter_title")
             if path_chunks < total_chunks:
                 print(f"    - {total_chunks - path_chunks} chunks missing chapter_path")
             if type_chunks < total_chunks:
                 print(f"    - {total_chunks - type_chunks} chunks missing section_type")
             if relevance_chunks < total_chunks:
-                print(
-                    f"    - {total_chunks - relevance_chunks} chunks missing content_relevance"
-                )
+                print(f"    - {total_chunks - relevance_chunks} chunks missing content_relevance")
 
     except Exception as e:
         print(f"❌ Error during verification: {e}")

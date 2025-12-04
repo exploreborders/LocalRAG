@@ -211,9 +211,7 @@ def migrate_embeddings_to_opensearch():
                 "_source": {
                     "document_id": i // 100,  # Placeholder logic
                     "chunk_id": i,
-                    "content": chunk.page_content
-                    if hasattr(chunk, "page_content")
-                    else str(chunk),
+                    "content": chunk.page_content if hasattr(chunk, "page_content") else str(chunk),
                     "embedding": embedding.tolist(),
                     "embedding_model": model_name,
                     "metadata": chunk.metadata if hasattr(chunk, "metadata") else {},
