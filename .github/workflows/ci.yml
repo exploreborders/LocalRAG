@@ -82,11 +82,11 @@ jobs:
 
     - name: Check code formatting with Black
       run: |
-        black --check --diff src/ tests/ || (echo "Code is not formatted with Black. Run 'black src/ tests/' to fix." && exit 1)
+        black --check --diff --line-length 100 --target-version py312 src/ tests/ || (echo "Code is not formatted with Black. Run 'black --line-length 100 --target-version py312 src/ tests/' to fix." && exit 1)
 
     - name: Check import sorting with isort
       run: |
-        isort --check-only --diff src/ tests/ || (echo "Imports are not sorted. Run 'isort src/ tests/' to fix." && exit 1)
+        isort --check-only --diff --profile black src/ tests/ || (echo "Imports are not sorted. Run 'isort --profile black src/ tests/' to fix." && exit 1)
 
     - name: Lint with flake8
       run: |
