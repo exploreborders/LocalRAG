@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides guidance for writing and running unit tests in the LocalRAG project. The project uses pytest with comprehensive mocking to enable isolated unit testing, with 409+ unit tests covering the entire codebase.
+This document provides guidance for writing and running unit tests in the LocalRAG project. The project uses pytest with comprehensive mocking to enable isolated unit testing, with 425+ unit tests covering the entire codebase.
 
 ## Test Structure
 

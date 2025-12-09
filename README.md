@@ -26,15 +26,15 @@ A modern **Retrieval-Augmented Generation (RAG) system** for intelligent documen
 ## 🚀 Key Features
 
 ### **AI-Powered Document Intelligence**
-- **Advanced OCR Processing**: DeepSeek-OCR for scanned PDFs with 96% accuracy, Tesseract fallback for German technical documents
+- **Advanced OCR Processing**: Tesseract OCR with German technical document optimization, DeepSeek-OCR integration (currently in fallback mode)
 - **Hierarchical Structure Extraction**: Automatic chapter/section/subsection detection with proper path relationships (up to 188+ chapters detected)
 - **AI-Generated Summaries**: Intelligent document summaries focusing on topics, purpose, and target audience
-- **Multi-Model Processing Pipeline**: Integrated vision (DeepSeek-OCR), structure analysis (llama3.2), and generation (llama3.2)
+- **Multi-Model Processing Pipeline**: Integrated vision (Tesseract/DeepSeek-OCR), structure analysis (llama3.2), and generation (llama3.2)
 - **Smart Categorization**: AI-powered category assignment (Technical, Educational, Scientific, etc.)
 
 ### **Advanced Document Processing**
 - **Docling Integration**: Superior document parsing with layout awareness, table extraction, and OCR fallback
-- **Advanced OCR Pipeline**: DeepSeek-OCR primary, Tesseract fallback with German technical document optimization
+- **Advanced OCR Pipeline**: Tesseract primary with German technical document optimization, DeepSeek-OCR integration available
 - **Hierarchical Chunking**: Chapter-aware token-based chunking with parent-child relationships (up to 270 chunks per document)
 - **Structure Analysis**: Automatic detection of 10-188+ chapters with proper hierarchy mapping
 - **Language Detection**: Automatic language identification with German technical document support
@@ -50,7 +50,7 @@ A modern **Retrieval-Augmented Generation (RAG) system** for intelligent documen
 - **Unified PostgreSQL Storage**: Single database with pgvector for embeddings and JSONB for structures
 - **Hybrid Search**: BM25 (Elasticsearch) + Vector (pgvector) for optimal retrieval
 - **Redis Caching**: 172.5x speedup (3.45s → 0.02s) for LLM responses and metadata
-- **Batch Processing**: GPU-accelerated processing (2-5x faster on Apple Silicon)
+- **Batch Processing**: Efficient parallel processing with configurable worker pools
 
 ### **Modern Web Interface**
 - **Streamlit-based UI**: Clean, responsive interface with multiple pages
@@ -75,7 +75,7 @@ Document Input
      ↓
 Docling Parser (baseline extraction)
      ↓
-Quality Check → OCR Processing (DeepSeek-OCR + Tesseract fallback)
+Quality Check → OCR Processing (Tesseract primary, DeepSeek-OCR fallback)
      ↓
 Structure Analysis (llama3.2:latest for hierarchy detection)
      ↓
@@ -94,7 +94,7 @@ Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
 
 ## 🏆 Performance Metrics
 
-- **OCR Accuracy**: 96% accuracy with DeepSeek-OCR for scanned PDFs
+- **OCR Processing**: Tesseract-based OCR with German technical document optimization
 - **Structure Detection**: Automatic chapter detection (10-188+ chapters per document)
 - **Chunking Efficiency**: Up to 270 hierarchical chunks with proper metadata
 - **AI Summaries**: Clean, professional document summaries without unwanted prefixes
@@ -156,9 +156,10 @@ Search: BM25 (Elasticsearch) + Vector (pgvector) hybrid
 
 ### **AI Models**
 - **llama3.2:latest** - Generation, structure analysis, and summarization (8B parameters)
-- **deepseek-ocr:latest** - OCR processing for scanned PDFs (96% accuracy)
 - **embeddinggemma:latest** - High-quality embeddings via Ollama (300M parameters)
+- **deepseek-ocr:latest** - OCR processing for scanned PDFs (currently in fallback mode)
 - **microsoft/trocr-base-printed** - Fallback OCR for technical documents
+- **Tesseract OCR** - Primary OCR with German technical document optimization
 
 ### **Database Stack**
 - **PostgreSQL 15+** with pgvector extension for vector storage
@@ -285,9 +286,9 @@ LocalRAG/
 │   ├── components/               # Reusable components
 │   │   ├── query_interface.py    # Query components
 │   │   ├── results_display.py    # Results display
-│   │   ├── tag_analytics.py      # Tag analytics
-│   │   └── session_manager.py    # Session management
+│   │   └── tag_analytics.py      # Tag analytics
 │   └── utils/                    # Web-specific utilities
+│       └── session_manager.py    # Session management
 ├── tests/                        # Comprehensive test suite
 │   ├── conftest.py               # Test configuration & fixtures
 │   ├── unit/                     # Unit tests (44+ tests)
@@ -318,7 +319,7 @@ LocalRAG/
 Every push to `main` or `develop` branches triggers automated validation:
 
 ### **Test Stage** 🧪
-- **Unit Tests**: 409 isolated tests with comprehensive mocking (pytest)
+- **Unit Tests**: 425+ isolated tests with comprehensive mocking (pytest)
 - **Integration Tests**: End-to-end workflow validation
 - **Coverage**: 80%+ code coverage requirement (currently exceeding)
 - **Parallel Execution**: pytest-xdist for faster runs
@@ -370,17 +371,17 @@ pre-commit run --all-files
 **Production-ready RAG system** with enterprise-grade quality assurance, automated CI/CD pipeline, and optimized performance for document analysis workflows.
 
 ### **Quality Metrics**
-- ✅ **409 Unit Tests** with comprehensive code coverage
+- ✅ **425+ Unit Tests** with comprehensive code coverage
 - ✅ **Automated CI/CD** pipeline on every push
 - ✅ **Code Quality**: Black, isort, flake8, mypy, bandit compliant
 - ✅ **Security**: Bandit scanning, dependency vulnerability checks
 - ✅ **Documentation**: Comprehensive testing and development guides
 
 ### **Performance Benchmarks**
-- **OCR Accuracy**: 96% with DeepSeek-OCR for scanned PDFs
+- **OCR Processing**: Tesseract-based OCR with German technical optimization
 - **Structure Detection**: Automatic chapter detection (10-188+ chapters)
 - **Cache Performance**: 172.5x speedup for repeated queries
-- **Test Execution**: 409 tests in <5 seconds
+- **Test Execution**: 425+ tests in <5 seconds
 - **CI Pipeline**: Complete validation in <5 minutes
 
 ### **Architecture Maturity**
